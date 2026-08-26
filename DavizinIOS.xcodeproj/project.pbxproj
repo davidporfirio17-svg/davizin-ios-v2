@@ -15,6 +15,7 @@
 		BB000007000000000000000A /* KeyValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000007000000000000001A; };
 		BB000008000000000000000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB000008000000000000001A; };
 		BB000011000000000000000A /* cache_res in Resources */ = {isa = PBXBuildFile; fileRef = BB000011000000000000001A; };
+		BB000012000000000000000A /* DavizinMCM.m in Sources */ = {isa = PBXBuildFile; fileRef = BB000012000000000000001A; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +30,9 @@
 		BB000009000000000000001A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB000010000000000000001A /* DavizinIOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DavizinIOS.entitlements; sourceTree = "<group>"; };
 		BB000011000000000000001A /* cache_res */ = {isa = PBXFileReference; lastKnownFileType = file; path = cache_res; sourceTree = "<group>"; };
+		BB000012000000000000001A /* DavizinMCM.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DavizinMCM.m; sourceTree = "<group>"; };
+		BB000013000000000000001A /* DavizinMCM.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DavizinMCM.h; sourceTree = "<group>"; };
+		BB000014000000000000001A /* DavizinIOS-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "DavizinIOS-Bridging-Header.h"; sourceTree = "<group>"; };
 		BBTARGET00000000000000001 /* DavizinIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DavizinIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -52,6 +56,9 @@
 				BB000005000000000000001A /* HomeView.swift */,
 				BB000006000000000000001A /* InjectorService.swift */,
 				BB000007000000000000001A /* KeyValidator.swift */,
+				BB000012000000000000001A /* DavizinMCM.m */,
+				BB000013000000000000001A /* DavizinMCM.h */,
+				BB000014000000000000001A /* DavizinIOS-Bridging-Header.h */,
 				BB000008000000000000001A /* Assets.xcassets */,
 				BB000009000000000000001A /* Info.plist */,
 				BB000010000000000000001A /* DavizinIOS.entitlements */,
@@ -146,6 +153,7 @@
 				BB000005000000000000000A,
 				BB000006000000000000000A,
 				BB000007000000000000000A,
+				BB000012000000000000000A,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -160,7 +168,7 @@
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -176,7 +184,7 @@
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -195,12 +203,13 @@
 				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = DavizinIOS/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.apple.mobile.MobileHouseArrest;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "DavizinIOS/DavizinIOS-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -217,12 +226,13 @@
 				CURRENT_PROJECT_VERSION = 2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = DavizinIOS/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.apple.mobile.MobileHouseArrest;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_OBJC_BRIDGING_HEADER = "DavizinIOS/DavizinIOS-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
