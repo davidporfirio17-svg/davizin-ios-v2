@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 struct InjectorResult {
     let success: Bool
@@ -15,7 +16,7 @@ private let kContainerPaths = [
 ]
 
 class InjectorService {
-    
+
     static func isJailbroken() -> Bool {
         let paths = ["/bin/bash","/usr/sbin/sshd","/etc/apt","/var/jb","/Applications/Cydia.app"]
         for p in paths { if FileManager.default.fileExists(atPath: p) { return true } }
@@ -26,7 +27,7 @@ class InjectorService {
         }
         return false
     }
-    
+
     static func findContainer(bundleID: String) -> String? {
         let fm = FileManager.default
         for base in kContainerPaths {
@@ -41,13 +42,12 @@ class InjectorService {
         }
         return nil
     }
-    
+
     static func checkIsInjected(bundleID: String) -> Bool {
         guard let container = findContainer(bundleID: bundleID) else { return false }
-        let backupPath = container + "/" + kCacheResBackup
-        return FileManager.default.fileExists(atPath: backupPath)
+        return FileManager.default.fileExists(atPath: container + "/" + kCacheResBackup)
     }
-    
+
     static func inject(bundleID: String) -> InjectorResult {
         let fm = FileManager.default
         guard isJailbroken() else {
@@ -79,7 +79,7 @@ class InjectorService {
         }
         return InjectorResult(success: true, message: "¡Inyectado! Abre Free Fire ahora.")
     }
-    
+
     static func uninject(bundleID: String) -> InjectorResult {
         let fm = FileManager.default
         guard isJailbroken() else {
@@ -105,14 +105,9 @@ class InjectorService {
         }
         return InjectorResult(success: true, message: "¡Restaurado! El original está activo.")
     }
-    
+
     private static func killApp(bundleID: String) {
         let name = bundleID.components(separatedBy: ".").last ?? bundleID
-        var pid: pid_t = 0
-        let cmd = "killall -9 \"\(name)\""
-        var args: [UnsafeMutablePointer<CChar>?] = [strdup("/bin/bash"), strdup("-c"), strdup(cmd), nil]
-        posix_spawn(&pid, "/bin/bash", nil, nil, &args, nil)
-        waitpid(pid, nil, 0)
-        args.forEach { free($0) }
+        _ = system("killall -9 \"\(name)\"")
     }
 }
