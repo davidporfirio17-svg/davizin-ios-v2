@@ -88,68 +88,66 @@ static NSString *MCMSigningIdentifier(void) {
     return identifier;
 }
 
+static NSString *MCMTryGetPath(NSString *bundleID, uint64_t flags) {
+    MCMAPI *api = MCMGetAPI();
+    if (!api->queryCreate || !api->queryGetSingle || !api->objectGetPath) return nil;
+
+    void *query = api->queryCreate();
+    if (!query) return nil;
+
+    api->querySetClass(query, 2);
+    xpc_object_t xpcID = xpc_string_create(bundleID.UTF8String);
+    api->querySetIdentifiers(query, xpcID);
+    api->querySetFlags(query, flags);
+    if (api->querySetPart) api->querySetPart(query, 0);
+
+    void *object = api->queryGetSingle(query);
+    if (!object) {
+        api->queryFree(query);
+        return nil;
+    }
+
+    const char *rawPath = api->objectGetPath(object);
+    NSString *path = rawPath ? [NSString stringWithUTF8String:rawPath] : nil;
+
+    if (path.length == 0 || !path.isAbsolutePath) {
+        api->queryFree(query);
+        return nil;
+    }
+
+    if ([path isEqualToString:@"/var"] || [path hasPrefix:@"/var/"])
+        path = [@"/private" stringByAppendingString:path];
+
+    void *copy = api->objectCopy ? api->objectCopy(object) : NULL;
+    if (copy) {
+        char *token = api->objectCopyToken ? api->objectCopyToken(copy) : NULL;
+        if (token) {
+            api->objectActivate(copy, false);
+            free(token);
+        }
+        if (api->objectFree) api->objectFree(copy);
+    }
+
+    api->queryFree(query);
+    return path;
+}
+
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     static const NSString *kRequiredID = @"com.apple.mobile.MobileHouseArrest";
-    // Flags de lectura/escritura para iOS 26
-    static const uint64_t kFlagsRW = 0x8100000000ULL;
-    static const uint64_t kFlagsRO = 0x900000000ULL;
-    static const uint64_t kClass = 2;
 
     NSString *signingID = MCMSigningIdentifier();
     if (![signingID isEqualToString:(NSString *)kRequiredID]) {
-        if (outError) *outError = [NSString stringWithFormat:
-            @"Signing ID: '%@'", signingID];
+        if (outError) *outError = [NSString stringWithFormat:@"Signing ID: '%@'", signingID];
         return nil;
     }
 
-    MCMAPI *api = MCMGetAPI();
-    if (!api->queryCreate || !api->queryGetSingle || !api->objectGetPath) {
-        if (outError) *outError = @"containermanager no disponible";
-        return nil;
-    }
-
-    // Intentar primero con flags de lectura/escritura
-    NSString *path = nil;
-    for (uint64_t flags in @[@(kFlagsRW), @(kFlagsRO)]) {
-        void *query = api->queryCreate();
-        if (!query) continue;
-
-        api->querySetClass(query, kClass);
-        xpc_object_t xpcID = xpc_string_create(bundleID.UTF8String);
-        api->querySetIdentifiers(query, xpcID);
-        api->querySetFlags(query, flags);
-        if (api->querySetPart) api->querySetPart(query, 0);
-
-        void *object = api->queryGetSingle(query);
-        if (object) {
-            const char *rawPath = api->objectGetPath(object);
-            NSString *candidatePath = rawPath ? [NSString stringWithUTF8String:rawPath] : nil;
-
-            if (candidatePath.length > 0 && candidatePath.isAbsolutePath) {
-                if ([candidatePath isEqualToString:@"/var"] || [candidatePath hasPrefix:@"/var/"])
-                    candidatePath = [@"/private" stringByAppendingString:candidatePath];
-
-                // Activar sandbox extension
-                void *copy = api->objectCopy ? api->objectCopy(object) : NULL;
-                if (copy) {
-                    char *token = api->objectCopyToken ? api->objectCopyToken(copy) : NULL;
-                    if (token) {
-                        api->objectActivate(copy, false);
-                        free(token);
-                    }
-                    if (api->objectFree) api->objectFree(copy);
-                }
-                path = candidatePath;
-                api->queryFree(query);
-                break;
-            }
-        }
-        api->queryFree(query);
-    }
+    // Probar flags de R/W primero, luego R/O
+    NSString *path = MCMTryGetPath(bundleID, 0x8100000000ULL);
+    if (!path) path = MCMTryGetPath(bundleID, 0x900000000ULL);
+    if (!path) path = MCMTryGetPath(bundleID, 0x100000000ULL);
 
     if (!path) {
-        if (outError) *outError = [NSString stringWithFormat:
-            @"Container no encontrado para '%@'", bundleID];
+        if (outError) *outError = [NSString stringWithFormat:@"Container no encontrado '%@'", bundleID];
         return nil;
     }
 
