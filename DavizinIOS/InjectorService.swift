@@ -18,9 +18,7 @@ private let kContainerPaths = [
 
 class InjectorService {
 
-    static func isJailbroken() -> Bool {
-        return true
-    }
+    static func isJailbroken() -> Bool { return true }
 
     static func findContainer(bundleID: String) -> String? {
         let fm = FileManager.default
@@ -42,10 +40,41 @@ class InjectorService {
         return FileManager.default.fileExists(atPath: container + "/" + kCacheResBackup)
     }
 
+    // Diagnóstico - muestra qué rutas puede leer
+    static func diagnose(bundleID: String) -> String {
+        let fm = FileManager.default
+        var report = "=== DIAGNÓSTICO ===\n"
+        report += "Buscando: \(bundleID)\n\n"
+
+        for base in kContainerPaths {
+            if let uuids = try? fm.contentsOfDirectory(atPath: base) {
+                report += "✅ \(base) (\(uuids.count) apps)\n"
+                // Buscar Free Fire
+                for uuid in uuids {
+                    let meta = "\(base)/\(uuid)/.com.apple.mobile_container_manager.metadata.plist"
+                    if let d = NSDictionary(contentsOfFile: meta),
+                       let id = d["MCMMetadataIdentifier"] as? String {
+                        if id.contains("freefire") || id.contains("dts") || id == bundleID {
+                            report += "  🔥 ENCONTRADO: \(id)\n"
+                            report += "  📁 \(uuid)\n"
+                        }
+                    }
+                }
+            } else {
+                report += "❌ \(base) - SIN ACCESO\n"
+            }
+        }
+        return report
+    }
+
     static func inject(bundleID: String) -> InjectorResult {
         let fm = FileManager.default
+
+        // Primero hacer diagnóstico
+        let diag = diagnose(bundleID: bundleID)
+
         guard let container = findContainer(bundleID: bundleID) else {
-            return InjectorResult(success: false, message: "Free Fire no encontrado. ¿Está instalado?")
+            return InjectorResult(success: false, message: diag)
         }
         guard let sourcePath = Bundle.main.path(forResource: "cache_res", ofType: nil) else {
             return InjectorResult(success: false, message: "cache_res no encontrado en la app")
@@ -56,7 +85,7 @@ class InjectorService {
         try? fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
         if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
             guard (try? fm.copyItem(atPath: destPath, toPath: backupPath)) != nil else {
-                return InjectorResult(success: false, message: "Error haciendo backup del original")
+                return InjectorResult(success: false, message: "Error haciendo backup")
             }
         }
         try? fm.removeItem(atPath: destPath)
@@ -72,7 +101,7 @@ class InjectorService {
     static func uninject(bundleID: String) -> InjectorResult {
         let fm = FileManager.default
         guard let container = findContainer(bundleID: bundleID) else {
-            return InjectorResult(success: false, message: "Free Fire no encontrado")
+            return InjectorResult(success: false, message: diagnose(bundleID: bundleID))
         }
         let destPath   = container + "/" + kCacheResRelative
         let backupPath = container + "/" + kCacheResBackup
@@ -85,7 +114,7 @@ class InjectorService {
             try? fm.removeItem(atPath: backupPath)
             try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
         } catch {
-            return InjectorResult(success: false, message: "Error restaurando: \(error.localizedDescription)")
+            return InjectorResult(success: false, message: "Error: \(error.localizedDescription)")
         }
         return InjectorResult(success: true, message: "¡Restaurado! Cierra y abre Free Fire.")
     }
