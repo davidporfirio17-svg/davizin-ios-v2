@@ -64,25 +64,22 @@ static MCMAPI *MCMGetAPI(void) {
     return &api;
 }
 
+typedef CFTypeRef SecTaskRef;
+extern SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
+extern CFStringRef SecTaskCopySigningIdentifier(SecTaskRef task, CFErrorRef *error);
+
 static NSString *MCMSigningIdentifier(void) {
     static NSString *identifier;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        typedef CFTypeRef (*SecTaskCreateFromSelf_t)(CFAllocatorRef);
-        typedef CFStringRef (*SecTaskCopySigningID_t)(CFTypeRef, CFErrorRef *);
-        void *secFw = dlopen("/usr/lib/libSystem.B.dylib", RTLD_LAZY);
-        SecTaskCreateFromSelf_t createSelf = (SecTaskCreateFromSelf_t)dlsym(secFw, "SecTaskCreateFromSelf");
-        SecTaskCopySigningID_t  copyID     = (SecTaskCopySigningID_t)dlsym(secFw, "SecTaskCopySigningIdentifier");
-        if (createSelf && copyID) {
-            CFTypeRef task = createSelf(kCFAllocatorDefault);
-            if (task) {
-                CFErrorRef err = NULL;
-                CFStringRef value = copyID(task, &err);
-                if (value) identifier = [(__bridge NSString *)value copy];
-                if (value) CFRelease(value);
-                if (err)   CFRelease(err);
-                CFRelease(task);
-            }
+        SecTaskRef task = SecTaskCreateFromSelf(kCFAllocatorDefault);
+        if (task) {
+            CFErrorRef err = NULL;
+            CFStringRef value = SecTaskCopySigningIdentifier(task, &err);
+            if (value) identifier = [(__bridge NSString *)value copy];
+            if (value) CFRelease(value);
+            if (err)   CFRelease(err);
+            CFRelease(task);
         }
     });
     return identifier;
