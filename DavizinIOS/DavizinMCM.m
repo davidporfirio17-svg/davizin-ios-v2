@@ -87,7 +87,7 @@ static NSString *MCMSigningIdentifier(void) {
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     static const NSString *kRequiredID = @"com.apple.mobile.MobileHouseArrest";
-    static const uint64_t kFlags = 0x900000000ULL;
+    static const uint64_t kFlags = 0x8100000000ULL;
     static const uint64_t kClass = 2;
 
     NSString *signingID = MCMSigningIdentifier();
