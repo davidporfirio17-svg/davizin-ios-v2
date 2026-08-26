@@ -14,6 +14,7 @@
 		BB000006000000000000000A /* InjectorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000006000000000000001A; };
 		BB000007000000000000000A /* KeyValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000007000000000000001A; };
 		BB000008000000000000000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB000008000000000000001A; };
+		BB000011000000000000000A /* cache_res in Resources */ = {isa = PBXBuildFile; fileRef = BB000011000000000000001A; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +28,7 @@
 		BB000008000000000000001A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BB000009000000000000001A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB000010000000000000001A /* DavizinIOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DavizinIOS.entitlements; sourceTree = "<group>"; };
+		BB000011000000000000001A /* cache_res */ = {isa = PBXFileReference; lastKnownFileType = file; path = cache_res; sourceTree = "<group>"; };
 		BBTARGET00000000000000001 /* DavizinIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DavizinIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -53,6 +55,7 @@
 				BB000008000000000000001A /* Assets.xcassets */,
 				BB000009000000000000001A /* Info.plist */,
 				BB000010000000000000001A /* DavizinIOS.entitlements */,
+				BB000011000000000000001A /* cache_res */,
 			);
 			path = DavizinIOS;
 			sourceTree = "<group>";
@@ -123,7 +126,10 @@
 		BBPHASE000000000000000RB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (BB000008000000000000000A);
+			files = (
+				BB000008000000000000000A /* Assets.xcassets in Resources */,
+				BB000011000000000000000A /* cache_res in Resources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
