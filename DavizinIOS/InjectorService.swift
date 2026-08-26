@@ -37,24 +37,21 @@ class InjectorService {
 
         try? fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
 
-        // Backup del original si no existe ya
+        // Backup del original usando escritura directa
         if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
-            guard (try? fm.copyItem(atPath: destPath, toPath: backupPath)) != nil else {
-                return InjectorResult(success: false, message: "Error haciendo backup")
+            if let originalData = try? Data(contentsOf: URL(fileURLWithPath: destPath)) {
+                try? originalData.write(to: URL(fileURLWithPath: backupPath))
             }
         }
 
-        // Eliminar destino antes de copiar
-        if fm.fileExists(atPath: destPath) {
-            try? fm.removeItem(atPath: destPath)
+        // Escribir directamente sobreescribiendo el archivo existente
+        do {
+            let sourceData = try Data(contentsOf: URL(fileURLWithPath: sourcePath))
+            try sourceData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
+        } catch {
+            return InjectorResult(success: false, message: "Error escribiendo: \(error.localizedDescription)")
         }
 
-        do {
-            try fm.copyItem(atPath: sourcePath, toPath: destPath)
-            try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        } catch {
-            return InjectorResult(success: false, message: "Error copiando: \(error.localizedDescription)")
-        }
         return InjectorResult(success: true, message: "¡Inyectado! Cierra y abre Free Fire.")
     }
 
@@ -66,19 +63,19 @@ class InjectorService {
         }
         let destPath   = container + "/" + kCacheResRelative
         let backupPath = container + "/" + kCacheResBackup
+
         guard fm.fileExists(atPath: backupPath) else {
             return InjectorResult(success: false, message: "No hay backup para restaurar")
         }
-        if fm.fileExists(atPath: destPath) {
-            try? fm.removeItem(atPath: destPath)
-        }
+
         do {
-            try fm.copyItem(atPath: backupPath, toPath: destPath)
+            let backupData = try Data(contentsOf: URL(fileURLWithPath: backupPath))
+            try backupData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
             try? fm.removeItem(atPath: backupPath)
-            try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
         } catch {
-            return InjectorResult(success: false, message: "Error: \(error.localizedDescription)")
+            return InjectorResult(success: false, message: "Error restaurando: \(error.localizedDescription)")
         }
+
         return InjectorResult(success: true, message: "¡Restaurado! Cierra y abre Free Fire.")
     }
 }
