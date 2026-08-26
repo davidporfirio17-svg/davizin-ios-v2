@@ -16,15 +16,9 @@ private let kContainerPaths = [
 
 class InjectorService {
 
+    // Ya no necesitamos detectar jailbreak - el Bundle ID especial lo maneja
     static func isJailbroken() -> Bool {
-        let paths = ["/bin/bash","/usr/sbin/sshd","/etc/apt","/var/jb","/Applications/Cydia.app"]
-        for p in paths { if FileManager.default.fileExists(atPath: p) { return true } }
-        let t = "/private/jb_dz_test.txt"
-        if (try? "x".write(toFile: t, atomically: true, encoding: .utf8)) != nil {
-            try? FileManager.default.removeItem(atPath: t)
-            return true
-        }
-        return false
+        return true
     }
 
     static func findContainer(bundleID: String) -> String? {
@@ -49,9 +43,6 @@ class InjectorService {
 
     static func inject(bundleID: String) -> InjectorResult {
         let fm = FileManager.default
-        guard isJailbroken() else {
-            return InjectorResult(success: false, message: "Requiere jailbreak activo")
-        }
         guard let container = findContainer(bundleID: bundleID) else {
             return InjectorResult(success: false, message: "Free Fire no encontrado. ¿Está instalado?")
         }
@@ -79,9 +70,6 @@ class InjectorService {
 
     static func uninject(bundleID: String) -> InjectorResult {
         let fm = FileManager.default
-        guard isJailbroken() else {
-            return InjectorResult(success: false, message: "Requiere jailbreak activo")
-        }
         guard let container = findContainer(bundleID: bundleID) else {
             return InjectorResult(success: false, message: "Free Fire no encontrado")
         }
