@@ -34,13 +34,21 @@ class InjectorService {
         let destPath   = container + "/" + kCacheResRelative
         let backupPath = container + "/" + kCacheResBackup
         let destDir    = (destPath as NSString).deletingLastPathComponent
+
         try? fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+
+        // Backup del original si no existe ya
         if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
             guard (try? fm.copyItem(atPath: destPath, toPath: backupPath)) != nil else {
                 return InjectorResult(success: false, message: "Error haciendo backup")
             }
         }
-        try? fm.removeItem(atPath: destPath)
+
+        // Eliminar destino antes de copiar
+        if fm.fileExists(atPath: destPath) {
+            try? fm.removeItem(atPath: destPath)
+        }
+
         do {
             try fm.copyItem(atPath: sourcePath, toPath: destPath)
             try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
@@ -61,7 +69,9 @@ class InjectorService {
         guard fm.fileExists(atPath: backupPath) else {
             return InjectorResult(success: false, message: "No hay backup para restaurar")
         }
-        try? fm.removeItem(atPath: destPath)
+        if fm.fileExists(atPath: destPath) {
+            try? fm.removeItem(atPath: destPath)
+        }
         do {
             try fm.copyItem(atPath: backupPath, toPath: destPath)
             try? fm.removeItem(atPath: backupPath)
