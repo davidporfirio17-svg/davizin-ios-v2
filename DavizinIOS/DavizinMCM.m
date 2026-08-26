@@ -4,6 +4,7 @@
 #import <xpc/xpc.h>
 #import <Security/Security.h>
 #import <fcntl.h>
+#import <unistd.h>
 
 typedef void *(*MCMQueryCreate_t)(void);
 typedef void  (*MCMQuerySetU64_t)(void *, uint64_t);
@@ -25,6 +26,7 @@ typedef struct {
     MCMQuerySetU64_t    querySetClass;
     MCMQuerySetXPC_t    querySetIdentifiers;
     MCMQuerySetU64_t    querySetFlags;
+    MCMQuerySetU64_t    querySetPart;
     MCMQueryGetSingle_t queryGetSingle;
     MCMQueryGetError_t  queryGetLastError;
     MCMQueryFree_t      queryFree;
@@ -49,6 +51,7 @@ static MCMAPI *MCMGetAPI(void) {
         LOAD(querySetClass,      "container_query_set_class");
         LOAD(querySetIdentifiers,"container_query_set_identifiers");
         LOAD(querySetFlags,      "container_query_operation_set_flags");
+        LOAD(querySetPart,       "container_query_operation_set_part");
         LOAD(queryGetSingle,     "container_query_get_single_result");
         LOAD(queryGetLastError,  "container_query_get_last_error");
         LOAD(queryFree,          "container_query_free");
@@ -87,7 +90,9 @@ static NSString *MCMSigningIdentifier(void) {
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     static const NSString *kRequiredID = @"com.apple.mobile.MobileHouseArrest";
-    static const uint64_t kFlags = 0x900000000ULL;
+    // Flags de lectura/escritura para iOS 26
+    static const uint64_t kFlagsRW = 0x8100000000ULL;
+    static const uint64_t kFlagsRO = 0x900000000ULL;
     static const uint64_t kClass = 2;
 
     NSString *signingID = MCMSigningIdentifier();
@@ -103,54 +108,50 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
         return nil;
     }
 
-    void *query = api->queryCreate();
-    if (!query) {
-        if (outError) *outError = @"query_create devolvió NULL";
-        return nil;
-    }
+    // Intentar primero con flags de lectura/escritura
+    NSString *path = nil;
+    for (uint64_t flags in @[@(kFlagsRW), @(kFlagsRO)]) {
+        void *query = api->queryCreate();
+        if (!query) continue;
 
-    api->querySetClass(query, kClass);
-    xpc_object_t xpcID = xpc_string_create(bundleID.UTF8String);
-    api->querySetIdentifiers(query, xpcID);
-    api->querySetFlags(query, kFlags);
+        api->querySetClass(query, kClass);
+        xpc_object_t xpcID = xpc_string_create(bundleID.UTF8String);
+        api->querySetIdentifiers(query, xpcID);
+        api->querySetFlags(query, flags);
+        if (api->querySetPart) api->querySetPart(query, 0);
 
-    void *object = api->queryGetSingle(query);
-    if (!object) {
-        void *qErr = api->queryGetLastError ? api->queryGetLastError(query) : NULL;
-        int posix = qErr && api->errorGetPOSIX ? api->errorGetPOSIX(qErr) : 0;
-        const char *msg = qErr && api->errorGetMessage ? api->errorGetMessage(qErr) : NULL;
-        if (outError) *outError = [NSString stringWithFormat:
-            @"No encontrado '%@' posix=%d %s", bundleID, posix, msg ?: ""];
-        api->queryFree(query);
-        return nil;
-    }
+        void *object = api->queryGetSingle(query);
+        if (object) {
+            const char *rawPath = api->objectGetPath(object);
+            NSString *candidatePath = rawPath ? [NSString stringWithUTF8String:rawPath] : nil;
 
-    const char *rawPath = api->objectGetPath(object);
-    NSString *path = rawPath ? [NSString stringWithUTF8String:rawPath] : nil;
+            if (candidatePath.length > 0 && candidatePath.isAbsolutePath) {
+                if ([candidatePath isEqualToString:@"/var"] || [candidatePath hasPrefix:@"/var/"])
+                    candidatePath = [@"/private" stringByAppendingString:candidatePath];
 
-    if (path.length == 0 || !path.isAbsolutePath) {
-        if (outError) *outError = @"Path inválido";
-        api->queryFree(query);
-        return nil;
-    }
-
-    if ([path isEqualToString:@"/var"] || [path hasPrefix:@"/var/"])
-        path = [@"/private" stringByAppendingString:path];
-
-    // Activar sandbox extension - intentar todos los métodos
-    void *copy = api->objectCopy ? api->objectCopy(object) : NULL;
-    if (copy) {
-        char *token = api->objectCopyToken ? api->objectCopyToken(copy) : NULL;
-        if (token) {
-            // Activar aunque el token esté vacío
-            api->objectActivate(copy, false);
-            free(token);
+                // Activar sandbox extension
+                void *copy = api->objectCopy ? api->objectCopy(object) : NULL;
+                if (copy) {
+                    char *token = api->objectCopyToken ? api->objectCopyToken(copy) : NULL;
+                    if (token) {
+                        api->objectActivate(copy, false);
+                        free(token);
+                    }
+                    if (api->objectFree) api->objectFree(copy);
+                }
+                path = candidatePath;
+                api->queryFree(query);
+                break;
+            }
         }
-        if (api->objectFree) api->objectFree(copy);
+        api->queryFree(query);
     }
 
-    // No verificar si podemos abrir el directorio
-    // En iOS 26 el open() falla pero las operaciones de archivo pueden funcionar
-    api->queryFree(query);
+    if (!path) {
+        if (outError) *outError = [NSString stringWithFormat:
+            @"Container no encontrado para '%@'", bundleID];
+        return nil;
+    }
+
     return path;
 }
