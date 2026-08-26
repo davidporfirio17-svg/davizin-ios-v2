@@ -16,7 +16,6 @@ private let kContainerPaths = [
 
 class InjectorService {
 
-    // Ya no necesitamos detectar jailbreak - el Bundle ID especial lo maneja
     static func isJailbroken() -> Bool {
         return true
     }
@@ -63,7 +62,7 @@ class InjectorService {
             try fm.copyItem(atPath: sourcePath, toPath: destPath)
             try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
         } catch {
-            return InjectorResult(success: false, message: "Error inyectando: \(error.localizedDescription)")
+            return InjectorResult(success: false, message: "Error: \(error.localizedDescription)")
         }
         return InjectorResult(success: true, message: "¡Inyectado! Cierra y abre Free Fire.")
     }
