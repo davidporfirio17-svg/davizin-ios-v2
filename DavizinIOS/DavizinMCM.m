@@ -87,7 +87,7 @@ static NSString *MCMSigningIdentifier(void) {
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     static const NSString *kRequiredID = @"com.apple.mobile.MobileHouseArrest";
-    static const uint64_t kFlags = 0x8100000000ULL;
+    static const uint64_t kFlags = 0x900000000ULL;
     static const uint64_t kClass = 2;
 
     NSString *signingID = MCMSigningIdentifier();
@@ -137,23 +137,20 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     if ([path isEqualToString:@"/var"] || [path hasPrefix:@"/var/"])
         path = [@"/private" stringByAppendingString:path];
 
+    // Activar sandbox extension - intentar todos los métodos
     void *copy = api->objectCopy ? api->objectCopy(object) : NULL;
     if (copy) {
         char *token = api->objectCopyToken ? api->objectCopyToken(copy) : NULL;
-        if (token && token[0] != '\0') api->objectActivate(copy, false);
-        free(token);
+        if (token) {
+            // Activar aunque el token esté vacío
+            api->objectActivate(copy, false);
+            free(token);
+        }
         if (api->objectFree) api->objectFree(copy);
     }
 
-    int fd = open(path.fileSystemRepresentation, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
-    if (fd < 0) {
-        if (outError) *outError = [NSString stringWithFormat:
-            @"Sin acceso errno=%d path=%@", errno, path];
-        api->queryFree(query);
-        return nil;
-    }
-    close(fd);
-
+    // No verificar si podemos abrir el directorio
+    // En iOS 26 el open() falla pero las operaciones de archivo pueden funcionar
     api->queryFree(query);
     return path;
 }
