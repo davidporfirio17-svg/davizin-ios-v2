@@ -1,5 +1,4 @@
 import Foundation
-import Darwin
 
 struct InjectorResult {
     let success: Bool
@@ -68,8 +67,6 @@ class InjectorService {
                 return InjectorResult(success: false, message: "Error haciendo backup del original")
             }
         }
-        killApp(bundleID: bundleID)
-        Thread.sleep(forTimeInterval: 0.8)
         try? fm.removeItem(atPath: destPath)
         do {
             try fm.copyItem(atPath: sourcePath, toPath: destPath)
@@ -77,7 +74,7 @@ class InjectorService {
         } catch {
             return InjectorResult(success: false, message: "Error inyectando: \(error.localizedDescription)")
         }
-        return InjectorResult(success: true, message: "¡Inyectado! Abre Free Fire ahora.")
+        return InjectorResult(success: true, message: "¡Inyectado! Cierra y abre Free Fire.")
     }
 
     static func uninject(bundleID: String) -> InjectorResult {
@@ -93,8 +90,6 @@ class InjectorService {
         guard fm.fileExists(atPath: backupPath) else {
             return InjectorResult(success: false, message: "No hay backup para restaurar")
         }
-        killApp(bundleID: bundleID)
-        Thread.sleep(forTimeInterval: 0.8)
         try? fm.removeItem(atPath: destPath)
         do {
             try fm.copyItem(atPath: backupPath, toPath: destPath)
@@ -103,11 +98,6 @@ class InjectorService {
         } catch {
             return InjectorResult(success: false, message: "Error restaurando: \(error.localizedDescription)")
         }
-        return InjectorResult(success: true, message: "¡Restaurado! El original está activo.")
-    }
-
-    private static func killApp(bundleID: String) {
-        let name = bundleID.components(separatedBy: ".").last ?? bundleID
-        _ = system("killall -9 \"\(name)\"")
+        return InjectorResult(success: true, message: "¡Restaurado! Cierra y abre Free Fire.")
     }
 }
