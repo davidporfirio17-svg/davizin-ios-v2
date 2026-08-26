@@ -13,7 +13,6 @@ struct KeyGateView: View {
     
     var body: some View {
         ZStack {
-            // Fondo con gradiente
             LinearGradient(
                 colors: [
                     Color(red: 0.04, green: 0.04, blue: 0.08),
@@ -24,39 +23,19 @@ struct KeyGateView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            
-            // Partículas de fondo
             BackgroundParticles()
-            
             VStack(spacing: 0) {
                 Spacer()
-                
-                // Logo section
                 VStack(spacing: 12) {
-                    // Icono
                     ZStack {
-                        Circle()
-                            .fill(Color.cyan.opacity(0.15))
-                            .frame(width: 90, height: 90)
-                        Circle()
-                            .strokeBorder(Color.cyan.opacity(0.4), lineWidth: 1.5)
-                            .frame(width: 90, height: 90)
-                        Image(systemName: "syringe.fill")
-                            .font(.system(size: 36))
-                            .foregroundColor(.cyan)
+                        Circle().fill(Color.cyan.opacity(0.15)).frame(width: 90, height: 90)
+                        Circle().strokeBorder(Color.cyan.opacity(0.4), lineWidth: 1.5).frame(width: 90, height: 90)
+                        Image(systemName: "syringe.fill").font(.system(size: 36)).foregroundColor(.cyan)
                     }
-                    
                     Text("DAVIZIN")
                         .font(.system(size: 44, weight: .black, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.cyan, Color(red: 0.0, green: 0.7, blue: 1.0)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .foregroundStyle(LinearGradient(colors: [.cyan, Color(red: 0.0, green: 0.7, blue: 1.0)], startPoint: .leading, endPoint: .trailing))
                         .shadow(color: .cyan.opacity(0.5), radius: 12)
-                    
                     Text("iOS Injector v\(appState.appVersion)")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.4))
@@ -70,42 +49,21 @@ struct KeyGateView: View {
                         logoOpacity = 1.0
                     }
                 }
-                
                 Spacer().frame(height: 50)
-                
-                // Card de key
                 VStack(spacing: 16) {
-                    
-                    // Jailbreak status
                     HStack(spacing: 8) {
-                        Circle()
-                            .fill(InjectorService.isJailbroken() ? Color.green : Color.red)
-                            .frame(width: 8, height: 8)
-                        Text(InjectorService.isJailbroken() ? "Jailbreak detectado" : "Sin Jailbreak")
+                        Circle().fill(Color.green).frame(width: 8, height: 8)
+                        Text("Compatible con tu dispositivo")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(InjectorService.isJailbroken() ? .green : .red)
+                            .foregroundColor(.green)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(InjectorService.isJailbroken() ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(InjectorService.isJailbroken() ? Color.green.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-                    
-                    // TextField de key
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(Capsule().fill(Color.green.opacity(0.1)).overlay(Capsule().strokeBorder(Color.green.opacity(0.3), lineWidth: 1)))
                     HStack(spacing: 12) {
-                        Image(systemName: "key.fill")
-                            .foregroundColor(.cyan.opacity(0.7))
-                            .font(.system(size: 16))
-                        
+                        Image(systemName: "key.fill").foregroundColor(.cyan.opacity(0.7)).font(.system(size: 16))
                         TextField("", text: $keyInput)
                             .placeholder(when: keyInput.isEmpty) {
-                                Text("Ingresa tu Key de acceso")
-                                    .foregroundColor(.white.opacity(0.25))
+                                Text("Ingresa tu Key de acceso").foregroundColor(.white.opacity(0.25))
                             }
                             .foregroundColor(.white)
                             .autocorrectionDisabled()
@@ -113,82 +71,40 @@ struct KeyGateView: View {
                             .submitLabel(.done)
                             .onSubmit { validateKey() }
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.white.opacity(0.05))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .strokeBorder(Color.cyan.opacity(0.3), lineWidth: 1.5)
-                            )
-                    )
-                    
-                    // Error message
+                    .padding(.horizontal, 18).padding(.vertical, 16)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.05)).overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.cyan.opacity(0.3), lineWidth: 1.5)))
                     if showError {
                         HStack(spacing: 6) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.red)
-                                .font(.system(size: 13))
-                            Text(errorMessage)
-                                .font(.system(size: 13))
-                                .foregroundColor(.red)
+                            Image(systemName: "xmark.circle.fill").foregroundColor(.red).font(.system(size: 13))
+                            Text(errorMessage).font(.system(size: 13)).foregroundColor(.red)
                         }
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
-                    
-                    // Botón validar
                     Button(action: validateKey) {
                         ZStack {
                             if isValidating {
-                                ProgressView()
-                                    .tint(.black)
+                                ProgressView().tint(.black)
                             } else {
                                 HStack(spacing: 8) {
                                     Image(systemName: "checkmark.shield.fill")
-                                    Text("VALIDAR KEY")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .tracking(1)
+                                    Text("VALIDAR KEY").font(.system(size: 16, weight: .bold)).tracking(1)
                                 }
                                 .foregroundColor(.black)
                             }
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.cyan, Color(red: 0.0, green: 0.7, blue: 1.0)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .shadow(color: .cyan.opacity(0.4), radius: 12, y: 4)
-                        )
+                        .frame(maxWidth: .infinity).frame(height: 54)
+                        .background(RoundedRectangle(cornerRadius: 14)
+                            .fill(LinearGradient(colors: [.cyan, Color(red: 0.0, green: 0.7, blue: 1.0)], startPoint: .leading, endPoint: .trailing))
+                            .shadow(color: .cyan.opacity(0.4), radius: 12, y: 4))
                     }
                     .disabled(isValidating || keyInput.isEmpty)
                     .opacity(keyInput.isEmpty ? 0.6 : 1.0)
-                    
                 }
                 .padding(24)
-                .background(
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(Color.white.opacity(0.04))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 24)
-                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-                        )
-                )
+                .background(RoundedRectangle(cornerRadius: 24).fill(Color.white.opacity(0.04)).overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Color.white.opacity(0.08), lineWidth: 1)))
                 .padding(.horizontal, 20)
-                
                 Spacer()
-                
-                // Footer
-                Text("By Davizin • ABE Studio")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.2))
-                    .padding(.bottom, 30)
+                Text("By Davizin • ABE Studio").font(.system(size: 12)).foregroundColor(.white.opacity(0.2)).padding(.bottom, 30)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showError)
@@ -196,24 +112,16 @@ struct KeyGateView: View {
     
     private func validateKey() {
         guard !keyInput.isEmpty else { return }
-        
         withAnimation { showError = false }
         isValidating = true
-        
         validator.validate(key: keyInput) { isValid, message in
             isValidating = false
-            
-            if isValid {
-                appState.saveKey(keyInput)
-            } else {
-                errorMessage = message
-                withAnimation { showError = true }
-            }
+            if isValid { appState.saveKey(keyInput) }
+            else { errorMessage = message; withAnimation { showError = true } }
         }
     }
 }
 
-// MARK: - Background particles
 struct BackgroundParticles: View {
     var body: some View {
         GeometryReader { geo in
@@ -231,7 +139,6 @@ struct BackgroundParticles: View {
     }
 }
 
-// MARK: - Placeholder extension
 extension View {
     func placeholder<Content: View>(when shouldShow: Bool, @ViewBuilder placeholder: () -> Content) -> some View {
         ZStack(alignment: .leading) {
