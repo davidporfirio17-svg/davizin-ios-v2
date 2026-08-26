@@ -10,8 +10,10 @@ private let kCacheResBackup   = "Documents/contentcache/Compulsory/ios/gameasset
 
 private let kContainerPaths = [
     "/var/mobile/Containers/Data/Application",
-    "/var/jb/var/mobile/Containers/Data/Application",
     "/private/var/mobile/Containers/Data/Application",
+    "/private/var/containers/Data/Application",
+    "/var/containers/Data/Application",
+    "/var/jb/var/mobile/Containers/Data/Application",
 ]
 
 class InjectorService {
