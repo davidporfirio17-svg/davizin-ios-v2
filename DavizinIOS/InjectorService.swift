@@ -8,31 +8,13 @@ struct InjectorResult {
 private let kCacheResRelative = "Documents/contentcache/Compulsory/ios/gameassetbundles/cache_res.CfnFf59sr1SbsqQ6JqTKsEusjKs~3D"
 private let kCacheResBackup   = "Documents/contentcache/Compulsory/ios/gameassetbundles/cache_res.original"
 
-private let kContainerPaths = [
-    "/var/mobile/Containers/Data/Application",
-    "/private/var/mobile/Containers/Data/Application",
-    "/private/var/containers/Data/Application",
-    "/var/containers/Data/Application",
-    "/var/jb/var/mobile/Containers/Data/Application",
-]
-
 class InjectorService {
 
     static func isJailbroken() -> Bool { return true }
 
     static func findContainer(bundleID: String) -> String? {
-        let fm = FileManager.default
-        for base in kContainerPaths {
-            guard let uuids = try? fm.contentsOfDirectory(atPath: base) else { continue }
-            for uuid in uuids {
-                let meta = "\(base)/\(uuid)/.com.apple.mobile_container_manager.metadata.plist"
-                if let d = NSDictionary(contentsOfFile: meta),
-                   d["MCMMetadataIdentifier"] as? String == bundleID {
-                    return "\(base)/\(uuid)"
-                }
-            }
-        }
-        return nil
+        var errorMsg: NSString? = nil
+        return DavizinGetContainerPath(bundleID, &errorMsg)
     }
 
     static func checkIsInjected(bundleID: String) -> Bool {
@@ -40,41 +22,11 @@ class InjectorService {
         return FileManager.default.fileExists(atPath: container + "/" + kCacheResBackup)
     }
 
-    // Diagnóstico - muestra qué rutas puede leer
-    static func diagnose(bundleID: String) -> String {
-        let fm = FileManager.default
-        var report = "=== DIAGNÓSTICO ===\n"
-        report += "Buscando: \(bundleID)\n\n"
-
-        for base in kContainerPaths {
-            if let uuids = try? fm.contentsOfDirectory(atPath: base) {
-                report += "✅ \(base) (\(uuids.count) apps)\n"
-                // Buscar Free Fire
-                for uuid in uuids {
-                    let meta = "\(base)/\(uuid)/.com.apple.mobile_container_manager.metadata.plist"
-                    if let d = NSDictionary(contentsOfFile: meta),
-                       let id = d["MCMMetadataIdentifier"] as? String {
-                        if id.contains("freefire") || id.contains("dts") || id == bundleID {
-                            report += "  🔥 ENCONTRADO: \(id)\n"
-                            report += "  📁 \(uuid)\n"
-                        }
-                    }
-                }
-            } else {
-                report += "❌ \(base) - SIN ACCESO\n"
-            }
-        }
-        return report
-    }
-
     static func inject(bundleID: String) -> InjectorResult {
         let fm = FileManager.default
-
-        // Primero hacer diagnóstico
-        let diag = diagnose(bundleID: bundleID)
-
-        guard let container = findContainer(bundleID: bundleID) else {
-            return InjectorResult(success: false, message: diag)
+        var mcmError: NSString? = nil
+        guard let container = DavizinGetContainerPath(bundleID, &mcmError) else {
+            return InjectorResult(success: false, message: "Error: \((mcmError as String?) ?? "desconocido")")
         }
         guard let sourcePath = Bundle.main.path(forResource: "cache_res", ofType: nil) else {
             return InjectorResult(success: false, message: "cache_res no encontrado en la app")
@@ -93,15 +45,16 @@ class InjectorService {
             try fm.copyItem(atPath: sourcePath, toPath: destPath)
             try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
         } catch {
-            return InjectorResult(success: false, message: "Error: \(error.localizedDescription)")
+            return InjectorResult(success: false, message: "Error copiando: \(error.localizedDescription)")
         }
         return InjectorResult(success: true, message: "¡Inyectado! Cierra y abre Free Fire.")
     }
 
     static func uninject(bundleID: String) -> InjectorResult {
         let fm = FileManager.default
-        guard let container = findContainer(bundleID: bundleID) else {
-            return InjectorResult(success: false, message: diagnose(bundleID: bundleID))
+        var mcmError: NSString? = nil
+        guard let container = DavizinGetContainerPath(bundleID, &mcmError) else {
+            return InjectorResult(success: false, message: "Error: \((mcmError as String?) ?? "desconocido")")
         }
         let destPath   = container + "/" + kCacheResRelative
         let backupPath = container + "/" + kCacheResBackup
