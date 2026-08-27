@@ -8,7 +8,6 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     ) -> Bool {
         true
     }
-
     func application(
         _ application: UIApplication,
         configurationForConnecting connectingSceneSession: UISceneSession,
