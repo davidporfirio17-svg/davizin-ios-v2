@@ -25,17 +25,22 @@ jobs:
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           DEVELOPMENT_TEAM="" \
-          archive 2>&1 | tail -50
+          archive 2>&1 | tail -30
+        echo "=== Buscando archive ==="
+        find /tmp -name "*.xcarchive" 2>/dev/null
+        find ~/Library -name "*.xcarchive" 2>/dev/null | head -5
+        ls /tmp/
 
     - name: Create IPA
       run: |
-        ARCHIVE=$(find /tmp -name "*.xcarchive" | head -1)
-        echo "Archive: $ARCHIVE"
-        ls "$ARCHIVE/Products/Applications/"
-        cd "$ARCHIVE/Products/Applications/"
-        mkdir -p Payload
-        cp -r *.app Payload/
-        zip -r /tmp/Davizin_unsigned.ipa Payload/
+        ARCHIVE=$(find /tmp ~/Library/Developer/Xcode/Archives -name "*.xcarchive" 2>/dev/null | head -1)
+        echo "Archive encontrado: $ARCHIVE"
+        find "$ARCHIVE" -name "*.app" 2>/dev/null
+        APP=$(find "$ARCHIVE" -name "*.app" | head -1)
+        echo "App: $APP"
+        mkdir -p /tmp/Payload
+        cp -r "$APP" /tmp/Payload/
+        cd /tmp && zip -r Davizin_unsigned.ipa Payload/
         ls -lh /tmp/Davizin_unsigned.ipa
 
     - name: Upload IPA
