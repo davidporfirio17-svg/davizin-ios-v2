@@ -18,25 +18,21 @@ jobs:
           -project DavizinIOS.xcodeproj \
           -scheme DavizinIOS \
           -configuration Release \
+          -sdk iphoneos \
           -destination 'generic/platform=iOS' \
-          -archivePath /tmp/Davizin.xcarchive \
           IPHONEOS_DEPLOYMENT_TARGET=17.0 \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           DEVELOPMENT_TEAM="" \
-          archive 2>&1 | tail -30
-        echo "=== Buscando archive ==="
-        find /tmp -name "*.xcarchive" 2>/dev/null
-        find ~/Library -name "*.xcarchive" 2>/dev/null | head -5
-        ls /tmp/
+          CONFIGURATION_BUILD_DIR=/tmp/build \
+          build 2>&1 | tail -20
+        echo "=== Build output ==="
+        find /tmp/build -name "*.app" 2>/dev/null
 
     - name: Create IPA
       run: |
-        ARCHIVE=$(find /tmp ~/Library/Developer/Xcode/Archives -name "*.xcarchive" 2>/dev/null | head -1)
-        echo "Archive encontrado: $ARCHIVE"
-        find "$ARCHIVE" -name "*.app" 2>/dev/null
-        APP=$(find "$ARCHIVE" -name "*.app" | head -1)
+        APP=$(find /tmp/build -name "*.app" | head -1)
         echo "App: $APP"
         mkdir -p /tmp/Payload
         cp -r "$APP" /tmp/Payload/
