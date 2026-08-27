@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 struct KeyResponse: Codable {
     let success: Bool
@@ -13,6 +14,24 @@ struct KeyData: Codable {
 }
 
 class KeyValidator {
+    static func getDeviceHWID() -> String {
+        if let hwid = UIDevice.current.identifierForVendor?.uuidString {
+            return hwid
+        }
+        return UUID().uuidString
+    }
+    
+    static func getDeviceModel() -> String {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let model = String(bytes: Data(bytes: &systemInfo.machine, count: Int(_SYS_NAMELEN)), encoding: .ascii)?.trimmingCharacters(in: .controlCharacters) ?? "Unknown"
+        return model
+    }
+    
+    static func getIOSVersion() -> String {
+        return UIDevice.current.systemVersion
+    }
+    
     static func validate(key: String, completion: @escaping (Bool, String, Int) -> Void) {
         validateWithSeconds(key: key, completion: completion)
     }
@@ -29,9 +48,16 @@ class KeyValidator {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 15
 
+        let hwid = getDeviceHWID()
+        let model = getDeviceModel()
+        let ios = getIOSVersion()
+        
         let body: [String: Any] = [
-            "key": key,
-            "username": key
+            "key": key.uppercased(),
+            "username": key.uppercased(),
+            "hwid": hwid,
+            "model": model,
+            "ios": ios
         ]
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
