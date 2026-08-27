@@ -25,13 +25,16 @@ jobs:
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           DEVELOPMENT_TEAM="" \
-          archive 2>&1 | tail -30
+          archive 2>&1 | tail -50
 
     - name: Create IPA
       run: |
-        cd /tmp/Davizin.xcarchive/Products/Applications/
+        ARCHIVE=$(find /tmp -name "*.xcarchive" | head -1)
+        echo "Archive: $ARCHIVE"
+        ls "$ARCHIVE/Products/Applications/"
+        cd "$ARCHIVE/Products/Applications/"
         mkdir -p Payload
-        cp -r DavizinIOS.app Payload/
+        cp -r *.app Payload/
         zip -r /tmp/Davizin_unsigned.ipa Payload/
         ls -lh /tmp/Davizin_unsigned.ipa
 
