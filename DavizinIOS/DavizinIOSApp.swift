@@ -1,6 +1,5 @@
 import SwiftUI
 
-@main
 struct DavizinIOSApp: App {
     @StateObject var appState = AppState()
     
