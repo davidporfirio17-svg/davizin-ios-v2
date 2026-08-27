@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct KeyGateView: View {
-    @EnvironmentObject var appState: AppState
+    @ObservedObject var appState: AppState
+    let onSuccess: () -> Void
     
     @State private var keyInput: String = ""
     @State private var isValidating: Bool = false
@@ -118,11 +119,9 @@ struct KeyGateView: View {
             isValidating = false
             
             if isValid {
-                // Calcular timestamp de expiración (en milisegundos)
                 let expirationTimeMs = Int64(Date().timeIntervalSince1970 * 1000) + Int64(remainingSeconds * 1000)
-                
-                // Guardar key con expiración
                 appState.saveKey(keyInput, expirationMs: expirationTimeMs)
+                onSuccess()
             } else {
                 errorMessage = message
                 withAnimation { showError = true }
