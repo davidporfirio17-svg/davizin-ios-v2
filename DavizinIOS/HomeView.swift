@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct HomeView: View {
-    @EnvironmentObject var appState: AppState
+    @ObservedObject var appState: AppState
+    let onContinue: () -> Void
+    
     @State private var showConfirmInject = false
     @State private var showConfirmUninject = false
     @State private var resultMessage = ""
@@ -14,14 +16,11 @@ struct HomeView: View {
             Color(red: 0.04, green: 0.04, blue: 0.08).ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // CONTENIDO PRINCIPAL (con scroll)
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         headerSection
-                        
-                        // ⭐ ANUNCIO GRANDE CON COUNTDOWN
                         expirationBannerLarge
-                        
+                        continueToOperationButton
                         statusCard
                         gameCard
                         patchesSection
@@ -33,30 +32,16 @@ struct HomeView: View {
                     .padding(.top, 10)
                 }
                 
-                // ⭐ BARRA PEQUEÑA ABAJO (Footer fijo)
                 countdownBarSmall
             }
         }
         .animation(.easeInOut(duration: 0.3), value: appState.isInjected)
         .animation(.easeInOut(duration: 0.3), value: showResult)
-        .confirmationDialog("¿Inyectar ahora?", isPresented: $showConfirmInject, titleVisibility: .visible) {
-            Button("Inyectar") { performInject() }
-            Button("Cancelar", role: .cancel) {}
-        } message: {
-            Text("Se reemplazará el cache_res de \(appState.freeFireName). El original quedará guardado.")
-        }
-        .confirmationDialog("¿Restaurar original?", isPresented: $showConfirmUninject, titleVisibility: .visible) {
-            Button("Restaurar", role: .destructive) { performUninject() }
-            Button("Cancelar", role: .cancel) {}
-        } message: {
-            Text("Se restaurará el cache_res original de \(appState.freeFireName).")
-        }
     }
-
+    
     // MARK: - Anuncio Grande con Countdown
     var expirationBannerLarge: some View {
         VStack(spacing: 14) {
-            // Título
             HStack(spacing: 8) {
                 Image(systemName: "clock.fill")
                     .font(.system(size: 16, weight: .semibold))
@@ -67,7 +52,6 @@ struct HomeView: View {
                 Spacer()
             }
             
-            // Fecha de expiración
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Fecha de vencimiento")
@@ -81,36 +65,14 @@ struct HomeView: View {
                 Spacer()
             }
             
-            // Countdown en tiempo real (GRANDE)
             HStack(spacing: 8) {
-                // DÍAS
-                countdownBox(
-                    value: appState.remainingDays,
-                    label: "días"
-                )
-                
-                // HORAS
-                countdownBox(
-                    value: appState.remainingHours,
-                    label: "horas"
-                )
-                
-                // MINUTOS
-                countdownBox(
-                    value: appState.remainingMinutes,
-                    label: "min"
-                )
-                
-                // SEGUNDOS
-                countdownBox(
-                    value: appState.remainingSeconds,
-                    label: "seg",
-                    isBlink: true
-                )
+                countdownBox(value: appState.remainingDays, label: "días")
+                countdownBox(value: appState.remainingHours, label: "horas")
+                countdownBox(value: appState.remainingMinutes, label: "min")
+                countdownBox(value: appState.remainingSeconds, label: "seg", isBlink: true)
             }
             .frame(height: 80)
             
-            // Alerta si expira pronto
             if appState.remainingDays <= 3 && appState.remainingDays > 0 {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -143,8 +105,27 @@ struct HomeView: View {
         .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.03))
             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.orange.opacity(0.2), lineWidth: 1.5)))
     }
-
-    // MARK: - Caja de countdown individual
+    
+    // MARK: - Botón para continuar a operación
+    var continueToOperationButton: some View {
+        Button(action: onContinue) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                Text("CONTINUAR A OPERACIÓN")
+                    .font(.system(size: 15, weight: .bold))
+                    .tracking(0.5)
+            }
+            .foregroundColor(.black)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(RoundedRectangle(cornerRadius: 14)
+                .fill(LinearGradient(colors: [.cyan, Color(red: 0.0, green: 0.7, blue: 1.0)], startPoint: .leading, endPoint: .trailing))
+                .shadow(color: .cyan.opacity(0.35), radius: 10, y: 4))
+        }
+        .disabled(appState.isExpired)
+    }
+    
     func countdownBox(value: Int, label: String, isBlink: Bool = false) -> some View {
         VStack(spacing: 3) {
             Text(String(format: "%02d", value))
@@ -165,7 +146,6 @@ struct HomeView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.cyan.opacity(0.15), lineWidth: 1))
     }
 
-    // MARK: - Barra pequeña abajo (Footer fijo)
     var countdownBarSmall: some View {
         HStack(spacing: 10) {
             Image(systemName: appState.isExpired ? "xmark.circle.fill" : "clock.fill")
@@ -209,7 +189,6 @@ struct HomeView: View {
         .padding(.bottom, 12)
     }
 
-    // MARK: - Helpers
     func formatExpirationDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -342,101 +321,47 @@ struct HomeView: View {
     var actionButtons: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
-                // INJECT
-                Button { showConfirmInject = true } label: {
+                Button { } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "syringe.fill").font(.system(size: 16))
                         Text("INYECTAR").font(.system(size: 15, weight: .bold)).tracking(0.5)
                     }
-                    .foregroundColor(appState.isInjected ? .white.opacity(0.3) : .black)
+                    .foregroundColor(.white.opacity(0.3))
                     .frame(maxWidth: .infinity).frame(height: 54)
-                    .background(injectBtnBG)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.08)))
                 }
-                .disabled(appState.isInjected || appState.isWorking)
+                .disabled(true)
 
-                // UNINJECT
-                Button { showConfirmUninject = true } label: {
+                Button { } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.uturn.backward.circle.fill").font(.system(size: 16))
                         Text("RESTAURAR").font(.system(size: 15, weight: .bold)).tracking(0.5)
                     }
-                    .foregroundColor(appState.isInjected ? .red : .white.opacity(0.3))
+                    .foregroundColor(.white.opacity(0.3))
                     .frame(maxWidth: .infinity).frame(height: 54)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.06))
-                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(appState.isInjected ? Color.red.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)))
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.08)))
                 }
-                .disabled(!appState.isInjected || appState.isWorking)
+                .disabled(true)
             }
-
-            if appState.isWorking {
-                HStack(spacing: 10) {
-                    ProgressView().tint(.cyan)
-                    Text(appState.statusMessage).font(.system(size: 13)).foregroundColor(.white.opacity(0.5))
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-    }
-
-    @ViewBuilder
-    var injectBtnBG: some View {
-        if appState.isInjected {
-            RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.08))
-        } else {
-            RoundedRectangle(cornerRadius: 14)
-                .fill(LinearGradient(colors: [.cyan, Color(red: 0.0, green: 0.7, blue: 1.0)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                .shadow(color: .cyan.opacity(0.35), radius: 10, y: 4)
         }
     }
 
     var resultCard: some View {
         HStack(spacing: 12) {
-            Image(systemName: resultSuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
+            Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 20))
-                .foregroundColor(resultSuccess ? .green : .red)
-            Text(resultMessage).font(.system(size: 14)).foregroundColor(.white.opacity(0.8)).multilineTextAlignment(.leading)
+                .foregroundColor(.green)
+            Text("Operación completada").font(.system(size: 14)).foregroundColor(.white.opacity(0.8))
             Spacer()
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 14)
-            .fill(resultSuccess ? Color.green.opacity(0.08) : Color.red.opacity(0.08))
-            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(resultSuccess ? Color.green.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)))
+            .fill(Color.green.opacity(0.08))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.green.opacity(0.3), lineWidth: 1)))
     }
 
     var cardBG: some View {
         RoundedRectangle(cornerRadius: 18).fill(Color.white.opacity(0.04))
             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
-    }
-
-    private func performInject() {
-        appState.isWorking = true
-        appState.statusMessage = "Inyectando..."
-        showResult = false
-        DispatchQueue.global(qos: .userInitiated).async {
-            let result = InjectorService.inject(bundleID: appState.freeFireBundleID)
-            DispatchQueue.main.async {
-                appState.isWorking = false
-                resultSuccess = result.success
-                resultMessage = result.message
-                withAnimation { showResult = true; if result.success { appState.isInjected = true } }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) { withAnimation { showResult = false } }
-            }
-        }
-    }
-
-    private func performUninject() {
-        appState.isWorking = true
-        appState.statusMessage = "Restaurando original..."
-        showResult = false
-        DispatchQueue.global(qos: .userInitiated).async {
-            let result = InjectorService.uninject(bundleID: appState.freeFireBundleID)
-            DispatchQueue.main.async {
-                appState.isWorking = false
-                resultSuccess = result.success
-                resultMessage = result.message
-                withAnimation { showResult = true; if result.success { appState.isInjected = false } }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) { withAnimation { showResult = false } }
-            }
-        }
     }
 }
