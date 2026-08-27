@@ -1,17 +1,19 @@
 import UIKit
 
 final class ViewController: UIViewController {
+    /// Actívalo en false cuando conectes tus propios callbacks de aplicación.
     var simulateUIStates = true
 
+    /// Callbacks vacíos por defecto para conectar la lógica real desde fuera del UI.
     var onLoginContinue: ((String) -> Void)?
     var onGameSelected: ((ARIFIGame) -> Void)?
     var onModeSelected: ((ARIFIMode) -> Void)?
     var onOperation: ((ARIFIOperationKind) -> Void)?
     var onClose: (() -> Void)?
 
-    private let animatedBG = ARIFIAnimatedBackgroundView()
+    private let animatedBackgroundView = ARIFIAnimatedBackgroundView()
     private let headerView = ARIFIHeaderView()
-    private let contentView = UIView()
+    private let contentContainerView = UIView()
 
     private var currentStage: ARIFIScreenStage = .login
     private var selectedGame: ARIFIGame = .freeFireMax
@@ -22,67 +24,98 @@ final class ViewController: UIViewController {
     private var modeSelectionView: ModeSelectionView?
     private var operationView: OperationView?
 
-    override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        .lightContent
+    }
 
-    // MARK: - Public controls
-    func showGameSelectionScreen()  { showGameSelection(animated: true) }
-    func showModeSelectionScreen()  { showModeSelection(animated: true) }
-    func showOperationScreen()      { showOperation(animated: true) }
-    func setLoginChecking(_ c: Bool){ loginView?.setChecking(c) }
-    func setLoginStatus(_ t: String?, success: Bool = false) { loginView?.setStatus(t, success: success) }
-    func setOperationState(_ s: ARIFIOperationState) { operationView?.setState(s) }
+    /// Usa este factory cuando presentes el UI desde otro controlador.
+    /// El estilo se fija antes de `present(...)`, que es el momento correcto para evitar `.pageSheet`.
+    static func makeFullScreen() -> ViewController {
+        let controller = ViewController()
+        controller.modalPresentationStyle = .fullScreen
+        controller.modalPresentationCapturesStatusBarAppearance = true
+        return controller
+    }
+
+    // MARK: - Public UI controls
+
+    func showGameSelectionScreen() {
+        showGameSelection(animated: true)
+    }
+
+    func showModeSelectionScreen() {
+        showModeSelection(animated: true)
+    }
+
+    func showOperationScreen() {
+        showOperation(animated: true)
+    }
+
+    func setLoginChecking(_ checking: Bool) {
+        loginView?.setChecking(checking)
+    }
+
+    func setLoginStatus(_ text: String?, success: Bool = false) {
+        loginView?.setStatus(text, success: success)
+    }
+
+    func setOperationState(_ state: ARIFIOperationState) {
+        operationView?.setState(state)
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        setupLayout()
+        modalPresentationStyle = .fullScreen
+        modalPresentationCapturesStatusBarAppearance = true
+        configureBaseUI()
         showLogin(animated: false)
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        animatedBG.startAnimating()
+        animatedBackgroundView.startAnimating()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        animatedBG.stopAnimating()
+        animatedBackgroundView.stopAnimating()
     }
 
-    private func setupLayout() {
-        view.backgroundColor = .black
+    private func configureBaseUI() {
+        view.backgroundColor = AppTheme.background
 
-        // Background — full screen
-        animatedBG.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(animatedBG)
-        animatedBG.arifiPinEdges(to: view)
+        animatedBackgroundView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(animatedBackgroundView)
 
-        // Header
         headerView.delegate = self
-        headerView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(headerView)
 
-        // Content — fills everything below header
-        contentView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.backgroundColor = .clear
-        view.addSubview(contentView)
+        contentContainerView.translatesAutoresizingMaskIntoConstraints = false
+        contentContainerView.backgroundColor = .clear
+        view.addSubview(contentContainerView)
 
         NSLayoutConstraint.activate([
-            headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            headerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 6),
+            animatedBackgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            animatedBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            animatedBackgroundView.topAnchor.constraint(equalTo: view.topAnchor),
+            animatedBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            contentView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            contentView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 8),
-            contentView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16.0),
+            headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16.0),
+            headerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 6.0),
+
+            contentContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            contentContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            contentContainerView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 4.0),
+            contentContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
     }
 
-    // MARK: - Screen transitions
     private func showLogin(animated: Bool) {
         currentStage = .login
         headerView.title = "Davizin"
         headerView.showsBackButton = false
+
         let screen = LoginView()
         screen.delegate = self
         loginView = screen
@@ -93,6 +126,7 @@ final class ViewController: UIViewController {
         currentStage = .gameSelection
         headerView.title = "Select Game"
         headerView.showsBackButton = true
+
         let screen = GameSelectionView()
         screen.delegate = self
         screen.setSelectedGame(selectedGame)
@@ -104,6 +138,7 @@ final class ViewController: UIViewController {
         currentStage = .modeSelection
         headerView.title = selectedGame.rawValue
         headerView.showsBackButton = true
+
         let screen = ModeSelectionView()
         screen.delegate = self
         screen.setSelectedMode(selectedMode)
@@ -113,8 +148,9 @@ final class ViewController: UIViewController {
 
     private func showOperation(animated: Bool) {
         currentStage = .operation
-        headerView.title = "Davizin"
-        headerView.showsBackButton = false
+        headerView.title = "\(selectedGame.rawValue) - \(selectedMode.rawValue)"
+        headerView.showsBackButton = true
+
         let screen = OperationView()
         screen.delegate = self
         screen.selectedGame = selectedGame
@@ -124,68 +160,106 @@ final class ViewController: UIViewController {
     }
 
     private func display(_ screen: UIView, animated: Bool) {
-        contentView.subviews.forEach { $0.removeFromSuperview() }
+        contentContainerView.subviews.forEach { $0.removeFromSuperview() }
         screen.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(screen)
-        screen.arifiPinEdges(to: contentView)
+        contentContainerView.addSubview(screen)
+        screen.arifiPinEdges(to: contentContainerView)
 
-        guard animated else { screen.alpha = 1; screen.transform = .identity; return }
-        screen.alpha = 0
-        screen.transform = CGAffineTransform(translationX: 0, y: 12)
-        UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut]) {
-            screen.alpha = 1
+        guard animated else {
+            screen.alpha = 1.0
+            screen.transform = .identity
+            return
+        }
+
+        screen.alpha = 0.0
+        screen.transform = CGAffineTransform(translationX: 0.0, y: 10.0)
+        UIView.animate(
+            withDuration: 0.28,
+            delay: 0.0,
+            options: [.curveEaseOut, .beginFromCurrentState, .allowUserInteraction]
+        ) {
+            screen.alpha = 1.0
             screen.transform = .identity
         }
     }
 
-    private func goBack() {
-        switch currentStage {
-        case .login: break
-        case .gameSelection: showLogin(animated: true)
-        case .modeSelection: showGameSelection(animated: true)
-        case .operation: showModeSelection(animated: true)
-        }
-    }
-
-    // MARK: - Simulate
     private func simulateLogin(key: String) {
-        loginView?.setChecking(true)
+        guard let screen = loginView else { return }
+        screen.setChecking(true)
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) { [weak self] in
-            guard let self, self.currentStage == .login else { return }
-            self.loginView?.setChecking(false)
-            self.loginView?.setStatus("Access granted", success: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                guard let self, self.currentStage == .login else { return }
+            guard let self = self, self.currentStage == .login else { return }
+            screen.setChecking(false)
+            screen.setStatus("Access granted", success: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                guard let self = self, self.currentStage == .login else { return }
                 self.showGameSelection(animated: true)
             }
         }
     }
 
-    private func simulateOperation(_ op: ARIFIOperationKind) {
-        let state: ARIFIOperationState = op == .runExploit ? .running : op == .inject ? .injecting : .cleaning
-        operationView?.setState(state)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { [weak self] in
-            guard let self, self.currentStage == .operation else { return }
-            let msg = op == .runExploit ? "Run complete" : op == .inject ? "Injection complete" : "Successfully cleaned!"
-            self.operationView?.setState(.succeeded(msg))
+    private func simulateOperation(_ operation: ARIFIOperationKind) {
+        guard let screen = operationView else { return }
+        let state: ARIFIOperationState
+        switch operation {
+        case .runExploit:
+            state = .running
+        case .inject:
+            state = .injecting
+        case .clean:
+            state = .cleaning
+        }
+        screen.setState(state)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.15) { [weak self] in
+            guard let self = self, self.currentStage == .operation else { return }
+            let message: String
+            switch operation {
+            case .runExploit:
+                message = "Run complete"
+            case .inject:
+                message = "Injection complete"
+            case .clean:
+                message = "Successfully cleaned !"
+            }
+            screen.setState(.succeeded(message))
+        }
+    }
+
+    private func goBack() {
+        switch currentStage {
+        case .login:
+            break
+        case .gameSelection:
+            showLogin(animated: true)
+        case .modeSelection:
+            showGameSelection(animated: true)
+        case .operation:
+            showModeSelection(animated: true)
         }
     }
 }
 
 extension ViewController: ARIFIHeaderViewDelegate {
-    func headerViewDidTapBack(_ h: ARIFIHeaderView) { goBack() }
-    func headerViewDidTapClose(_ h: ARIFIHeaderView) { onClose?() }
+    func headerViewDidTapBack(_ headerView: ARIFIHeaderView) {
+        goBack()
+    }
+
+    func headerViewDidTapClose(_ headerView: ARIFIHeaderView) {
+        onClose?()
+    }
 }
 
 extension ViewController: LoginViewDelegate {
-    func loginView(_ v: LoginView, didTapContinueWithKey key: String) {
+    func loginView(_ loginView: LoginView, didTapContinueWithKey key: String) {
         onLoginContinue?(key)
-        if simulateUIStates { simulateLogin(key: key) }
+        guard simulateUIStates else { return }
+        simulateLogin(key: key)
     }
 }
 
 extension ViewController: GameSelectionViewDelegate {
-    func gameSelectionView(_ v: GameSelectionView, didSelect game: ARIFIGame) {
+    func gameSelectionView(_ view: GameSelectionView, didSelect game: ARIFIGame) {
         selectedGame = game
         onGameSelected?(game)
         showModeSelection(animated: true)
@@ -193,7 +267,7 @@ extension ViewController: GameSelectionViewDelegate {
 }
 
 extension ViewController: ModeSelectionViewDelegate {
-    func modeSelectionView(_ v: ModeSelectionView, didSelect mode: ARIFIMode) {
+    func modeSelectionView(_ view: ModeSelectionView, didSelect mode: ARIFIMode) {
         selectedMode = mode
         onModeSelected?(mode)
         showOperation(animated: true)
@@ -201,8 +275,9 @@ extension ViewController: ModeSelectionViewDelegate {
 }
 
 extension ViewController: OperationViewDelegate {
-    func operationView(_ v: OperationView, didTap op: ARIFIOperationKind) {
-        onOperation?(op)
-        if simulateUIStates { simulateOperation(op) }
+    func operationView(_ view: OperationView, didTap operation: ARIFIOperationKind) {
+        onOperation?(operation)
+        guard simulateUIStates else { return }
+        simulateOperation(operation)
     }
 }
