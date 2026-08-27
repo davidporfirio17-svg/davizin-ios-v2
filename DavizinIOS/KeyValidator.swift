@@ -13,6 +13,10 @@ struct KeyData: Codable {
 }
 
 class KeyValidator {
+    static func validate(key: String, completion: @escaping (Bool, String, Int) -> Void) {
+        validateWithSeconds(key: key, completion: completion)
+    }
+    
     static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int) -> Void) {
         let serverURL = "https://dz.davidporfirio17.workers.dev"
         guard let url = URL(string: "\(serverURL)/check") else {
