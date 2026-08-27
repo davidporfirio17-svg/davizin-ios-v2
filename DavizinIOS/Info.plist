@@ -11,6 +11,7 @@
     <key>CFBundleVersion</key><string>1</string>
     <key>LSRequiresIPhoneOS</key><true/>
     <key>MinimumOSVersion</key><string>17.0</string>
+    <key>UIRequiresFullScreen</key><true/>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key><false/>
@@ -26,7 +27,15 @@
         </dict>
     </dict>
     <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
-    <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+    </array>
     <key>UIStatusBarStyle</key><string>UIStatusBarStyleLightContent</string>
     <key>UIUserInterfaceStyle</key><string>Dark</string>
     <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
