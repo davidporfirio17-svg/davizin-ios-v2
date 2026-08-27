@@ -1,12 +1,12 @@
 #import "DavizinMCM.h"
 #import <dlfcn.h>
 #import <stdlib.h>
-#import <xpc/xpc.h>
-#import <Security/Security.h>
 #import <fcntl.h>
-#import <unistd.h>
 
-// ── Tipos de containermanager ────────────────────────────────────
+// XPC sin importar el header — usamos void* directamente
+typedef void *xpc_object_t;
+typedef xpc_object_t (*xpc_string_create_t)(const char *);
+
 typedef void *(*cm_query_create_t)(void);
 typedef void  (*cm_query_set_u64_t)(void *, uint64_t);
 typedef void  (*cm_query_set_xpc_t)(void *, xpc_object_t);
@@ -18,8 +18,7 @@ typedef char *(*cm_obj_copy_token_t)(void *);
 typedef void  (*cm_obj_free_t)(void *);
 typedef int   (*cm_err_posix_t)(void *);
 typedef const char *(*cm_err_msg_t)(void *);
-// sandbox_extension_consume via dlsym (API privada)
-typedef int64_t (*sandbox_ext_consume_t)(const char *);
+typedef int64_t (*sandbox_consume_t)(const char *);
 
 typedef struct {
     cm_query_create_t   queryCreate;
@@ -34,63 +33,61 @@ typedef struct {
     cm_obj_free_t       objFree;
     cm_err_posix_t      errPosix;
     cm_err_msg_t        errMsg;
-    sandbox_ext_consume_t sandboxConsume;
+    xpc_string_create_t xpcStringCreate;
+    sandbox_consume_t   sandboxConsume;
 } CMAPI;
 
 static CMAPI *getCMAPI(void) {
     static CMAPI api;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        void *h = dlopen("/usr/lib/system/libsystem_containermanager.dylib",
-                         RTLD_NOW | RTLD_LOCAL);
-        if (!h) h = RTLD_DEFAULT;
-#define L(f,s) api.f = (__typeof(api.f))dlsym(h,s)
-        L(queryCreate,   "container_query_create");
-        L(querySetClass, "container_query_set_class");
-        L(querySetIds,   "container_query_set_identifiers");
-        L(querySetFlags, "container_query_operation_set_flags");
-        L(queryGetSingle,"container_query_get_single_result");
-        L(queryGetErr,   "container_query_get_last_error");
-        L(queryFree,     "container_query_free");
-        L(objGetPath,    "container_object_get_path");
-        L(objCopyToken,  "container_copy_sandbox_token");
-        L(objFree,       "container_object_free");
-        L(errPosix,      "container_error_get_posix_errno");
-        L(errMsg,        "container_error_get_message");
+        void *cm = dlopen("/usr/lib/system/libsystem_containermanager.dylib", RTLD_NOW|RTLD_LOCAL);
+        if (!cm) cm = RTLD_DEFAULT;
+        void *xpc = dlopen("/usr/lib/system/libxpc.dylib", RTLD_NOW|RTLD_LOCAL);
+        if (!xpc) xpc = RTLD_DEFAULT;
+        void *sb = dlopen("/usr/lib/system/libsystem_sandbox.dylib", RTLD_NOW|RTLD_LOCAL);
+        if (!sb) sb = RTLD_DEFAULT;
+#define L(h,f,s) api.f = (__typeof(api.f))dlsym(h,s)
+        L(cm, queryCreate,   "container_query_create");
+        L(cm, querySetClass, "container_query_set_class");
+        L(cm, querySetIds,   "container_query_set_identifiers");
+        L(cm, querySetFlags, "container_query_operation_set_flags");
+        L(cm, queryGetSingle,"container_query_get_single_result");
+        L(cm, queryGetErr,   "container_query_get_last_error");
+        L(cm, queryFree,     "container_query_free");
+        L(cm, objGetPath,    "container_object_get_path");
+        L(cm, objCopyToken,  "container_copy_sandbox_token");
+        L(cm, objFree,       "container_object_free");
+        L(cm, errPosix,      "container_error_get_posix_errno");
+        L(cm, errMsg,        "container_error_get_message");
+        L(xpc, xpcStringCreate, "xpc_string_create");
+        L(sb,  sandboxConsume,  "sandbox_extension_consume");
 #undef L
-        // sandbox_extension_consume — API privada via dlsym
-        void *sandboxLib = dlopen("/usr/lib/system/libsystem_sandbox.dylib",
-                                  RTLD_NOW | RTLD_LOCAL);
-        if (!sandboxLib) sandboxLib = RTLD_DEFAULT;
-        api.sandboxConsume = (sandbox_ext_consume_t)dlsym(sandboxLib,
-                                                          "sandbox_extension_consume");
     });
     return &api;
 }
 
-// ── Signing identifier ────────────────────────────────────────────
-typedef CFTypeRef SecTaskRef;
-typedef SecTaskRef (*SecTaskCreateFromSelf_t)(CFAllocatorRef);
-typedef CFStringRef (*SecTaskCopySigningID_t)(SecTaskRef, CFErrorRef *);
+// Signing identifier via dlsym
+typedef void *SecTaskRef_t;
+typedef SecTaskRef_t (*SecTaskCreateFromSelf_fn)(void *);
+typedef void        *(*SecTaskCopySigningID_fn)(SecTaskRef_t, void **);
 
-static NSString *signingID(void) {
+static NSString *getSigningID(void) {
     static NSString *result;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        void *secLib = dlopen("/System/Library/Frameworks/Security.framework/Security",
-                              RTLD_LAZY);
-        if (!secLib) secLib = RTLD_DEFAULT;
-        SecTaskCreateFromSelf_t createFn =
-            (SecTaskCreateFromSelf_t)dlsym(secLib, "SecTaskCreateFromSelf");
-        SecTaskCopySigningID_t copyFn =
-            (SecTaskCopySigningID_t)dlsym(secLib, "SecTaskCopySigningIdentifier");
+        void *sec = RTLD_DEFAULT;
+        SecTaskCreateFromSelf_fn createFn = (SecTaskCreateFromSelf_fn)dlsym(sec, "SecTaskCreateFromSelf");
+        SecTaskCopySigningID_fn  copyFn   = (SecTaskCopySigningID_fn)dlsym(sec, "SecTaskCopySigningIdentifier");
         if (createFn && copyFn) {
-            CFTypeRef task = createFn(kCFAllocatorDefault);
+            SecTaskRef_t task = createFn(NULL);
             if (task) {
-                CFErrorRef err = NULL;
-                CFStringRef v = copyFn(task, &err);
-                if (v) { result = [(__bridge NSString *)v copy]; CFRelease(v); }
-                if (err) CFRelease(err);
+                void *err = NULL;
+                void *val = copyFn(task, &err);
+                if (val) {
+                    result = [(__bridge NSString *)val copy];
+                    CFRelease(val);
+                }
                 CFRelease(task);
             }
         }
@@ -98,13 +95,12 @@ static NSString *signingID(void) {
     return result;
 }
 
-// ── Función principal ─────────────────────────────────────────────
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     static NSString *kRequired = @"com.apple.mobile.MobileHouseArrest";
     static const uint64_t kClass = 2;
     static const uint64_t kFlags = 0x900000000ULL;
 
-    NSString *sid = signingID();
+    NSString *sid = getSigningID();
     if (![sid isEqualToString:kRequired]) {
         if (outErr) *outErr = [NSString stringWithFormat:@"Signing ID: '%@'", sid];
         return nil;
@@ -112,56 +108,53 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
 
     CMAPI *api = getCMAPI();
     if (!api->queryCreate || !api->queryGetSingle || !api->objGetPath) {
-        if (outErr) *outErr = @"libsystem_containermanager no disponible";
+        if (outErr) *outErr = @"containermanager no disponible";
         return nil;
     }
 
     void *query = api->queryCreate();
     if (!query) {
-        if (outErr) *outErr = @"container_query_create → NULL";
+        if (outErr) *outErr = @"query_create NULL";
         return nil;
     }
 
     api->querySetClass(query, kClass);
-    xpc_object_t xpcID = xpc_string_create(bundleID.UTF8String);
-    api->querySetIds(query, xpcID);
+
+    xpc_object_t xpcID = NULL;
+    if (api->xpcStringCreate)
+        xpcID = api->xpcStringCreate(bundleID.UTF8String);
+    if (xpcID) api->querySetIds(query, xpcID);
+
     api->querySetFlags(query, kFlags);
 
     void *obj = api->queryGetSingle(query);
     if (!obj) {
-        int posix = 0;
-        const char *msg = NULL;
-        void *qErr = api->queryGetErr ? api->queryGetErr(query) : NULL;
-        if (qErr) {
-            if (api->errPosix) posix = api->errPosix(qErr);
-            if (api->errMsg)   msg   = api->errMsg(qErr);
-        }
+        int posix = 0; const char *msg = NULL;
+        void *qe = api->queryGetErr ? api->queryGetErr(query) : NULL;
+        if (qe && api->errPosix) posix = api->errPosix(qe);
+        if (qe && api->errMsg)   msg   = api->errMsg(qe);
         if (outErr) *outErr = [NSString stringWithFormat:
-            @"No encontrado '%@' (posix=%d %s)", bundleID, posix, msg ?: ""];
+            @"No encontrado '%@' posix=%d %s", bundleID, posix, msg ?: ""];
         api->queryFree(query);
         return nil;
     }
 
     const char *raw = api->objGetPath(obj);
     NSString *path = raw ? [NSString stringWithUTF8String:raw] : nil;
-
     if (!path || !path.isAbsolutePath) {
         if (outErr) *outErr = @"Path inválido";
         api->queryFree(query);
         return nil;
     }
 
-    if ([path isEqualToString:@"/var"] || [path hasPrefix:@"/var/"])
+    if ([path hasPrefix:@"/var/"])
         path = [@"/private" stringByAppendingString:path];
 
-    // Activar sandbox extension via dlsym
+    // Activar sandbox extension
     if (api->objCopyToken) {
         char *token = api->objCopyToken(obj);
-        if (token && token[0] != '\0') {
-            if (api->sandboxConsume) {
-                api->sandboxConsume(token);
-            }
-        }
+        if (token && token[0] && api->sandboxConsume)
+            api->sandboxConsume(token);
         if (token) free(token);
     }
 
