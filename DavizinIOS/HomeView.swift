@@ -12,18 +12,29 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             Color(red: 0.04, green: 0.04, blue: 0.08).ignoresSafeArea()
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    headerSection
-                    statusCard
-                    gameCard
-                    patchesSection
-                    actionButtons
-                    if showResult { resultCard.transition(.opacity) }
-                    Spacer().frame(height: 20)
+            
+            VStack(spacing: 0) {
+                // CONTENIDO PRINCIPAL (con scroll)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        headerSection
+                        
+                        // ⭐ ANUNCIO GRANDE CON COUNTDOWN
+                        expirationBannerLarge
+                        
+                        statusCard
+                        gameCard
+                        patchesSection
+                        actionButtons
+                        if showResult { resultCard.transition(.opacity) }
+                        Spacer().frame(height: 20)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
+                
+                // ⭐ BARRA PEQUEÑA ABAJO (Footer fijo)
+                countdownBarSmall
             }
         }
         .animation(.easeInOut(duration: 0.3), value: appState.isInjected)
@@ -40,6 +51,171 @@ struct HomeView: View {
         } message: {
             Text("Se restaurará el cache_res original de \(appState.freeFireName).")
         }
+    }
+
+    // MARK: - Anuncio Grande con Countdown
+    var expirationBannerLarge: some View {
+        VStack(spacing: 14) {
+            // Título
+            HStack(spacing: 8) {
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.orange)
+                Text("Tu Key Expira")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white.opacity(0.7))
+                Spacer()
+            }
+            
+            // Fecha de expiración
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Fecha de vencimiento")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundColor(.white.opacity(0.4))
+                    
+                    Text(formatExpirationDate(appState.expirationDate()))
+                        .font(.system(size: 15, weight: .bold, design: .monospaced))
+                        .foregroundColor(.orange)
+                }
+                Spacer()
+            }
+            
+            // Countdown en tiempo real (GRANDE)
+            HStack(spacing: 8) {
+                // DÍAS
+                countdownBox(
+                    value: appState.remainingDays,
+                    label: "días"
+                )
+                
+                // HORAS
+                countdownBox(
+                    value: appState.remainingHours,
+                    label: "horas"
+                )
+                
+                // MINUTOS
+                countdownBox(
+                    value: appState.remainingMinutes,
+                    label: "min"
+                )
+                
+                // SEGUNDOS
+                countdownBox(
+                    value: appState.remainingSeconds,
+                    label: "seg",
+                    isBlink: true
+                )
+            }
+            .frame(height: 80)
+            
+            // Alerta si expira pronto
+            if appState.remainingDays <= 3 && appState.remainingDays > 0 {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                    Text("Tu key expira en poco tiempo. Considera renovar pronto.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.red.opacity(0.8))
+                    Spacer()
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.red.opacity(0.08)))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.red.opacity(0.2), lineWidth: 1))
+            }
+            
+            if appState.isExpired {
+                HStack(spacing: 8) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                    Text("Tu key ha expirado. Solicita una nueva.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.red)
+                    Spacer()
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.red.opacity(0.15)))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.red.opacity(0.3), lineWidth: 1))
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.03))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.orange.opacity(0.2), lineWidth: 1.5)))
+    }
+
+    // MARK: - Caja de countdown individual
+    func countdownBox(value: Int, label: String, isBlink: Bool = false) -> some View {
+        VStack(spacing: 3) {
+            Text(String(format: "%02d", value))
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                .foregroundColor(Color(red: 0.0, green: 0.8, blue: 1.0))
+                .frame(height: 30)
+                .opacity(isBlink && value % 2 == 0 ? 0.6 : 1.0)
+                .animation(.linear(duration: 0.5).repeatForever(autoreverses: true), value: value)
+            
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.white.opacity(0.35))
+                .tracking(0.5)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.04)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.cyan.opacity(0.15), lineWidth: 1))
+    }
+
+    // MARK: - Barra pequeña abajo (Footer fijo)
+    var countdownBarSmall: some View {
+        HStack(spacing: 10) {
+            Image(systemName: appState.isExpired ? "xmark.circle.fill" : "clock.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(appState.isExpired ? .red : .cyan)
+            
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Expira en")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white.opacity(0.4))
+                
+                HStack(spacing: 4) {
+                    if appState.isExpired {
+                        Text("Expirada")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(.red)
+                    } else {
+                        HStack(spacing: 3) {
+                            Text(String(format: "%dd", appState.remainingDays))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            Text(String(format: "%02dh", appState.remainingHours))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            Text(String(format: "%02dm", appState.remainingMinutes))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            Text(String(format: "%02ds", appState.remainingSeconds))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.cyan)
+                        }
+                        .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08), lineWidth: 1)))
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Helpers
+    func formatExpirationDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        formatter.locale = Locale(identifier: "es_MX")
+        return formatter.string(from: date)
     }
 
     var headerSection: some View {
