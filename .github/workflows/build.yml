@@ -19,26 +19,41 @@ jobs:
           -project DavizinIOS.xcodeproj \
           -scheme DavizinIOS \
           -configuration Release \
-          -destination 'generic/platform=iOS' \
-          -archivePath /tmp/Davizin.xcarchive \
+          -sdk iphoneos \
+          -arch arm64 \
           IPHONEOS_DEPLOYMENT_TARGET=17.0 \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           DEVELOPMENT_TEAM="" \
+          ONLY_ACTIVE_ARCH=NO \
           ALWAYS_SEARCH_USER_PATHS=NO \
-          archive 2>&1 | tee /tmp/build_full.log | grep -E "error:|warning:|ARCHIVE FAILED|BUILD FAILED" | head -40
-        echo "=== ERRORES ==="
-        grep "error:" /tmp/build_full.log | grep -v "^/Applications" | head -20
+          BUILD_DIR=/tmp/davizin_build \
+          build 2>&1 | tee /tmp/build.log
+        
+        echo "=== Build completed. Checking for .app ==="
+        find /tmp/davizin_build -name "*.app" -type d 2>/dev/null || echo "No .app found"
+        
+        echo "=== Checking for errors in log ==="
+        grep -i "error:" /tmp/build.log | head -20 || echo "No errors found"
 
     - name: Create IPA
       run: |
-        ls /tmp/Davizin.xcarchive/Products/Applications/
-        APP=$(find /tmp/Davizin.xcarchive/Products/Applications -name "*.app" | head -1)
+        APP=$(find /tmp/davizin_build -name "*.app" -not -path "*/simulator/*" -type d | head -1)
+        if [ -z "$APP" ]; then
+          echo "ERROR: No .app found"
+          exit 1
+        fi
+        
+        echo "Found app: $APP"
+        du -sh "$APP"
+        
         mkdir -p /tmp/Payload
-        cp -r "$APP" /tmp/Payload/
+        cp -r "$APP" /tmp/Payload/DavizinIOS.app
         cd /tmp && zip -r Davizin_unsigned.ipa Payload/
+        
         ls -lh /tmp/Davizin_unsigned.ipa
+        unzip -l /tmp/Davizin_unsigned.ipa | head -20
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
