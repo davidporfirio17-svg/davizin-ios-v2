@@ -15,59 +15,6 @@ struct KeyData: Codable {
 class KeyValidator: ObservableObject {
     static let serverURL = "https://dz.davidporfirio17.workers.dev"
 
-    func validate(key: String, completion: @escaping (Bool, String) -> Void) {
-        guard let url = URL(string: "\(KeyValidator.serverURL)/check") else {
-            completion(false, "URL inválida")
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 15
-
-        let body: [String: Any] = [
-            "key": key,
-            "username": key,
-        ]
-
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    completion(false, "Error de conexión: \(error.localizedDescription)")
-                    return
-                }
-
-                guard let data = data else {
-                    completion(false, "Sin respuesta del servidor")
-                    return
-                }
-
-                do {
-                    let resp = try JSONDecoder().decode(KeyResponse.self, from: data)
-                    
-                    if resp.success {
-                        // Obtener remaining_seconds
-                        let remainingSeconds = resp.data?.remaining_seconds ?? resp.remaining_seconds ?? 0
-                        
-                        // Calcular timestamp de expiración (en milisegundos)
-                        let expirationTimeMs = Int64(Date().timeIntervalSince1970 * 1000) + Int64(remainingSeconds * 1000)
-                        
-                        // Guardar en AppState con expiración
-                        completion(true, resp.message ?? "Login exitoso")
-                    } else {
-                        completion(false, resp.message ?? "Validación rechazada")
-                    }
-                } catch {
-                    completion(false, "Invalid server response.")
-                }
-            }
-        }.resume()
-    }
-    
-    // Versión alternativa que retorna remaining_seconds para cálculos manuales
     static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int) -> Void) {
         guard let url = URL(string: "\(serverURL)/check") else {
             completion(false, "URL inválida", 0)
