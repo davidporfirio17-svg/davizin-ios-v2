@@ -1,5 +1,4 @@
 import UIKit
-import SwiftUI
 
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
@@ -9,19 +8,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         willConnectTo session: UISceneSession,
         options connectionOptions: UIScene.ConnectionOptions
     ) {
-        guard let windowScene = scene as? UIWindowScene else { return }
-
-        // Usar SwiftUI como root - esto muestra el flujo completo
-        let window = UIWindow(windowScene: windowScene)
-        let rootView = RootView()
-        
-        let hostingController = UIHostingController(rootView: rootView)
-        hostingController.overrideUserInterfaceStyle = .dark
-        
-        window.rootViewController = hostingController
-        window.makeKeyAndVisible()
-        
-        self.window = window
+        // SwiftUI se encarga de todo via DavizinIOSApp
+        // No necesitamos hacer nada acá
     }
 
     func sceneWillResignActive(_ scene: UIScene) {}
