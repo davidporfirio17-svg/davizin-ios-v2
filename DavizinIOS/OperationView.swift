@@ -18,27 +18,11 @@ final class OperationView: UIView {
 
     private(set) var operationState: ARIFIOperationState = .idle
 
-    var selectedGame: ARIFIGame = .freeFireMax {
-        didSet {
-            updateSubtitle()
-        }
-    }
+    var selectedGame: ARIFIGame = .freeFireMax { didSet { updateContent() } }
+    var selectedMode: ARIFIMode = .drag { didSet { updateContent() } }
 
-    var selectedMode: ARIFIMode = .drag {
-        didSet {
-            updateSubtitle()
-        }
-    }
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        configure()
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        configure()
-    }
+    override init(frame: CGRect) { super.init(frame: frame); configure() }
+    required init?(coder: NSCoder) { super.init(coder: coder); configure() }
 
     func setState(_ state: ARIFIOperationState) {
         operationState = state
@@ -86,7 +70,6 @@ final class OperationView: UIView {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
-        titleLabel.text = ""
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = AppTheme.titleFont()
         titleLabel.textAlignment = .center
@@ -96,13 +79,10 @@ final class OperationView: UIView {
         subtitleLabel.font = AppTheme.bodyFont()
         subtitleLabel.textAlignment = .center
         subtitleLabel.numberOfLines = 0
-        subtitleLabel.adjustsFontForContentSizeCategory = true
         subtitleLabel.isHidden = true
-        updateSubtitle()
 
-        runButton.accessibilityIdentifier = "operation.runExploit"
-        injectButton.accessibilityIdentifier = "operation.inject"
-        cleanButton.accessibilityIdentifier = "operation.clean"
+        updateContent()
+
         runButton.addTarget(self, action: #selector(runTapped), for: .touchUpInside)
         injectButton.addTarget(self, action: #selector(injectTapped), for: .touchUpInside)
         cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
@@ -115,10 +95,17 @@ final class OperationView: UIView {
 
         stackView.axis = .vertical
         stackView.alignment = .fill
-        stackView.spacing = 12.0
+        stackView.spacing = AppTheme.standardSpacing
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
+
+        // Spacer
+        let spacer = UIView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.heightAnchor.constraint(equalToConstant: 8).isActive = true
+        stackView.addArrangedSubview(spacer)
+
         stackView.addArrangedSubview(runButton)
         stackView.addArrangedSubview(injectButton)
         stackView.addArrangedSubview(cleanButton)
@@ -129,32 +116,24 @@ final class OperationView: UIView {
         addSubview(cardView)
 
         NSLayoutConstraint.activate([
-            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 22.0),
-            cardView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -22.0),
-            cardView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            // Card llena todo el ancho con margen
+            cardView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            cardView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            // Centrado verticalmente pero con límite de ancho máximo
             cardView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: AppTheme.contentMaximumWidth),
-            stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: 240.0),
+
             runButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             injectButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
-            cleanButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
+            cleanButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
         ])
     }
 
-    private func updateSubtitle() {
-        titleLabel.text = "\(selectedGame.rawValue) - \(selectedMode.rawValue)"
-        subtitleLabel.text = nil
+    private func updateContent() {
+        titleLabel.text = "\(selectedGame.rawValue)"
+        subtitleLabel.text = "Mode: \(selectedMode.rawValue)"
     }
 
-    @objc private func runTapped() {
-        delegate?.operationView(self, didTap: .runExploit)
-    }
-
-    @objc private func injectTapped() {
-        delegate?.operationView(self, didTap: .inject)
-    }
-
-    @objc private func cleanTapped() {
-        delegate?.operationView(self, didTap: .clean)
-    }
+    @objc private func runTapped()    { delegate?.operationView(self, didTap: .runExploit) }
+    @objc private func injectTapped() { delegate?.operationView(self, didTap: .inject) }
+    @objc private func cleanTapped()  { delegate?.operationView(self, didTap: .clean) }
 }
