@@ -10,7 +10,7 @@ class AppState: ObservableObject {
     @Published var isWorking: Bool = false
     
     // COUNTDOWN
-    @Published var expirationTime: Int64 = 0  // timestamp en ms
+    @Published var expirationTime: Int64 = 0
     @Published var remainingDays: Int = 0
     @Published var remainingHours: Int = 0
     @Published var remainingMinutes: Int = 0
@@ -24,13 +24,9 @@ class AppState: ObservableObject {
     private var countdownTimer: Timer?
     
     init() {
-        if let saved = UserDefaults.standard.string(forKey: "dz_key") {
-            currentKey = saved
-        }
-        if let exp = UserDefaults.standard.object(forKey: "dz_expiration") as? Int64 {
-            expirationTime = exp
-            startCountdown()
-        }
+        // NO cargar key automáticamente - SIEMPRE pedir
+        isAuthenticated = false
+        currentKey = ""
         checkInjectionStatus()
     }
     
@@ -41,8 +37,7 @@ class AppState: ObservableObject {
     func saveKey(_ key: String, expirationMs: Int64) {
         currentKey = key
         expirationTime = expirationMs
-        UserDefaults.standard.set(key, forKey: "dz_key")
-        UserDefaults.standard.set(expirationMs, forKey: "dz_expiration")
+        // NO guardar en UserDefaults - se pide siempre
         isAuthenticated = true
         startCountdown()
     }
@@ -57,8 +52,7 @@ class AppState: ObservableObject {
         remainingSeconds = 0
         isExpired = false
         stopCountdown()
-        UserDefaults.standard.removeObject(forKey: "dz_key")
-        UserDefaults.standard.removeObject(forKey: "dz_expiration")
+        // NO limpiar UserDefaults - se pide fresh key siempre
     }
     
     func startCountdown() {
@@ -75,7 +69,7 @@ class AppState: ObservableObject {
     }
     
     private func updateCountdown() {
-        let now = Date().timeIntervalSince1970 * 1000  // ms
+        let now = Date().timeIntervalSince1970 * 1000
         let remaining = expirationTime - Int64(now)
         
         if remaining <= 0 {
