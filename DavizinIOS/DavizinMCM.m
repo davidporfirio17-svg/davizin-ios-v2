@@ -6,11 +6,7 @@
 #import <fcntl.h>
 #import <unistd.h>
 
-// ── Sandbox extension consume (libsandbox private API) ──────────
-// Esta es la clave para obtener acceso de escritura real
-extern int64_t sandbox_extension_consume(const char *token);
-
-// ── Container Manager function types ────────────────────────────
+// ── Tipos de containermanager ────────────────────────────────────
 typedef void *(*cm_query_create_t)(void);
 typedef void  (*cm_query_set_u64_t)(void *, uint64_t);
 typedef void  (*cm_query_set_xpc_t)(void *, xpc_object_t);
@@ -22,6 +18,8 @@ typedef char *(*cm_obj_copy_token_t)(void *);
 typedef void  (*cm_obj_free_t)(void *);
 typedef int   (*cm_err_posix_t)(void *);
 typedef const char *(*cm_err_msg_t)(void *);
+// sandbox_extension_consume via dlsym (API privada)
+typedef int64_t (*sandbox_ext_consume_t)(const char *);
 
 typedef struct {
     cm_query_create_t   queryCreate;
@@ -36,6 +34,7 @@ typedef struct {
     cm_obj_free_t       objFree;
     cm_err_posix_t      errPosix;
     cm_err_msg_t        errMsg;
+    sandbox_ext_consume_t sandboxConsume;
 } CMAPI;
 
 static CMAPI *getCMAPI(void) {
@@ -59,38 +58,52 @@ static CMAPI *getCMAPI(void) {
         L(errPosix,      "container_error_get_posix_errno");
         L(errMsg,        "container_error_get_message");
 #undef L
+        // sandbox_extension_consume — API privada via dlsym
+        void *sandboxLib = dlopen("/usr/lib/system/libsystem_sandbox.dylib",
+                                  RTLD_NOW | RTLD_LOCAL);
+        if (!sandboxLib) sandboxLib = RTLD_DEFAULT;
+        api.sandboxConsume = (sandbox_ext_consume_t)dlsym(sandboxLib,
+                                                          "sandbox_extension_consume");
     });
     return &api;
 }
 
-// ── Signing identifier check ─────────────────────────────────────
+// ── Signing identifier ────────────────────────────────────────────
 typedef CFTypeRef SecTaskRef;
-extern SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
-extern CFStringRef SecTaskCopySigningIdentifier(SecTaskRef task, CFErrorRef *error);
+typedef SecTaskRef (*SecTaskCreateFromSelf_t)(CFAllocatorRef);
+typedef CFStringRef (*SecTaskCopySigningID_t)(SecTaskRef, CFErrorRef *);
 
 static NSString *signingID(void) {
     static NSString *result;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        SecTaskRef task = SecTaskCreateFromSelf(kCFAllocatorDefault);
-        if (task) {
-            CFErrorRef err = NULL;
-            CFStringRef v = SecTaskCopySigningIdentifier(task, &err);
-            if (v) { result = [(__bridge NSString *)v copy]; CFRelease(v); }
-            if (err) CFRelease(err);
-            CFRelease(task);
+        void *secLib = dlopen("/System/Library/Frameworks/Security.framework/Security",
+                              RTLD_LAZY);
+        if (!secLib) secLib = RTLD_DEFAULT;
+        SecTaskCreateFromSelf_t createFn =
+            (SecTaskCreateFromSelf_t)dlsym(secLib, "SecTaskCreateFromSelf");
+        SecTaskCopySigningID_t copyFn =
+            (SecTaskCopySigningID_t)dlsym(secLib, "SecTaskCopySigningIdentifier");
+        if (createFn && copyFn) {
+            CFTypeRef task = createFn(kCFAllocatorDefault);
+            if (task) {
+                CFErrorRef err = NULL;
+                CFStringRef v = copyFn(task, &err);
+                if (v) { result = [(__bridge NSString *)v copy]; CFRelease(v); }
+                if (err) CFRelease(err);
+                CFRelease(task);
+            }
         }
     });
     return result;
 }
 
-// ── Main function ────────────────────────────────────────────────
+// ── Función principal ─────────────────────────────────────────────
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     static NSString *kRequired = @"com.apple.mobile.MobileHouseArrest";
-    static const uint64_t kClass = 2;       // App data container
+    static const uint64_t kClass = 2;
     static const uint64_t kFlags = 0x900000000ULL;
 
-    // 1. Verificar signing identifier
     NSString *sid = signingID();
     if (![sid isEqualToString:kRequired]) {
         if (outErr) *outErr = [NSString stringWithFormat:@"Signing ID: '%@'", sid];
@@ -103,7 +116,6 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
         return nil;
     }
 
-    // 2. Crear query
     void *query = api->queryCreate();
     if (!query) {
         if (outErr) *outErr = @"container_query_create → NULL";
@@ -115,7 +127,6 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     api->querySetIds(query, xpcID);
     api->querySetFlags(query, kFlags);
 
-    // 3. Obtener objeto container
     void *obj = api->queryGetSingle(query);
     if (!obj) {
         int posix = 0;
@@ -126,36 +137,29 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
             if (api->errMsg)   msg   = api->errMsg(qErr);
         }
         if (outErr) *outErr = [NSString stringWithFormat:
-            @"Container no encontrado '%@' (posix=%d %s)",
-            bundleID, posix, msg ?: ""];
+            @"No encontrado '%@' (posix=%d %s)", bundleID, posix, msg ?: ""];
         api->queryFree(query);
         return nil;
     }
 
-    // 4. Obtener path
     const char *raw = api->objGetPath(obj);
     NSString *path = raw ? [NSString stringWithUTF8String:raw] : nil;
 
     if (!path || !path.isAbsolutePath) {
-        if (outErr) *outErr = @"Path inválido del container";
+        if (outErr) *outErr = @"Path inválido";
         api->queryFree(query);
         return nil;
     }
 
-    // Normalizar /var → /private/var
     if ([path isEqualToString:@"/var"] || [path hasPrefix:@"/var/"])
         path = [@"/private" stringByAppendingString:path];
 
-    // 5. Obtener sandbox token y consumirlo con sandbox_extension_consume
-    // Esta es la clave para escribir archivos en el container
+    // Activar sandbox extension via dlsym
     if (api->objCopyToken) {
         char *token = api->objCopyToken(obj);
         if (token && token[0] != '\0') {
-            // sandbox_extension_consume activa el permiso de lectura/escritura
-            int64_t result = sandbox_extension_consume(token);
-            if (result == -1) {
-                // Si falla, intentar de todas formas
-                NSLog(@"[DavizinMCM] sandbox_extension_consume falló, continuando...");
+            if (api->sandboxConsume) {
+                api->sandboxConsume(token);
             }
         }
         if (token) free(token);
