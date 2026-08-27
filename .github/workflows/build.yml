@@ -14,30 +14,29 @@ jobs:
 
     - name: Build
       run: |
+        set -o pipefail
         xcodebuild \
           -project DavizinIOS.xcodeproj \
           -scheme DavizinIOS \
           -configuration Release \
-          -sdk iphoneos \
-          -arch arm64 \
+          -destination 'generic/platform=iOS' \
+          -archivePath /tmp/Davizin.xcarchive \
           IPHONEOS_DEPLOYMENT_TARGET=17.0 \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           DEVELOPMENT_TEAM="" \
-          ONLY_ACTIVE_ARCH=NO \
           ALWAYS_SEARCH_USER_PATHS=NO \
-          BUILD_DIR=/tmp/davizin_build \
-          build 2>&1 | tail -20
-        find /tmp/davizin_build -name "*.app" 2>/dev/null
+          archive
 
     - name: Create IPA
       run: |
-        APP=$(find /tmp/davizin_build -name "*.app" -not -path "*/simulator/*" | head -1)
+        ls /tmp/Davizin.xcarchive/Products/Applications/
+        APP=$(find /tmp/Davizin.xcarchive/Products/Applications -name "*.app" | head -1)
         echo "App: $APP"
         du -sh "$APP"
         mkdir -p /tmp/Payload
-        cp -r "$APP" /tmp/Payload/DavizinIOS.app
+        cp -r "$APP" /tmp/Payload/
         cd /tmp && zip -r Davizin_unsigned.ipa Payload/
         ls -lh /tmp/Davizin_unsigned.ipa
 
