@@ -114,10 +114,21 @@ struct KeyGateView: View {
         guard !keyInput.isEmpty else { return }
         withAnimation { showError = false }
         isValidating = true
-        validator.validate(key: keyInput) { isValid, message in
+        
+        // Usar el método que retorna remaining_seconds
+        KeyValidator.validateWithSeconds(key: keyInput) { isValid, message, remainingSeconds in
             isValidating = false
-            if isValid { appState.saveKey(keyInput) }
-            else { errorMessage = message; withAnimation { showError = true } }
+            
+            if isValid {
+                // Calcular timestamp de expiración (en milisegundos)
+                let expirationTimeMs = Int64(Date().timeIntervalSince1970 * 1000) + Int64(remainingSeconds * 1000)
+                
+                // Guardar key con expiración
+                appState.saveKey(keyInput, expirationMs: expirationTimeMs)
+            } else {
+                errorMessage = message
+                withAnimation { showError = true }
+            }
         }
     }
 }
