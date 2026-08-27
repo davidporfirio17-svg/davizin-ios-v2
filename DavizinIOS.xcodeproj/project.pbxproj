@@ -21,8 +21,11 @@
 		A14 = {isa=PBXBuildFile;fileRef=F14;};
 		A15 = {isa=PBXBuildFile;fileRef=F15;};
 		A16 = {isa=PBXBuildFile;fileRef=F16;};
+		A17 = {isa=PBXBuildFile;fileRef=F17;};
+		A18 = {isa=PBXBuildFile;fileRef=F18;};
 		AR1 = {isa=PBXBuildFile;fileRef=FR1;};
 		AR2 = {isa=PBXBuildFile;fileRef=FR2;};
+		AR3 = {isa=PBXBuildFile;fileRef=FR3;};
 /* PBXFileReference */
 		F01 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=AppDelegate.swift;sourceTree="<group>";};
 		F02 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=SceneDelegate.swift;sourceTree="<group>";};
@@ -47,14 +50,13 @@
 		F21 = {isa=PBXFileReference;lastKnownFileType=text.plist.entitlements;path=DavizinIOS.entitlements;sourceTree="<group>";};
 		FR1 = {isa=PBXFileReference;lastKnownFileType=folder.assetcatalog;path=Assets.xcassets;sourceTree="<group>";};
 		FR2 = {isa=PBXFileReference;lastKnownFileType=file;path=cache_res;sourceTree="<group>";};
+		FR3 = {isa=PBXFileReference;lastKnownFileType=file.storyboard;path=LaunchScreen.storyboard;sourceTree="<group>";};
 		PROD = {isa=PBXFileReference;explicitFileType=wrapper.application;includeInIndex=0;path=DavizinIOS.app;sourceTree=BUILT_PRODUCTS_DIR;};
-/* PBXBuildFile for ObjC */
-		A17 = {isa=PBXBuildFile;fileRef=F17;};
 /* PBXFrameworksBuildPhase */
 		PH_F = {isa=PBXFrameworksBuildPhase;buildActionMask=2147483647;files=();runOnlyForDeploymentPostprocessing=0;};
 /* PBXGroup */
 		GRP_M = {isa=PBXGroup;children=(GRP_S,GRP_P);sourceTree="<group>";};
-		GRP_S = {isa=PBXGroup;children=(F01,F02,F03,F04,F05,F06,F07,F08,F09,F10,F11,F12,F13,F14,F15,F16,F17,F18,F19,F20,F21,FR1,FR2);path=DavizinIOS;sourceTree="<group>";};
+		GRP_S = {isa=PBXGroup;children=(F01,F02,F03,F04,F05,F06,F07,F08,F09,F10,F11,F12,F13,F14,F15,F16,F17,F18,F19,F20,F21,FR1,FR2,FR3);path=DavizinIOS;sourceTree="<group>";};
 		GRP_P = {isa=PBXGroup;children=(PROD);name=Products;sourceTree="<group>";};
 /* PBXNativeTarget */
 		TGT = {
@@ -84,7 +86,7 @@
 			targets=(TGT);
 		};
 /* PBXResourcesBuildPhase */
-		PH_R = {isa=PBXResourcesBuildPhase;buildActionMask=2147483647;files=(AR1,AR2);runOnlyForDeploymentPostprocessing=0;};
+		PH_R = {isa=PBXResourcesBuildPhase;buildActionMask=2147483647;files=(AR1,AR2,AR3);runOnlyForDeploymentPostprocessing=0;};
 /* PBXSourcesBuildPhase */
 		PH_S = {
 			isa=PBXSourcesBuildPhase;
