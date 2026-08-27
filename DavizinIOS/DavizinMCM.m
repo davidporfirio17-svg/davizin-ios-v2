@@ -6,150 +6,161 @@
 #import <fcntl.h>
 #import <unistd.h>
 
-typedef void *(*MCMQueryCreate_t)(void);
-typedef void  (*MCMQuerySetU64_t)(void *, uint64_t);
-typedef void  (*MCMQuerySetXPC_t)(void *, xpc_object_t);
-typedef void *(*MCMQueryGetSingle_t)(void *);
-typedef void *(*MCMQueryGetError_t)(void *);
-typedef void  (*MCMQueryFree_t)(void *);
-typedef const char *(*MCMObjectGetPath_t)(void *);
-typedef void *(*MCMObjectCopy_t)(void *);
-typedef char *(*MCMObjectCopyToken_t)(void *);
-typedef bool  (*MCMObjectActivate_t)(void *, bool);
-typedef void  (*MCMObjectFree_t)(void *);
-typedef int   (*MCMErrorGetPOSIX_t)(void *);
-typedef const char *(*MCMErrorGetMessage_t)(void *);
+// ── Sandbox extension consume (libsandbox private API) ──────────
+// Esta es la clave para obtener acceso de escritura real
+extern int64_t sandbox_extension_consume(const char *token);
+
+// ── Container Manager function types ────────────────────────────
+typedef void *(*cm_query_create_t)(void);
+typedef void  (*cm_query_set_u64_t)(void *, uint64_t);
+typedef void  (*cm_query_set_xpc_t)(void *, xpc_object_t);
+typedef void *(*cm_query_get_single_t)(void *);
+typedef void *(*cm_query_get_err_t)(void *);
+typedef void  (*cm_query_free_t)(void *);
+typedef const char *(*cm_obj_get_path_t)(void *);
+typedef char *(*cm_obj_copy_token_t)(void *);
+typedef void  (*cm_obj_free_t)(void *);
+typedef int   (*cm_err_posix_t)(void *);
+typedef const char *(*cm_err_msg_t)(void *);
 
 typedef struct {
-    void *handle;
-    MCMQueryCreate_t    queryCreate;
-    MCMQuerySetU64_t    querySetClass;
-    MCMQuerySetXPC_t    querySetIdentifiers;
-    MCMQuerySetU64_t    querySetFlags;
-    MCMQuerySetU64_t    querySetPart;
-    MCMQueryGetSingle_t queryGetSingle;
-    MCMQueryGetError_t  queryGetLastError;
-    MCMQueryFree_t      queryFree;
-    MCMObjectGetPath_t  objectGetPath;
-    MCMObjectCopy_t     objectCopy;
-    MCMObjectCopyToken_t objectCopyToken;
-    MCMObjectActivate_t objectActivate;
-    MCMObjectFree_t     objectFree;
-    MCMErrorGetPOSIX_t  errorGetPOSIX;
-    MCMErrorGetMessage_t errorGetMessage;
-} MCMAPI;
+    cm_query_create_t   queryCreate;
+    cm_query_set_u64_t  querySetClass;
+    cm_query_set_xpc_t  querySetIds;
+    cm_query_set_u64_t  querySetFlags;
+    cm_query_get_single_t queryGetSingle;
+    cm_query_get_err_t  queryGetErr;
+    cm_query_free_t     queryFree;
+    cm_obj_get_path_t   objGetPath;
+    cm_obj_copy_token_t objCopyToken;
+    cm_obj_free_t       objFree;
+    cm_err_posix_t      errPosix;
+    cm_err_msg_t        errMsg;
+} CMAPI;
 
-static MCMAPI *MCMGetAPI(void) {
-    static MCMAPI api;
+static CMAPI *getCMAPI(void) {
+    static CMAPI api;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        api.handle = dlopen("/usr/lib/system/libsystem_containermanager.dylib",
-                            RTLD_NOW | RTLD_LOCAL);
-        void *h = api.handle ? api.handle : RTLD_DEFAULT;
-#define LOAD(f, sym) api.f = (__typeof(api.f))dlsym(h, sym)
-        LOAD(queryCreate,        "container_query_create");
-        LOAD(querySetClass,      "container_query_set_class");
-        LOAD(querySetIdentifiers,"container_query_set_identifiers");
-        LOAD(querySetFlags,      "container_query_operation_set_flags");
-        LOAD(querySetPart,       "container_query_operation_set_part");
-        LOAD(queryGetSingle,     "container_query_get_single_result");
-        LOAD(queryGetLastError,  "container_query_get_last_error");
-        LOAD(queryFree,          "container_query_free");
-        LOAD(objectGetPath,      "container_object_get_path");
-        LOAD(objectCopy,         "container_object_copy");
-        LOAD(objectCopyToken,    "container_copy_sandbox_token");
-        LOAD(objectActivate,     "container_object_sandbox_extension_activate");
-        LOAD(objectFree,         "container_object_free");
-        LOAD(errorGetPOSIX,      "container_error_get_posix_errno");
-        LOAD(errorGetMessage,    "container_error_get_message");
-#undef LOAD
+        void *h = dlopen("/usr/lib/system/libsystem_containermanager.dylib",
+                         RTLD_NOW | RTLD_LOCAL);
+        if (!h) h = RTLD_DEFAULT;
+#define L(f,s) api.f = (__typeof(api.f))dlsym(h,s)
+        L(queryCreate,   "container_query_create");
+        L(querySetClass, "container_query_set_class");
+        L(querySetIds,   "container_query_set_identifiers");
+        L(querySetFlags, "container_query_operation_set_flags");
+        L(queryGetSingle,"container_query_get_single_result");
+        L(queryGetErr,   "container_query_get_last_error");
+        L(queryFree,     "container_query_free");
+        L(objGetPath,    "container_object_get_path");
+        L(objCopyToken,  "container_copy_sandbox_token");
+        L(objFree,       "container_object_free");
+        L(errPosix,      "container_error_get_posix_errno");
+        L(errMsg,        "container_error_get_message");
+#undef L
     });
     return &api;
 }
 
+// ── Signing identifier check ─────────────────────────────────────
 typedef CFTypeRef SecTaskRef;
 extern SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
 extern CFStringRef SecTaskCopySigningIdentifier(SecTaskRef task, CFErrorRef *error);
 
-static NSString *MCMSigningIdentifier(void) {
-    static NSString *identifier;
+static NSString *signingID(void) {
+    static NSString *result;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         SecTaskRef task = SecTaskCreateFromSelf(kCFAllocatorDefault);
         if (task) {
             CFErrorRef err = NULL;
-            CFStringRef value = SecTaskCopySigningIdentifier(task, &err);
-            if (value) identifier = [(__bridge NSString *)value copy];
-            if (value) CFRelease(value);
-            if (err)   CFRelease(err);
+            CFStringRef v = SecTaskCopySigningIdentifier(task, &err);
+            if (v) { result = [(__bridge NSString *)v copy]; CFRelease(v); }
+            if (err) CFRelease(err);
             CFRelease(task);
         }
     });
-    return identifier;
+    return result;
 }
 
-static NSString *MCMTryGetPath(NSString *bundleID, uint64_t flags) {
-    MCMAPI *api = MCMGetAPI();
-    if (!api->queryCreate || !api->queryGetSingle || !api->objectGetPath) return nil;
+// ── Main function ────────────────────────────────────────────────
+NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
+    static NSString *kRequired = @"com.apple.mobile.MobileHouseArrest";
+    static const uint64_t kClass = 2;       // App data container
+    static const uint64_t kFlags = 0x900000000ULL;
 
+    // 1. Verificar signing identifier
+    NSString *sid = signingID();
+    if (![sid isEqualToString:kRequired]) {
+        if (outErr) *outErr = [NSString stringWithFormat:@"Signing ID: '%@'", sid];
+        return nil;
+    }
+
+    CMAPI *api = getCMAPI();
+    if (!api->queryCreate || !api->queryGetSingle || !api->objGetPath) {
+        if (outErr) *outErr = @"libsystem_containermanager no disponible";
+        return nil;
+    }
+
+    // 2. Crear query
     void *query = api->queryCreate();
-    if (!query) return nil;
+    if (!query) {
+        if (outErr) *outErr = @"container_query_create → NULL";
+        return nil;
+    }
 
-    api->querySetClass(query, 2);
+    api->querySetClass(query, kClass);
     xpc_object_t xpcID = xpc_string_create(bundleID.UTF8String);
-    api->querySetIdentifiers(query, xpcID);
-    api->querySetFlags(query, flags);
-    if (api->querySetPart) api->querySetPart(query, 0);
+    api->querySetIds(query, xpcID);
+    api->querySetFlags(query, kFlags);
 
-    void *object = api->queryGetSingle(query);
-    if (!object) {
+    // 3. Obtener objeto container
+    void *obj = api->queryGetSingle(query);
+    if (!obj) {
+        int posix = 0;
+        const char *msg = NULL;
+        void *qErr = api->queryGetErr ? api->queryGetErr(query) : NULL;
+        if (qErr) {
+            if (api->errPosix) posix = api->errPosix(qErr);
+            if (api->errMsg)   msg   = api->errMsg(qErr);
+        }
+        if (outErr) *outErr = [NSString stringWithFormat:
+            @"Container no encontrado '%@' (posix=%d %s)",
+            bundleID, posix, msg ?: ""];
         api->queryFree(query);
         return nil;
     }
 
-    const char *rawPath = api->objectGetPath(object);
-    NSString *path = rawPath ? [NSString stringWithUTF8String:rawPath] : nil;
+    // 4. Obtener path
+    const char *raw = api->objGetPath(obj);
+    NSString *path = raw ? [NSString stringWithUTF8String:raw] : nil;
 
-    if (path.length == 0 || !path.isAbsolutePath) {
+    if (!path || !path.isAbsolutePath) {
+        if (outErr) *outErr = @"Path inválido del container";
         api->queryFree(query);
         return nil;
     }
 
+    // Normalizar /var → /private/var
     if ([path isEqualToString:@"/var"] || [path hasPrefix:@"/var/"])
         path = [@"/private" stringByAppendingString:path];
 
-    void *copy = api->objectCopy ? api->objectCopy(object) : NULL;
-    if (copy) {
-        char *token = api->objectCopyToken ? api->objectCopyToken(copy) : NULL;
-        if (token) {
-            api->objectActivate(copy, false);
-            free(token);
+    // 5. Obtener sandbox token y consumirlo con sandbox_extension_consume
+    // Esta es la clave para escribir archivos en el container
+    if (api->objCopyToken) {
+        char *token = api->objCopyToken(obj);
+        if (token && token[0] != '\0') {
+            // sandbox_extension_consume activa el permiso de lectura/escritura
+            int64_t result = sandbox_extension_consume(token);
+            if (result == -1) {
+                // Si falla, intentar de todas formas
+                NSLog(@"[DavizinMCM] sandbox_extension_consume falló, continuando...");
+            }
         }
-        if (api->objectFree) api->objectFree(copy);
+        if (token) free(token);
     }
 
     api->queryFree(query);
-    return path;
-}
-
-NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
-    static const NSString *kRequiredID = @"com.apple.mobile.MobileHouseArrest";
-
-    NSString *signingID = MCMSigningIdentifier();
-    if (![signingID isEqualToString:(NSString *)kRequiredID]) {
-        if (outError) *outError = [NSString stringWithFormat:@"Signing ID: '%@'", signingID];
-        return nil;
-    }
-
-    // Probar flags de R/W primero, luego R/O
-    NSString *path = MCMTryGetPath(bundleID, 0x8100000000ULL);
-    if (!path) path = MCMTryGetPath(bundleID, 0x900000000ULL);
-    if (!path) path = MCMTryGetPath(bundleID, 0x100000000ULL);
-
-    if (!path) {
-        if (outError) *outError = [NSString stringWithFormat:@"Container no encontrado '%@'", bundleID];
-        return nil;
-    }
-
     return path;
 }
