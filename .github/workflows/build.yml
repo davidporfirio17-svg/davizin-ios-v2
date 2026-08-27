@@ -27,14 +27,14 @@ jobs:
           CODE_SIGNING_ALLOWED=NO \
           DEVELOPMENT_TEAM="" \
           ALWAYS_SEARCH_USER_PATHS=NO \
-          archive
+          archive 2>&1 | tee /tmp/build_full.log | grep -E "error:|warning:|ARCHIVE FAILED|BUILD FAILED" | head -40
+        echo "=== ERRORES ==="
+        grep "error:" /tmp/build_full.log | grep -v "^/Applications" | head -20
 
     - name: Create IPA
       run: |
         ls /tmp/Davizin.xcarchive/Products/Applications/
         APP=$(find /tmp/Davizin.xcarchive/Products/Applications -name "*.app" | head -1)
-        echo "App: $APP"
-        du -sh "$APP"
         mkdir -p /tmp/Payload
         cp -r "$APP" /tmp/Payload/
         cd /tmp && zip -r Davizin_unsigned.ipa Payload/
