@@ -1,4 +1,4 @@
-name: Build Davizin iOS IPA
+name: Build Davizin iOS
 
 on:
   push:
@@ -8,36 +8,36 @@ on:
 jobs:
   build:
     runs-on: macos-14
-
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Compilar app
+    - name: Build
       run: |
         xcodebuild \
           -project DavizinIOS.xcodeproj \
           -scheme DavizinIOS \
           -configuration Release \
           -destination 'generic/platform=iOS' \
-          -archivePath /tmp/DavizinIOS.xcarchive \
+          -archivePath /tmp/Davizin.xcarchive \
           IPHONEOS_DEPLOYMENT_TARGET=17.0 \
-          archive \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
-          DEVELOPMENT_TEAM=""
+          DEVELOPMENT_TEAM="" \
+          archive 2>&1 | tail -30
 
-    - name: Crear IPA
+    - name: Create IPA
       run: |
-        cd /tmp/DavizinIOS.xcarchive/Products/Applications/
+        cd /tmp/Davizin.xcarchive/Products/Applications/
         mkdir -p Payload
         cp -r DavizinIOS.app Payload/
-        zip -r /tmp/DavizinIOS_unsigned.ipa Payload/
+        zip -r /tmp/Davizin_unsigned.ipa Payload/
+        ls -lh /tmp/Davizin_unsigned.ipa
 
-    - name: Subir IPA
+    - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
-        name: DavizinIOS_v2_unsigned
-        path: /tmp/DavizinIOS_unsigned.ipa
+        name: Davizin_iOS_unsigned
+        path: /tmp/Davizin_unsigned.ipa
         retention-days: 30
