@@ -19,24 +19,31 @@ jobs:
           -scheme DavizinIOS \
           -configuration Release \
           -sdk iphoneos \
-          -destination 'generic/platform=iOS' \
+          -arch arm64 \
           IPHONEOS_DEPLOYMENT_TARGET=17.0 \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           DEVELOPMENT_TEAM="" \
-          CONFIGURATION_BUILD_DIR=/tmp/build \
-          build 2>&1 | tail -20
-        echo "=== Build output ==="
-        find /tmp/build -name "*.app" 2>/dev/null
+          ONLY_ACTIVE_ARCH=NO \
+          BUILD_DIR=/tmp/davizin_build \
+          build
+        echo "=== Archivos generados ==="
+        find /tmp/davizin_build -name "*.app" 2>/dev/null
+        find /tmp/davizin_build -type f | head -20
 
     - name: Create IPA
       run: |
-        APP=$(find /tmp/build -name "*.app" | head -1)
+        APP=$(find /tmp/davizin_build -name "*.app" -not -path "*/simulator/*" | head -1)
         echo "App: $APP"
+        echo "Tamaño del .app:"
+        du -sh "$APP"
+        echo "Contenido:"
+        ls "$APP"
         mkdir -p /tmp/Payload
-        cp -r "$APP" /tmp/Payload/
-        cd /tmp && zip -r Davizin_unsigned.ipa Payload/
+        cp -r "$APP" /tmp/Payload/DavizinIOS.app
+        cd /tmp
+        zip -r Davizin_unsigned.ipa Payload/
         ls -lh /tmp/Davizin_unsigned.ipa
 
     - name: Upload IPA
