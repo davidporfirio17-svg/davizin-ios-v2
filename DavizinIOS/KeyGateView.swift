@@ -2,7 +2,6 @@ import SwiftUI
 
 struct KeyGateView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var validator = KeyValidator()
     
     @State private var keyInput: String = ""
     @State private var isValidating: Bool = false
@@ -115,7 +114,6 @@ struct KeyGateView: View {
         withAnimation { showError = false }
         isValidating = true
         
-        // Usar el método que retorna remaining_seconds
         KeyValidator.validateWithSeconds(key: keyInput) { isValid, message, remainingSeconds in
             isValidating = false
             
