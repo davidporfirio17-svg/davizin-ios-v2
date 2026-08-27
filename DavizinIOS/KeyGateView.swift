@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct KeyGateView: View {
-    @ObservedObject var appState: AppState
+    @EnvironmentObject var appState: AppState
     let onSuccess: () -> Void
     
     @State private var keyInput: String = ""
