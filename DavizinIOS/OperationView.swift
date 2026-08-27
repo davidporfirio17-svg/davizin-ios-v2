@@ -7,21 +7,24 @@ protocol OperationViewDelegate: AnyObject {
 final class OperationView: UIView {
     weak var delegate: OperationViewDelegate?
 
-    private let gameLabel = UILabel()
-    private let statusLabel = UILabel()
-    private let runButton = ARIFIButton(title: "Run Exploit", style: .secondary)
-    private let injectButton = ARIFIButton(title: "Inject", style: .primary)
-    private let cleanButton = ARIFIButton(title: "Clean", style: .secondary)
-    private let resultLabel = UILabel()
+    // ── UI ────────────────────────────────────────────────────────
+    private let topInfoLabel  = UILabel()
+    private let runButton     = ARIFIButton(title: "Run Exploit", style: .secondary)
+    private let injectButton  = ARIFIButton(title: "Inject", style: .primary)
+    private let cleanButton   = ARIFIButton(title: "Clean", style: .secondary)
+    private let resultLabel   = UILabel()
+    private let stackView     = UIStackView()
 
     private(set) var operationState: ARIFIOperationState = .idle
 
-    var selectedGame: ARIFIGame = .freeFireMax { didSet { updateContent() } }
-    var selectedMode: ARIFIMode = .drag { didSet { updateContent() } }
+    var selectedGame: ARIFIGame = .freeFireMax { didSet { updateInfo() } }
+    var selectedMode: ARIFIMode = .drag        { didSet { updateInfo() } }
 
-    override init(frame: CGRect) { super.init(frame: frame); configure() }
-    required init?(coder: NSCoder) { super.init(coder: coder); configure() }
+    // ── Init ──────────────────────────────────────────────────────
+    override init(frame: CGRect) { super.init(frame: frame); setup() }
+    required init?(coder: NSCoder) { super.init(coder: coder); setup() }
 
+    // ── State ─────────────────────────────────────────────────────
     func setState(_ state: ARIFIOperationState) {
         operationState = state
         resultLabel.textColor = AppTheme.secondaryText
@@ -29,30 +32,25 @@ final class OperationView: UIView {
         injectButton.setLoading(false)
         cleanButton.setLoading(false)
 
-        let enabled = !state.isBusy
-        runButton.isEnabled = enabled
-        injectButton.isEnabled = enabled
-        cleanButton.isEnabled = enabled
+        let busy = state.isBusy
+        runButton.isEnabled    = !busy
+        injectButton.isEnabled = !busy
+        cleanButton.isEnabled  = !busy
 
         switch state {
         case .idle:
-            resultLabel.text = nil
-            resultLabel.isHidden = true
+            resultLabel.text = nil; resultLabel.isHidden = true
         case .checking:
-            resultLabel.text = "Checking..."
-            resultLabel.isHidden = false
+            resultLabel.text = "Checking..."; resultLabel.isHidden = false
         case .running:
             runButton.setLoading(true, title: "Running...")
-            resultLabel.text = "Running exploit..."
-            resultLabel.isHidden = false
+            resultLabel.text = "Running..."; resultLabel.isHidden = false
         case .injecting:
             injectButton.setLoading(true, title: "Injecting...")
-            resultLabel.text = "Injecting mod..."
-            resultLabel.isHidden = false
+            resultLabel.text = "Injecting..."; resultLabel.isHidden = false
         case .cleaning:
             cleanButton.setLoading(true, title: "Cleaning...")
-            resultLabel.text = "Cleaning..."
-            resultLabel.isHidden = false
+            resultLabel.text = "Cleaning..."; resultLabel.isHidden = false
         case .succeeded(let msg):
             resultLabel.text = "✓ " + msg
             resultLabel.textColor = AppTheme.success
@@ -64,75 +62,72 @@ final class OperationView: UIView {
         }
     }
 
-    private func configure() {
+    // ── Setup ─────────────────────────────────────────────────────
+    private func setup() {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
-        // Game label
-        gameLabel.textColor = AppTheme.secondaryText
-        gameLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
-        gameLabel.textAlignment = .center
-        gameLabel.translatesAutoresizingMaskIntoConstraints = false
+        // Info label
+        topInfoLabel.textColor = AppTheme.secondaryText
+        topInfoLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
+        topInfoLabel.textAlignment = .center
+        topInfoLabel.numberOfLines = 1
+        updateInfo()
 
         // Result label
-        resultLabel.textColor = AppTheme.secondaryText
         resultLabel.font = AppTheme.captionFont()
         resultLabel.textAlignment = .center
         resultLabel.numberOfLines = 0
         resultLabel.isHidden = true
-        resultLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        // Buttons
-        runButton.translatesAutoresizingMaskIntoConstraints = false
-        injectButton.translatesAutoresizingMaskIntoConstraints = false
-        cleanButton.translatesAutoresizingMaskIntoConstraints = false
-
-        runButton.addTarget(self, action: #selector(runTapped), for: .touchUpInside)
+        // Targets
+        runButton.addTarget(self, action: #selector(runTapped),    for: .touchUpInside)
         injectButton.addTarget(self, action: #selector(injectTapped), for: .touchUpInside)
         cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
 
-        addSubview(gameLabel)
-        addSubview(runButton)
-        addSubview(injectButton)
-        addSubview(cleanButton)
-        addSubview(resultLabel)
+        // Stack — fills the view vertically
+        stackView.axis = .vertical
+        stackView.alignment = .fill
+        stackView.distribution = .fill
+        stackView.spacing = 14
+        stackView.translatesAutoresizingMaskIntoConstraints = false
 
-        let pad: CGFloat = 20
-        let btnH: CGFloat = AppTheme.controlHeight
+        // Spacer helpers
+        func spacer(_ h: CGFloat) -> UIView {
+            let v = UIView(); v.translatesAutoresizingMaskIntoConstraints = false
+            v.heightAnchor.constraint(equalToConstant: h).isActive = true
+            return v
+        }
+
+        stackView.addArrangedSubview(spacer(12))
+        stackView.addArrangedSubview(topInfoLabel)
+        stackView.addArrangedSubview(spacer(24))
+        stackView.addArrangedSubview(runButton)
+        stackView.addArrangedSubview(injectButton)
+        stackView.addArrangedSubview(cleanButton)
+        stackView.addArrangedSubview(resultLabel)
+
+        // Flexible spacer at bottom
+        let flex = UIView()
+        flex.setContentHuggingPriority(.defaultLow, for: .vertical)
+        stackView.addArrangedSubview(flex)
+
+        addSubview(stackView)
 
         NSLayoutConstraint.activate([
-            // Game label at top
-            gameLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 20),
-            gameLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
-            gameLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            stackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -20),
 
-            // Buttons centered vertically
-            runButton.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -btnH - 16),
-            runButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
-            runButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
-            runButton.heightAnchor.constraint(equalToConstant: btnH),
-
-            injectButton.topAnchor.constraint(equalTo: runButton.bottomAnchor, constant: 12),
-            injectButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
-            injectButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
-            injectButton.heightAnchor.constraint(equalToConstant: btnH),
-
-            cleanButton.topAnchor.constraint(equalTo: injectButton.bottomAnchor, constant: 12),
-            cleanButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
-            cleanButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
-            cleanButton.heightAnchor.constraint(equalToConstant: btnH),
-
-            // Result below buttons
-            resultLabel.topAnchor.constraint(equalTo: cleanButton.bottomAnchor, constant: 16),
-            resultLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
-            resultLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+            runButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
+            injectButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
+            cleanButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
         ])
-
-        updateContent()
     }
 
-    private func updateContent() {
-        gameLabel.text = "\(selectedGame.rawValue) · \(selectedMode.rawValue)"
+    private func updateInfo() {
+        topInfoLabel.text = "\(selectedGame.rawValue)  ·  \(selectedMode.rawValue)"
     }
 
     @objc private func runTapped()    { delegate?.operationView(self, didTap: .runExploit) }
