@@ -17,13 +17,12 @@ final class DavizinBridge {
             self?.handleLogin(key: key)
         }
 
-        // ── Game selection: saltar directo a Free Fire MAX ─────
+        // ── Game selection: el usuario elige y avanza ──────────
         viewController.onGameSelected = { [weak self] _ in
-            // Siempre Free Fire MAX, saltar modo
             self?.vc?.showModeSelectionScreen()
         }
 
-        // ── Mode selection: saltar directo a operación ─────────
+        // ── Mode selection: el usuario elige y avanza ──────────
         viewController.onModeSelected = { [weak self] _ in
             self?.vc?.showOperationScreen()
         }
@@ -57,14 +56,8 @@ final class DavizinBridge {
                 self?.startCountdown()
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // Saltar game selection → ir directo a operación
+                    // Solo hasta selección de juego. El usuario avanza manualmente.
                     self?.vc?.showGameSelectionScreen()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        self?.vc?.showModeSelectionScreen()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            self?.vc?.showOperationScreen()
-                        }
-                    }
                 }
             } else {
                 self?.vc?.setLoginStatus(message ?? "Key inválida", success: false)
@@ -77,8 +70,6 @@ final class DavizinBridge {
         switch operation {
 
         case .runExploit:
-            // En nuestra app no necesitamos exploit — el MCM ya da acceso
-            // Simulamos que "ya está listo"
             vc?.setOperationState(.running)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 self?.vc?.setOperationState(.succeeded("Sistema listo ✓"))
@@ -121,7 +112,6 @@ final class DavizinBridge {
             guard let self = self else { return }
             if self.remainingSeconds > 0 {
                 self.remainingSeconds -= 1
-                // Guardar progreso
                 UserDefaults.standard.set(
                     UserDefaults.standard.double(forKey: "dz_saved_at"),
                     forKey: "dz_saved_at"
