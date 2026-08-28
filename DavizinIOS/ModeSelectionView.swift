@@ -11,9 +11,11 @@ final class ModeSelectionView: UIView {
     private let categoryLabel = UILabel()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
-    private let dragButton = ARIFIButton(title: ARIFIMode.drag.rawValue)
     private let footerLabel = UILabel()
     private let stackView = UIStackView()
+
+    /// Un botón por cada caso de ARIFIMode, en el mismo orden del enum.
+    private var modeButtons: [(mode: ARIFIMode, button: ARIFIButton)] = []
 
     private(set) var selectedMode: ARIFIMode?
 
@@ -29,7 +31,9 @@ final class ModeSelectionView: UIView {
 
     func setSelectedMode(_ mode: ARIFIMode?) {
         selectedMode = mode
-        dragButton.selectedVisual = mode == .drag
+        for entry in modeButtons {
+            entry.button.selectedVisual = (entry.mode == mode)
+        }
     }
 
     private func configure() {
@@ -55,9 +59,6 @@ final class ModeSelectionView: UIView {
         subtitleLabel.numberOfLines = 0
         subtitleLabel.adjustsFontForContentSizeCategory = true
 
-        dragButton.accessibilityIdentifier = "mode.drag"
-        dragButton.addTarget(self, action: #selector(dragTapped), for: .touchUpInside)
-
         footerLabel.text = "Make sure you use correct method to inject ."
         footerLabel.textColor = AppTheme.secondaryText
         footerLabel.font = AppTheme.captionFont()
@@ -69,10 +70,27 @@ final class ModeSelectionView: UIView {
         stackView.alignment = .fill
         stackView.spacing = 12.0
         stackView.translatesAutoresizingMaskIntoConstraints = false
+
         stackView.addArrangedSubview(categoryLabel)
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
-        stackView.addArrangedSubview(dragButton)
+
+        var buttonConstraints: [NSLayoutConstraint] = []
+
+        for (index, mode) in ARIFIMode.allCases.enumerated() {
+            let button = ARIFIButton(title: mode.rawValue)
+            button.accessibilityIdentifier = accessibilityIdentifier(for: mode)
+            button.tag = index
+            button.addTarget(self, action: #selector(modeTapped(_:)), for: .touchUpInside)
+
+            stackView.addArrangedSubview(button)
+            buttonConstraints.append(
+                button.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
+            )
+
+            modeButtons.append((mode: mode, button: button))
+        }
+
         stackView.addArrangedSubview(footerLabel)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
@@ -85,13 +103,23 @@ final class ModeSelectionView: UIView {
             cardView.centerXAnchor.constraint(equalTo: centerXAnchor),
             cardView.centerYAnchor.constraint(equalTo: centerYAnchor),
             cardView.widthAnchor.constraint(lessThanOrEqualToConstant: AppTheme.contentMaximumWidth),
-            stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: 240.0),
-            dragButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
-        ])
+            stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: 240.0)
+        ] + buttonConstraints)
     }
 
-    @objc private func dragTapped() {
-        setSelectedMode(.drag)
-        delegate?.modeSelectionView(self, didSelect: .drag)
+    private func accessibilityIdentifier(for mode: ARIFIMode) -> String {
+        switch mode {
+        case .drag:    return "mode.drag"
+        case .pecho:   return "mode.pecho"
+        case .body100: return "mode.body100"
+        }
+    }
+
+    @objc private func modeTapped(_ sender: ARIFIButton) {
+        let cases = ARIFIMode.allCases
+        guard sender.tag >= 0, sender.tag < cases.count else { return }
+        let mode = cases[sender.tag]
+        setSelectedMode(mode)
+        delegate?.modeSelectionView(self, didSelect: mode)
     }
 }
