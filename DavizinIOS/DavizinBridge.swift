@@ -1,6 +1,6 @@
 import UIKit
 
-/// Conecta el UI de ARIFIxIOS con la lógica real de Davizin
+/// Conecta el UI de ARIFIxIOS con la logica real de Davizin
 final class DavizinBridge {
 
     private weak var vc: ViewController?
@@ -8,26 +8,30 @@ final class DavizinBridge {
     private var remainingSeconds: Int = 0
     private let bundleID = "com.dts.freefiremax"
 
+    /// Modo elegido por el usuario. Define que cache_res se inyecta.
+    private var selectedMode: ARIFIMode = .drag
+
     func connect(to viewController: ViewController) {
         self.vc = viewController
         viewController.simulateUIStates = false
 
-        // ── Login: validar key con Cloudflare ──────────────────
+        // Login: validar key con Cloudflare
         viewController.onLoginContinue = { [weak self] key in
             self?.handleLogin(key: key)
         }
 
-        // ── Game selection: el usuario elige y avanza ──────────
+        // Game selection: el usuario elige y avanza
         viewController.onGameSelected = { [weak self] _ in
             self?.vc?.showModeSelectionScreen()
         }
 
-        // ── Mode selection: el usuario elige y avanza ──────────
-        viewController.onModeSelected = { [weak self] _ in
+        // Mode selection: guardamos el modo y avanzamos
+        viewController.onModeSelected = { [weak self] mode in
+            self?.selectedMode = mode
             self?.vc?.showOperationScreen()
         }
 
-        // ── Operaciones reales ─────────────────────────────────
+        // Operaciones reales
         viewController.onOperation = { [weak self] operation in
             self?.handleOperation(operation)
         }
@@ -37,7 +41,8 @@ final class DavizinBridge {
         }
     }
 
-    // ── Login ──────────────────────────────────────────────────
+    // MARK: - Login
+
     private func handleLogin(key: String) {
         vc?.setLoginChecking(true)
 
@@ -48,7 +53,6 @@ final class DavizinBridge {
                 self?.vc?.setLoginStatus("Acceso concedido ✓", success: true)
                 self?.remainingSeconds = remaining
 
-                // Guardar sesión
                 UserDefaults.standard.set(key.uppercased(), forKey: "dz_key")
                 UserDefaults.standard.set(remaining, forKey: "dz_remaining")
                 UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "dz_saved_at")
@@ -56,16 +60,16 @@ final class DavizinBridge {
                 self?.startCountdown()
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // Solo hasta selección de juego. El usuario avanza manualmente.
                     self?.vc?.showGameSelectionScreen()
                 }
             } else {
-                self?.vc?.setLoginStatus(message ?? "Key inválida", success: false)
+                self?.vc?.setLoginStatus(message ?? "Key invalida", success: false)
             }
         }
     }
 
-    // ── Operaciones ────────────────────────────────────────────
+    // MARK: - Operaciones
+
     private func handleOperation(_ operation: ARIFIOperationKind) {
         switch operation {
 
@@ -77,9 +81,10 @@ final class DavizinBridge {
 
         case .inject:
             vc?.setOperationState(.injecting)
+            let mode = selectedMode
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
-                let result = InjectorService.inject(bundleID: self.bundleID)
+                let result = InjectorService.inject(bundleID: self.bundleID, mode: mode)
                 DispatchQueue.main.async {
                     self.vc?.setOperationState(
                         result.success
@@ -105,7 +110,8 @@ final class DavizinBridge {
         }
     }
 
-    // ── Countdown ──────────────────────────────────────────────
+    // MARK: - Countdown
+
     private func startCountdown() {
         countdownTimer?.invalidate()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -129,7 +135,8 @@ final class DavizinBridge {
         return String(format: "%02d:%02d:%02d", h, m, s)
     }
 
-    // ── Restaurar sesión ───────────────────────────────────────
+    // MARK: - Restaurar sesion
+
     static func restoreSession() -> (key: String, remaining: Int)? {
         guard let key = UserDefaults.standard.string(forKey: "dz_key"),
               !key.isEmpty else { return nil }
