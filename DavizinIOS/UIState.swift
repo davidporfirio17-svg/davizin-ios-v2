@@ -14,6 +14,8 @@ enum ARIFIGame: String, CaseIterable {
 
 enum ARIFIMode: String, CaseIterable {
     case drag = "Drag"
+    case pecho = "Pecho"
+    case body100 = "Body 100%"
 }
 
 enum ARIFIOperationKind: String, CaseIterable {
