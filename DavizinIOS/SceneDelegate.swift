@@ -8,8 +8,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         willConnectTo session: UISceneSession,
         options connectionOptions: UIScene.ConnectionOptions
     ) {
-        // DavizinIOSApp ya maneja la creación de la ventana SwiftUI
-        // No necesitamos hacer nada aquí
+        guard let windowScene = scene as? UIWindowScene else { return }
+
+        let window = UIWindow(windowScene: windowScene)
+        let rootViewController = ViewController()
+        rootViewController.modalPresentationStyle = .fullScreen
+        window.rootViewController = rootViewController
+        self.window = window
+        window.makeKeyAndVisible()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {}
