@@ -10,13 +10,22 @@ private let kBackPath = "Documents/contentcache/Compulsory/ios/gameassetbundles/
 
 class InjectorService {
 
+    /// Nombre del archivo dentro del bundle de la app para cada modo.
+    private static func resourceName(for mode: ARIFIMode) -> String {
+        switch mode {
+        case .drag:    return "cache_res_drag"
+        case .pecho:   return "cache_res"
+        case .body100: return "cache_res_body100"
+        }
+    }
+
     static func checkIsInjected(bundleID: String) -> Bool {
         var err: NSString?
         guard let container = DavizinGetContainerPath(bundleID, &err) else { return false }
         return FileManager.default.fileExists(atPath: container + "/" + kBackPath)
     }
 
-    static func inject(bundleID: String) -> InjectorResult {
+    static func inject(bundleID: String, mode: ARIFIMode) -> InjectorResult {
         let fm = FileManager.default
 
         // Obtener container via MCM
@@ -26,10 +35,11 @@ class InjectorService {
                 message: (mcmErr as String?) ?? "Container no encontrado")
         }
 
-        // Verificar que tenemos el cache_res en el bundle
-        guard let sourcePath = Bundle.main.path(forResource: "cache_res", ofType: nil) else {
+        // Verificar que tenemos el cache_res del modo elegido
+        let resource = resourceName(for: mode)
+        guard let sourcePath = Bundle.main.path(forResource: resource, ofType: nil) else {
             return InjectorResult(success: false,
-                message: "cache_res no encontrado en la app")
+                message: "Falta \(resource) en la app")
         }
 
         let destPath   = container + "/" + kDestPath
@@ -51,7 +61,7 @@ class InjectorService {
             }
         }
 
-        // Copiar nuestro cache_res
+        // Copiar el cache_res del modo elegido
         do {
             let sourceData = try Data(contentsOf: URL(fileURLWithPath: sourcePath))
             try sourceData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
@@ -62,7 +72,7 @@ class InjectorService {
         }
 
         return InjectorResult(success: true,
-            message: "¡Inyectado! Cierra y abre Free Fire.")
+            message: "¡\(mode.rawValue) inyectado! Cierra y abre Free Fire.")
     }
 
     static func uninject(bundleID: String) -> InjectorResult {
