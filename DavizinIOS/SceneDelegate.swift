@@ -2,6 +2,7 @@ import UIKit
 
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
+    private var bridge: DavizinBridge?
 
     func scene(
         _ scene: UIScene,
@@ -13,6 +14,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let window = UIWindow(windowScene: windowScene)
         let rootViewController = ViewController()
         rootViewController.modalPresentationStyle = .fullScreen
+
+        // Conecta la lógica real (login, inyección, limpieza).
+        // Sin esto el ViewController queda en modo simulación.
+        let bridge = DavizinBridge()
+        bridge.connect(to: rootViewController)
+        self.bridge = bridge
+
         window.rootViewController = rootViewController
         self.window = window
         window.makeKeyAndVisible()
