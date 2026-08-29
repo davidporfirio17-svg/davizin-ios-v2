@@ -66,10 +66,11 @@ class InjectorService {
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
             guard let data = data, data.count > 28 else { return }
 
-            // Si el Worker marca cifrado, desciframos. Si no, usamos tal cual (compatibilidad).
-            let isEncrypted = (http.value(forHTTPHeaderField: "X-DZ-Enc") == "1")
-            if isEncrypted {
-                result = decrypt(data)
+            // Robusto: intentamos descifrar SIEMPRE. Si el descifrado funciona,
+            // el dato venia cifrado y usamos el resultado. Si falla, el dato ya
+            // venia en claro y lo usamos tal cual. No dependemos del header.
+            if let plain = decrypt(data) {
+                result = plain
             } else {
                 result = data
             }
