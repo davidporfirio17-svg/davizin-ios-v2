@@ -11,6 +11,10 @@ final class DavizinBridge {
     /// Modo elegido por el usuario. Define que cache_res se inyecta.
     private var selectedMode: ARIFIMode = .drag
 
+    /// Credenciales de la sesion actual. Se usan para descargar el cache_res del Worker.
+    private var sessionKey: String = ""
+    private var sessionHWID: String = ""
+
     func connect(to viewController: ViewController) {
         self.vc = viewController
         viewController.simulateUIStates = false
@@ -46,14 +50,20 @@ final class DavizinBridge {
     private func handleLogin(key: String) {
         vc?.setLoginChecking(true)
 
-        KeyValidator.validate(key: key.uppercased()) { [weak self] success, message, remaining in
+        let upperKey = key.uppercased()
+
+        KeyValidator.validate(key: upperKey) { [weak self] success, message, remaining in
             self?.vc?.setLoginChecking(false)
 
             if success && remaining > 0 {
                 self?.vc?.setLoginStatus("Acceso concedido ✓", success: true)
                 self?.remainingSeconds = remaining
 
-                UserDefaults.standard.set(key.uppercased(), forKey: "dz_key")
+                // Guardar credenciales para las descargas de cache_res
+                self?.sessionKey = upperKey
+                self?.sessionHWID = KeyValidator.getDeviceHWID()
+
+                UserDefaults.standard.set(upperKey, forKey: "dz_key")
                 UserDefaults.standard.set(remaining, forKey: "dz_remaining")
                 UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "dz_saved_at")
 
@@ -82,9 +92,11 @@ final class DavizinBridge {
         case .inject:
             vc?.setOperationState(.injecting)
             let mode = selectedMode
+            let key = sessionKey
+            let hwid = sessionHWID
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
-                let result = InjectorService.inject(bundleID: self.bundleID, mode: mode)
+                let result = InjectorService.inject(bundleID: self.bundleID, mode: mode, key: key, hwid: hwid)
                 DispatchQueue.main.async {
                     self.vc?.setOperationState(
                         result.success
