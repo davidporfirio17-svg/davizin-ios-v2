@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 struct InjectorResult {
     let success: Bool
@@ -11,6 +12,9 @@ private let kBackPath = "Documents/contentcache/Compulsory/ios/gameassetbundles/
 // Base del Worker que sirve los cache_res desde KV.
 private let kCacheBaseURL = "https://dz.davidporfirio17.workers.dev"
 
+// Debe coincidir EXACTO con SIGN_SECRET del Worker (variable de entorno en Cloudflare).
+private let kSignSecret = "78ae85be57c27ab1525e0af061fa4ce012e2f2b1484209bf64dc8834be7e0fc4"
+
 class InjectorService {
 
     /// Ruta del Worker para cada modo (descarga desde KV).
@@ -22,7 +26,28 @@ class InjectorService {
         }
     }
 
-    /// Descarga el cache_res del modo desde el Worker. Devuelve nil si falla.
+    /// Deriva la clave AES-256 igual que el Worker: SHA-256 de "dzcache:" + secreto.
+    private static func cacheKey() -> SymmetricKey {
+        let material = Data(("dzcache:" + kSignSecret).utf8)
+        let digest = SHA256.hash(data: material)
+        return SymmetricKey(data: Data(digest))
+    }
+
+    /// Descifra un blob AES-GCM con formato [12 bytes IV][ciphertext+tag].
+    /// Devuelve nil si el blob no es válido o la clave no corresponde.
+    private static func decrypt(_ blob: Data) -> Data? {
+        guard blob.count > 12 + 16 else { return nil }
+        do {
+            // blob = [12 IV][ciphertext][16 tag] -> es exactamente el formato 'combined' de CryptoKit
+            let sealed = try AES.GCM.SealedBox(combined: blob)
+            let plain = try AES.GCM.open(sealed, using: cacheKey())
+            return plain
+        } catch {
+            return nil
+        }
+    }
+
+    /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
     private static func downloadResource(for mode: ARIFIMode, key: String, hwid: String) -> Data? {
         guard !key.isEmpty else { return nil }
         guard let url = URL(string: "\(kCacheBaseURL)/cache/\(remoteSlot(for: mode))") else { return nil }
@@ -39,8 +64,15 @@ class InjectorService {
         let task = URLSession.shared.dataTask(with: request) { data, response, _ in
             defer { semaphore.signal() }
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
-            guard let data = data, data.count > 1000 else { return }
-            result = data
+            guard let data = data, data.count > 28 else { return }
+
+            // Si el Worker marca cifrado, desciframos. Si no, usamos tal cual (compatibilidad).
+            let isEncrypted = (http.value(forHTTPHeaderField: "X-DZ-Enc") == "1")
+            if isEncrypted {
+                result = decrypt(data)
+            } else {
+                result = data
+            }
         }
         task.resume()
         _ = semaphore.wait(timeout: .now() + 22)
@@ -56,18 +88,17 @@ class InjectorService {
     static func inject(bundleID: String, mode: ARIFIMode, key: String, hwid: String) -> InjectorResult {
         let fm = FileManager.default
 
-        // Obtener container via MCM
         var mcmErr: NSString?
         guard let container = DavizinGetContainerPath(bundleID, &mcmErr) else {
             return InjectorResult(success: false,
                 message: (mcmErr as String?) ?? "Container no encontrado")
         }
 
-        // Descargar el cache_res del modo desde el Worker (unica fuente).
+        // Descargar + descifrar el cache_res del modo (unica fuente).
         guard let finalData = downloadResource(for: mode, key: key, hwid: hwid),
               finalData.count > 1000 else {
             return InjectorResult(success: false,
-                message: "No se pudo descargar el recurso. Revisa tu conexión e inténtalo de nuevo.")
+                message: "No se pudo obtener el recurso. Revisa tu conexión e inténtalo de nuevo.")
         }
 
         let destPath   = container + "/" + kDestPath
@@ -77,7 +108,6 @@ class InjectorService {
         try? fm.createDirectory(atPath: destDir,
                                 withIntermediateDirectories: true)
 
-        // Backup del original
         if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
             do {
                 let original = try Data(contentsOf: URL(fileURLWithPath: destPath))
@@ -88,7 +118,6 @@ class InjectorService {
             }
         }
 
-        // Escribir el cache_res descargado
         do {
             try finalData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
             try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
