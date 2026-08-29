@@ -33,13 +33,29 @@ class InjectorService {
         return SymmetricKey(data: Data(digest))
     }
 
+    /// Un cache_res valido siempre empieza con la firma ASCII "UnityFS".
+    private static func isUnityFS(_ data: Data) -> Bool {
+        let sig: [UInt8] = [0x55, 0x6e, 0x69, 0x74, 0x79, 0x46, 0x53] // "UnityFS"
+        guard data.count >= sig.count else { return false }
+        return Array(data.prefix(sig.count)) == sig
+    }
+
     /// Descifra un blob AES-GCM con formato [12 bytes IV][ciphertext+tag].
     /// Devuelve nil si el blob no es válido o la clave no corresponde.
     private static func decrypt(_ blob: Data) -> Data? {
         guard blob.count > 12 + 16 else { return nil }
+        // Normalizar a un Data con indices desde 0 (una respuesta de red puede no estarlo,
+        // y CryptoKit falla silenciosamente si los indices no arrancan en 0).
+        let clean = Data(blob)
+        // Separar manualmente: [nonce 12][ciphertext ...][tag 16]
+        let nonceData = clean.prefix(12)
+        let tagData = clean.suffix(16)
+        let cipherData = clean.dropFirst(12).dropLast(16)
         do {
-            // blob = [12 IV][ciphertext][16 tag] -> es exactamente el formato 'combined' de CryptoKit
-            let sealed = try AES.GCM.SealedBox(combined: blob)
+            let nonce = try AES.GCM.Nonce(data: nonceData)
+            let sealed = try AES.GCM.SealedBox(nonce: nonce,
+                                               ciphertext: Data(cipherData),
+                                               tag: Data(tagData))
             let plain = try AES.GCM.open(sealed, using: cacheKey())
             return plain
         } catch {
@@ -66,13 +82,17 @@ class InjectorService {
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
             guard let data = data, data.count > 28 else { return }
 
-            // Robusto: intentamos descifrar SIEMPRE. Si el descifrado funciona,
-            // el dato venia cifrado y usamos el resultado. Si falla, el dato ya
-            // venia en claro y lo usamos tal cual. No dependemos del header.
-            if let plain = decrypt(data) {
+            // El archivo puede venir cifrado o en claro. Resolvemos a un cache_res VALIDO.
+            // Un cache_res valido SIEMPRE empieza con la firma "UnityFS".
+            // 1) Si ya viene en claro (empieza con UnityFS), usarlo.
+            // 2) Si no, intentar descifrar y validar que el resultado sea UnityFS.
+            // 3) Si nada da un UnityFS valido, devolver nil (NO escribir basura).
+            if isUnityFS(data) {
+                result = data
+            } else if let plain = decrypt(data), isUnityFS(plain) {
                 result = plain
             } else {
-                result = data
+                result = nil
             }
         }
         task.resume()
