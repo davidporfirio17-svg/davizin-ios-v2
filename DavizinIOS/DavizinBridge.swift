@@ -6,10 +6,12 @@ final class DavizinBridge {
     private weak var vc: ViewController?
     private var countdownTimer: Timer?
     private var remainingSeconds: Int = 0
-    private let bundleID = "com.dts.freefiremax"
 
     /// Modo elegido por el usuario. Define que cache_res se inyecta.
     private var selectedMode: ARIFIMode = .drag
+
+    /// Juego elegido. Define bundle ID y de que slots se descarga.
+    private var selectedGame: ARIFIGame = .freeFireMax
 
     /// Credenciales de la sesion actual. Se usan para descargar el cache_res del Worker.
     private var sessionKey: String = ""
@@ -25,7 +27,8 @@ final class DavizinBridge {
         }
 
         // Game selection: el usuario elige y avanza
-        viewController.onGameSelected = { [weak self] _ in
+        viewController.onGameSelected = { [weak self] game in
+            self?.selectedGame = game
             self?.vc?.showModeSelectionScreen()
         }
 
@@ -92,11 +95,12 @@ final class DavizinBridge {
         case .inject:
             vc?.setOperationState(.injecting)
             let mode = selectedMode
+            let game = selectedGame
             let key = sessionKey
             let hwid = sessionHWID
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
-                let result = InjectorService.inject(bundleID: self.bundleID, mode: mode, key: key, hwid: hwid)
+                let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
                 DispatchQueue.main.async {
                     self.vc?.setOperationState(
                         result.success
@@ -108,9 +112,10 @@ final class DavizinBridge {
 
         case .clean:
             vc?.setOperationState(.cleaning)
+            let game = selectedGame
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self = self else { return }
-                let result = InjectorService.uninject(bundleID: self.bundleID)
+                let result = InjectorService.uninject(game: game)
                 DispatchQueue.main.async {
                     self.vc?.setOperationState(
                         result.success
