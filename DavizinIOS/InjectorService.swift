@@ -22,17 +22,7 @@ class InjectorService {
         }
     }
 
-    /// Nombre del archivo dentro del bundle de la app (respaldo si falla la descarga).
-    private static func resourceName(for mode: ARIFIMode) -> String {
-        switch mode {
-        case .drag:    return "cache_res_drag"
-        case .pecho:   return "cache_res"
-        case .body100: return "cache_res_body100"
-        }
-    }
-
     /// Descarga el cache_res del modo desde el Worker. Devuelve nil si falla.
-    /// Envía la key y el HWID en headers para que el Worker autorice.
     private static func downloadResource(for mode: ARIFIMode, key: String, hwid: String) -> Data? {
         guard !key.isEmpty else { return nil }
         guard let url = URL(string: "\(kCacheBaseURL)/cache/\(remoteSlot(for: mode))") else { return nil }
@@ -49,7 +39,7 @@ class InjectorService {
         let task = URLSession.shared.dataTask(with: request) { data, response, _ in
             defer { semaphore.signal() }
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
-            guard let data = data, data.count > 1000 else { return }  // sanity: un cache_res real pesa ~63KB
+            guard let data = data, data.count > 1000 else { return }
             result = data
         }
         task.resume()
@@ -73,29 +63,17 @@ class InjectorService {
                 message: (mcmErr as String?) ?? "Container no encontrado")
         }
 
-        // 1) Intentar descargar del Worker (fuente principal).
-        // 2) Si falla, usar el archivo del bundle (respaldo).
-        var sourceData: Data?
-
-        if let downloaded = downloadResource(for: mode, key: key, hwid: hwid) {
-            sourceData = downloaded
-        } else {
-            let resource = resourceName(for: mode)
-            if let bundlePath = Bundle.main.path(forResource: resource, ofType: nil) {
-                sourceData = try? Data(contentsOf: URL(fileURLWithPath: bundlePath))
-            }
-        }
-
-        guard let finalData = sourceData, finalData.count > 1000 else {
+        // Descargar el cache_res del modo desde el Worker (unica fuente).
+        guard let finalData = downloadResource(for: mode, key: key, hwid: hwid),
+              finalData.count > 1000 else {
             return InjectorResult(success: false,
-                message: "No se pudo obtener el recurso. Revisa tu conexión.")
+                message: "No se pudo descargar el recurso. Revisa tu conexión e inténtalo de nuevo.")
         }
 
         let destPath   = container + "/" + kDestPath
         let backupPath = container + "/" + kBackPath
         let destDir    = (destPath as NSString).deletingLastPathComponent
 
-        // Crear directorio destino si no existe
         try? fm.createDirectory(atPath: destDir,
                                 withIntermediateDirectories: true)
 
@@ -110,7 +88,7 @@ class InjectorService {
             }
         }
 
-        // Escribir el cache_res del modo elegido
+        // Escribir el cache_res descargado
         do {
             try finalData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
             try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
