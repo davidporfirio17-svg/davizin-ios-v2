@@ -17,13 +17,24 @@ private let kSignSecret = "78ae85be57c27ab1525e0af061fa4ce012e2f2b1484209bf64dc8
 
 class InjectorService {
 
-    /// Ruta del Worker para cada modo (descarga desde KV).
-    private static func remoteSlot(for mode: ARIFIMode) -> String {
-        switch mode {
-        case .drag:    return "drag"
-        case .pecho:   return "pecho"
-        case .body100: return "body100"
+    /// Bundle ID del contenedor segun el juego.
+    private static func bundleID(for game: ARIFIGame) -> String {
+        switch game {
+        case .freeFireMax: return "com.dts.freefiremax"
+        case .freeFire:    return "com.dts.freefireth"
         }
+    }
+
+    /// Ruta del Worker para cada modo y juego (descarga desde KV).
+    /// Free Fire MAX usa slots base; Free Fire normal usa el sufijo _ff.
+    private static func remoteSlot(for mode: ARIFIMode, game: ARIFIGame) -> String {
+        let base: String
+        switch mode {
+        case .drag:    base = "drag"
+        case .pecho:   base = "pecho"
+        case .body100: base = "body100"
+        }
+        return game == .freeFire ? base + "_ff" : base
     }
 
     /// Deriva la clave AES-256 igual que el Worker: SHA-256 de "dzcache:" + secreto.
@@ -64,9 +75,9 @@ class InjectorService {
     }
 
     /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
-    private static func downloadResource(for mode: ARIFIMode, key: String, hwid: String) -> Data? {
+    private static func downloadResource(for mode: ARIFIMode, game: ARIFIGame, key: String, hwid: String) -> Data? {
         guard !key.isEmpty else { return nil }
-        guard let url = URL(string: "\(kCacheBaseURL)/cache/\(remoteSlot(for: mode))") else { return nil }
+        guard let url = URL(string: "\(kCacheBaseURL)/cache/\(remoteSlot(for: mode, game: game))") else { return nil }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -106,8 +117,9 @@ class InjectorService {
         return FileManager.default.fileExists(atPath: container + "/" + kBackPath)
     }
 
-    static func inject(bundleID: String, mode: ARIFIMode, key: String, hwid: String) -> InjectorResult {
+    static func inject(game: ARIFIGame, mode: ARIFIMode, key: String, hwid: String) -> InjectorResult {
         let fm = FileManager.default
+        let bundleID = bundleID(for: game)
 
         var mcmErr: NSString?
         guard let container = DavizinGetContainerPath(bundleID, &mcmErr) else {
@@ -116,7 +128,7 @@ class InjectorService {
         }
 
         // Descargar + descifrar el cache_res del modo (unica fuente).
-        guard let finalData = downloadResource(for: mode, key: key, hwid: hwid),
+        guard let finalData = downloadResource(for: mode, game: game, key: key, hwid: hwid),
               finalData.count > 1000 else {
             return InjectorResult(success: false,
                 message: "No se pudo obtener el recurso. Revisa tu conexión e inténtalo de nuevo.")
@@ -151,8 +163,9 @@ class InjectorService {
             message: "¡\(mode.rawValue) inyectado! Cierra y abre Free Fire.")
     }
 
-    static func uninject(bundleID: String) -> InjectorResult {
+    static func uninject(game: ARIFIGame) -> InjectorResult {
         let fm = FileManager.default
+        let bundleID = bundleID(for: game)
 
         var mcmErr: NSString?
         guard let container = DavizinGetContainerPath(bundleID, &mcmErr) else {
