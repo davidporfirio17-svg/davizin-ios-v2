@@ -1,41 +1,68 @@
 import Foundation
 import UIKit
+import CryptoKit
 
 struct KeyResponse: Codable {
     let success: Bool
     let message: String?
     let remaining_seconds: Int?
     let data: KeyData?
+    let signature: String?
 }
 
 struct KeyData: Codable {
     let container_access_ready: Bool?
     let remaining_seconds: Int?
+    let expire: Int64?
+    let token: String?
+    let resource_key: String?
 }
 
 class KeyValidator {
+
+    // Debe coincidir EXACTO con el secreto del Worker.
+    private static let signSecret = "78ae85be57c27ab1525e0af061fa4ce012e2f2b1484209bf64dc8834be7e0fc4"
+
     static func getDeviceHWID() -> String {
         if let hwid = UIDevice.current.identifierForVendor?.uuidString {
             return hwid
         }
         return UUID().uuidString
     }
-    
+
     static func getDeviceModel() -> String {
         var systemInfo = utsname()
         uname(&systemInfo)
         let model = String(bytes: Data(bytes: &systemInfo.machine, count: Int(_SYS_NAMELEN)), encoding: .ascii)?.trimmingCharacters(in: .controlCharacters) ?? "Unknown"
         return model
     }
-    
+
     static func getIOSVersion() -> String {
         return UIDevice.current.systemVersion
     }
-    
+
+    /// Recalcula HMAC-SHA256 hex igual que el Worker: HMAC(secreto, mensaje).
+    private static func hmacHex(_ message: String) -> String {
+        let key = SymmetricKey(data: Data(signSecret.utf8))
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(message.utf8), using: key)
+        return mac.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Verifica que la firma de la respuesta sea legitima (viene de nuestro Worker).
+    /// El Worker firma: key + "|" + remaining + "|" + expire
+    private static func verifySignature(key: String, remaining: Int, expire: Int64, signature: String?) -> Bool {
+        guard let signature = signature, !signature.isEmpty else { return false }
+        let message = "\(key)|\(remaining)|\(expire)"
+        let expected = hmacHex(message)
+        // Comparacion en tiempo constante
+        guard expected.count == signature.count else { return false }
+        return expected == signature
+    }
+
     static func validate(key: String, completion: @escaping (Bool, String, Int) -> Void) {
         validateWithSeconds(key: key, completion: completion)
     }
-    
+
     static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int) -> Void) {
         let serverURL = "https://dz.davidporfirio17.workers.dev"
         guard let url = URL(string: "\(serverURL)/check") else {
@@ -51,10 +78,11 @@ class KeyValidator {
         let hwid = getDeviceHWID()
         let model = getDeviceModel()
         let ios = getIOSVersion()
-        
+        let upperKey = key.uppercased()
+
         let body: [String: Any] = [
-            "key": key.uppercased(),
-            "username": key.uppercased(),
+            "key": upperKey,
+            "username": upperKey,
             "hwid": hwid,
             "model": model,
             "ios": ios
@@ -77,6 +105,18 @@ class KeyValidator {
                 do {
                     let resp = try JSONDecoder().decode(KeyResponse.self, from: data)
                     let rem = resp.data?.remaining_seconds ?? resp.remaining_seconds ?? 0
+
+                    // Si el login es exitoso, EXIGIMOS firma valida.
+                    // Esto bloquea servidores falsos que respondan success:true sin poder firmar.
+                    if resp.success {
+                        let expire = resp.data?.expire ?? 0
+                        let ok = verifySignature(key: upperKey, remaining: rem, expire: expire, signature: resp.signature)
+                        if !ok {
+                            completion(false, "Respuesta no válida. Servidor no autorizado.", 0)
+                            return
+                        }
+                    }
+
                     completion(resp.success, resp.message ?? "ok", rem)
                 } catch {
                     completion(false, "Error parsing response", 0)
