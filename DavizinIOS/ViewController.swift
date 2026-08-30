@@ -68,6 +68,15 @@ final class ViewController: UIViewController {
         headerView.countdownText = text
     }
 
+    /// Muestra un mensaje personalizado del panel al cliente (popup).
+    func showNotice(_ message: String, completion: @escaping () -> Void) {
+        let alert = UIAlertController(title: "Aviso", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            completion()
+        })
+        present(alert, animated: true)
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         modalPresentationStyle = .fullScreen
