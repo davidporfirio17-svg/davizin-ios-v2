@@ -63,6 +63,11 @@ final class ViewController: UIViewController {
         operationView?.setState(state)
     }
 
+    /// Actualiza el contador de tiempo restante en el header.
+    func setCountdownText(_ text: String) {
+        headerView.countdownText = text
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         modalPresentationStyle = .fullScreen
