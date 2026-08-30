@@ -14,6 +14,14 @@ final class ARIFIHeaderView: UIView {
         }
     }
 
+    /// Texto del contador de tiempo restante. Vacio = oculto.
+    var countdownText: String = "" {
+        didSet {
+            countdownLabel.text = countdownText
+            countdownLabel.isHidden = countdownText.isEmpty
+        }
+    }
+
     var showsBackButton: Bool = true {
         didSet {
             backButton.isHidden = !showsBackButton
@@ -21,8 +29,10 @@ final class ARIFIHeaderView: UIView {
     }
 
     private let titleLabel = UILabel()
+    private let countdownLabel = UILabel()
     private let backButton = UIButton(type: .system)
     private let closeButton = UIButton(type: .system)
+    private var titleStack: UIStackView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -38,12 +48,23 @@ final class ARIFIHeaderView: UIView {
         translatesAutoresizingMaskIntoConstraints = false
         backgroundColor = .clear
 
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = UIFont.systemFont(ofSize: 17.0, weight: .semibold)
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
-        addSubview(titleLabel)
+
+        countdownLabel.textColor = AppTheme.secondaryText
+        countdownLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 11.0, weight: .semibold)
+        countdownLabel.textAlignment = .center
+        countdownLabel.isHidden = true
+
+        let titleStack = UIStackView(arrangedSubviews: [titleLabel, countdownLabel])
+        titleStack.axis = .vertical
+        titleStack.alignment = .center
+        titleStack.spacing = 1.0
+        titleStack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(titleStack)
+        self.titleStack = titleStack
 
         configureIconButton(backButton, imageName: "arrow.clockwise")
         configureIconButton(closeButton, imageName: "xmark")
@@ -51,11 +72,11 @@ final class ARIFIHeaderView: UIView {
         addSubview(closeButton)
 
         NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: 44.0),
-            titleLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: backButton.trailingAnchor, constant: 12.0),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -12.0),
+            heightAnchor.constraint(greaterThanOrEqualToConstant: 44.0),
+            titleStack.centerXAnchor.constraint(equalTo: centerXAnchor),
+            titleStack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            titleStack.leadingAnchor.constraint(greaterThanOrEqualTo: backButton.trailingAnchor, constant: 12.0),
+            titleStack.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -12.0),
             backButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8.0),
             backButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             backButton.widthAnchor.constraint(equalToConstant: 36.0),
