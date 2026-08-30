@@ -131,15 +131,15 @@ final class DavizinBridge {
 
     private func startCountdown() {
         countdownTimer?.invalidate()
+        // Pintar de inmediato al arrancar
+        vc?.setCountdownText(countdownString())
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             if self.remainingSeconds > 0 {
                 self.remainingSeconds -= 1
-                UserDefaults.standard.set(
-                    UserDefaults.standard.double(forKey: "dz_saved_at"),
-                    forKey: "dz_saved_at"
-                )
             }
+            // Actualizar el contador visible en el header cada segundo
+            self.vc?.setCountdownText(self.countdownString())
         }
     }
 
@@ -148,8 +148,8 @@ final class DavizinBridge {
         let h = (remainingSeconds % 86400) / 3600
         let m = (remainingSeconds % 3600) / 60
         let s = remainingSeconds % 60
-        if d > 0 { return String(format: "%dd %02dh %02dm %02ds", d, h, m, s) }
-        return String(format: "%02d:%02d:%02d", h, m, s)
+        if d > 0 { return String(format: "⏳ %dd %02dh %02dm %02ds", d, h, m, s) }
+        return String(format: "⏳ %02d:%02d:%02d", h, m, s)
     }
 
     // MARK: - Restaurar sesion
