@@ -68,13 +68,119 @@ final class ViewController: UIViewController {
         headerView.countdownText = text
     }
 
-    /// Muestra un mensaje personalizado del panel al cliente (popup).
+    /// Muestra un mensaje personalizado del panel al cliente (popup con estilo Davizin).
     func showNotice(_ message: String, completion: @escaping () -> Void) {
-        let alert = UIAlertController(title: "Aviso", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
-            completion()
-        })
-        present(alert, animated: true)
+        let overlay = UIView()
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        overlay.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        overlay.alpha = 0.0
+
+        let card = UIView()
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = AppTheme.card
+        card.layer.cornerRadius = AppTheme.cardCornerRadius
+        card.layer.borderWidth = 1.0
+        card.layer.borderColor = AppTheme.accent.withAlphaComponent(0.4).cgColor
+        card.transform = CGAffineTransform(scaleX: 0.85, y: 0.85)
+
+        // Circulo con icono de campana
+        let iconCircle = UIView()
+        iconCircle.translatesAutoresizingMaskIntoConstraints = false
+        iconCircle.backgroundColor = AppTheme.accent.withAlphaComponent(0.15)
+        iconCircle.layer.cornerRadius = 32.0
+        iconCircle.layer.borderWidth = 2.0
+        iconCircle.layer.borderColor = AppTheme.accent.cgColor
+
+        let iconView = UIImageView(image: UIImage(systemName: "bell.fill"))
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.tintColor = AppTheme.accent
+        iconView.contentMode = .scaleAspectFit
+
+        let titleLabel = UILabel()
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.text = "Aviso"
+        titleLabel.textColor = AppTheme.primaryText
+        titleLabel.font = UIFont.systemFont(ofSize: 20.0, weight: .bold)
+        titleLabel.textAlignment = .center
+
+        let messageLabel = UILabel()
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        messageLabel.text = message
+        messageLabel.textColor = AppTheme.secondaryText
+        messageLabel.font = UIFont.systemFont(ofSize: 15.0, weight: .regular)
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+
+        let okButton = UIButton(type: .system)
+        okButton.translatesAutoresizingMaskIntoConstraints = false
+        okButton.setTitle("Entendido", for: .normal)
+        okButton.setTitleColor(.white, for: .normal)
+        okButton.titleLabel?.font = UIFont.systemFont(ofSize: 16.0, weight: .semibold)
+        okButton.backgroundColor = AppTheme.accent
+        okButton.layer.cornerRadius = AppTheme.controlCornerRadius
+
+        iconCircle.addSubview(iconView)
+        card.addSubview(iconCircle)
+        card.addSubview(titleLabel)
+        card.addSubview(messageLabel)
+        card.addSubview(okButton)
+        overlay.addSubview(card)
+        view.addSubview(overlay)
+
+        NSLayoutConstraint.activate([
+            overlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            overlay.topAnchor.constraint(equalTo: view.topAnchor),
+            overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            card.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            card.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+            card.leadingAnchor.constraint(greaterThanOrEqualTo: overlay.leadingAnchor, constant: 32.0),
+            card.trailingAnchor.constraint(lessThanOrEqualTo: overlay.trailingAnchor, constant: -32.0),
+            card.widthAnchor.constraint(lessThanOrEqualToConstant: 340.0),
+
+            iconCircle.topAnchor.constraint(equalTo: card.topAnchor, constant: 28.0),
+            iconCircle.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+            iconCircle.widthAnchor.constraint(equalToConstant: 64.0),
+            iconCircle.heightAnchor.constraint(equalToConstant: 64.0),
+
+            iconView.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 28.0),
+            iconView.heightAnchor.constraint(equalToConstant: 28.0),
+
+            titleLabel.topAnchor.constraint(equalTo: iconCircle.bottomAnchor, constant: 16.0),
+            titleLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24.0),
+            titleLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24.0),
+
+            messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 10.0),
+            messageLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24.0),
+            messageLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24.0),
+
+            okButton.topAnchor.constraint(equalTo: messageLabel.bottomAnchor, constant: 24.0),
+            okButton.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 24.0),
+            okButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -24.0),
+            okButton.heightAnchor.constraint(equalToConstant: 50.0),
+            okButton.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -24.0)
+        ])
+
+        // Accion del boton: cerrar con animacion y continuar
+        let dismissAction = UIAction { _ in
+            UIView.animate(withDuration: 0.2, animations: {
+                overlay.alpha = 0.0
+                card.transform = CGAffineTransform(scaleX: 0.85, y: 0.85)
+            }) { _ in
+                overlay.removeFromSuperview()
+                completion()
+            }
+        }
+        okButton.addAction(dismissAction, for: .touchUpInside)
+
+        // Animacion de entrada
+        UIView.animate(withDuration: 0.28, delay: 0.0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: [.curveEaseOut]) {
+            overlay.alpha = 1.0
+            card.transform = .identity
+        }
     }
 
     override func viewDidLoad() {
