@@ -8,6 +8,7 @@ struct KeyResponse: Codable {
     let remaining_seconds: Int?
     let data: KeyData?
     let signature: String?
+    let notice: String?
 }
 
 struct KeyData: Codable {
@@ -59,14 +60,14 @@ class KeyValidator {
         return expected == signature
     }
 
-    static func validate(key: String, completion: @escaping (Bool, String, Int) -> Void) {
+    static func validate(key: String, completion: @escaping (Bool, String, Int, String?) -> Void) {
         validateWithSeconds(key: key, completion: completion)
     }
 
-    static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int) -> Void) {
+    static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int, String?) -> Void) {
         let serverURL = "https://dz.davidporfirio17.workers.dev"
         guard let url = URL(string: "\(serverURL)/check") else {
-            completion(false, "URL inválida", 0)
+            completion(false, "URL inválida", 0, nil)
             return
         }
 
@@ -93,12 +94,12 @@ class KeyValidator {
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    completion(false, "Error: \(error.localizedDescription)", 0)
+                    completion(false, "Error: \(error.localizedDescription)", 0, nil)
                     return
                 }
 
                 guard let data = data else {
-                    completion(false, "Sin respuesta", 0)
+                    completion(false, "Sin respuesta", 0, nil)
                     return
                 }
 
@@ -112,14 +113,14 @@ class KeyValidator {
                         let expire = resp.data?.expire ?? 0
                         let ok = verifySignature(key: upperKey, remaining: rem, expire: expire, signature: resp.signature)
                         if !ok {
-                            completion(false, "Respuesta no válida. Servidor no autorizado.", 0)
+                            completion(false, "Respuesta no válida. Servidor no autorizado.", 0, nil)
                             return
                         }
                     }
 
-                    completion(resp.success, resp.message ?? "ok", rem)
+                    completion(resp.success, resp.message ?? "ok", rem, resp.notice)
                 } catch {
-                    completion(false, "Error parsing response", 0)
+                    completion(false, "Error parsing response", 0, nil)
                 }
             }
         }.resume()
