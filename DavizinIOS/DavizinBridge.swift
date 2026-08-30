@@ -55,7 +55,7 @@ final class DavizinBridge {
 
         let upperKey = key.uppercased()
 
-        KeyValidator.validate(key: upperKey) { [weak self] success, message, remaining in
+        KeyValidator.validate(key: upperKey) { [weak self] success, message, remaining, notice in
             self?.vc?.setLoginChecking(false)
 
             if success && remaining > 0 {
@@ -73,7 +73,14 @@ final class DavizinBridge {
                 self?.startCountdown()
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    self?.vc?.showGameSelectionScreen()
+                    // Si el cliente tiene un mensaje personalizado, mostrarlo antes de continuar
+                    if let notice = notice, !notice.isEmpty {
+                        self?.vc?.showNotice(notice) {
+                            self?.vc?.showGameSelectionScreen()
+                        }
+                    } else {
+                        self?.vc?.showGameSelectionScreen()
+                    }
                 }
             } else {
                 self?.vc?.setLoginStatus(message ?? "Key invalida", success: false)
