@@ -115,7 +115,7 @@ struct KeyGateView: View {
         withAnimation { showError = false }
         isValidating = true
         
-        KeyValidator.validateWithSeconds(key: keyInput) { isValid, message, remainingSeconds in
+        KeyValidator.validateWithSeconds(key: keyInput) { isValid, message, remainingSeconds, _ in
             isValidating = false
             
             if isValid {

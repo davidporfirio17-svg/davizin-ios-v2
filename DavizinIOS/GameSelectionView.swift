@@ -11,8 +11,8 @@ final class GameSelectionView: UIView {
     private let categoryLabel = UILabel()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
-    private let freeFireButton = ARIFIButton(title: ARIFIGame.freeFire.rawValue)
-    private let freeFireMaxButton = ARIFIButton(title: ARIFIGame.freeFireMax.rawValue)
+    private let freeFireButton = ARIFIButton(title: "FREE FIRE", style: .secondary)
+    private let freeFireMaxButton = ARIFIButton(title: "FREE FIRE MAX", style: .secondary)
     private let stackView = UIStackView()
 
     private(set) var selectedGame: ARIFIGame?
@@ -37,19 +37,19 @@ final class GameSelectionView: UIView {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
-        categoryLabel.text = "GAME"
+        categoryLabel.text = "01 / ENTORNO"
         categoryLabel.textColor = AppTheme.tertiaryText
         categoryLabel.font = AppTheme.captionFont()
         categoryLabel.textAlignment = .center
         categoryLabel.adjustsFontForContentSizeCategory = true
 
-        titleLabel.text = "Choose your version"
+        titleLabel.text = "Elige tu entorno"
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = AppTheme.titleFont()
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
 
-        subtitleLabel.text = "Select the version you want to use."
+        subtitleLabel.text = "Selecciona la versión que quieres preparar."
         subtitleLabel.textColor = AppTheme.secondaryText
         subtitleLabel.font = AppTheme.bodyFont()
         subtitleLabel.textAlignment = .center

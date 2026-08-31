@@ -233,18 +233,39 @@ final class ViewController: UIViewController {
 
     private func showLogin(animated: Bool) {
         currentStage = .login
-        headerView.title = "Davizin"
+        headerView.title = "Davizin Core"
         headerView.showsBackButton = false
 
         let screen = LoginView()
         screen.delegate = self
         loginView = screen
         display(screen, animated: animated)
+
+        // Chequeo inteligente de compatibilidad del dispositivo
+        runCompatibilityCheck()
+    }
+
+    /// Prueba si el dispositivo puede inyectar y pinta el estado en el login.
+    private func runCompatibilityCheck() {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let result = InjectorService.checkCompatibility()
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                switch result {
+                case .compatible:
+                    self.loginView?.setCompatibility("✅ Compatible con tu dispositivo", color: AppTheme.success)
+                case .notCompatible:
+                    self.loginView?.setCompatibility("❌ No compatible con esta versión de iOS", color: AppTheme.failure)
+                case .noGameInstalled:
+                    self.loginView?.setCompatibility("⚠️ Instala Free Fire para verificar", color: AppTheme.accentWarm)
+                }
+            }
+        }
     }
 
     private func showGameSelection(animated: Bool) {
         currentStage = .gameSelection
-        headerView.title = "Select Game"
+        headerView.title = "Seleccionar entorno"
         headerView.showsBackButton = true
 
         let screen = GameSelectionView()
@@ -256,7 +277,7 @@ final class ViewController: UIViewController {
 
     private func showModeSelection(animated: Bool) {
         currentStage = .modeSelection
-        headerView.title = selectedGame.rawValue
+        headerView.title = "Configurar / \(selectedGame.rawValue)"
         headerView.showsBackButton = true
 
         let screen = ModeSelectionView()
@@ -268,7 +289,7 @@ final class ViewController: UIViewController {
 
     private func showOperation(animated: Bool) {
         currentStage = .operation
-        headerView.title = "\(selectedGame.rawValue) - \(selectedMode.rawValue)"
+        headerView.title = "Control / \(selectedMode.rawValue)"
         headerView.showsBackButton = true
 
         let screen = OperationView()

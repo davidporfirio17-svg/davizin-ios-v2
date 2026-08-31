@@ -24,12 +24,12 @@ final class ARIFIAnimatedBackgroundView: UIView {
     private var displayLink: CADisplayLink?
     private var elapsed: CGFloat = 0
 
-    // ── Colores del tema azul eléctrico ──────────────────────────
+    // ── Paleta sunset glassmorphism ───────────────────────────────
     private let colors: [UIColor] = [
-        UIColor(red: 0.20, green: 0.80, blue: 1.00, alpha: 1), // cyan
-        UIColor(red: 0.30, green: 0.50, blue: 1.00, alpha: 1), // blue
-        UIColor(red: 0.55, green: 0.30, blue: 1.00, alpha: 1), // purple
-        UIColor(red: 0.10, green: 0.90, blue: 0.80, alpha: 1), // teal
+        UIColor(red: 1.00, green: 0.47, blue: 0.42, alpha: 1), // coral
+        UIColor(red: 1.00, green: 0.72, blue: 0.40, alpha: 1), // ambar
+        UIColor(red: 0.76, green: 0.28, blue: 0.52, alpha: 1), // rosa plum
+        UIColor(red: 0.61, green: 1.00, blue: 0.80, alpha: 1)  // menta
     ]
 
     // ── Init ──────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ final class ARIFIAnimatedBackgroundView: UIView {
     deinit { displayLink?.invalidate() }
 
     private func setup() {
-        backgroundColor = UIColor(red: 0.01, green: 0.02, blue: 0.12, alpha: 1)
+        backgroundColor = UIColor(red: 0.16, green: 0.055, blue: 0.13, alpha: 1)
         isUserInteractionEnabled = false
         layer.masksToBounds = true
         buildNodes()
@@ -178,7 +178,7 @@ final class ARIFIAnimatedBackgroundView: UIView {
             let waveR = waveT * max(w, h) * 0.8
             let waveAlpha = (1 - waveT / 0.7) * 0.06
             let waveX = w * 0.5, waveY = h * 0.4
-            let waveColor = UIColor(red: 0.2, green: 0.6, blue: 1.0, alpha: waveAlpha)
+            let waveColor = UIColor(red: 1.00, green: 0.47, blue: 0.42, alpha: waveAlpha)
             ctx.setStrokeColor(waveColor.cgColor)
             ctx.setLineWidth(1.5)
             ctx.strokeEllipse(in: CGRect(x: waveX - waveR, y: waveY - waveR, width: waveR*2, height: waveR*2))

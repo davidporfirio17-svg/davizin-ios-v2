@@ -10,9 +10,9 @@ final class OperationView: UIView {
     private let cardView = ARIFICardView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
-    private let runButton = ARIFIButton(title: ARIFIOperationKind.runExploit.rawValue, style: .secondary)
-    private let injectButton = ARIFIButton(title: ARIFIOperationKind.inject.rawValue, style: .secondary)
-    private let cleanButton = ARIFIButton(title: ARIFIOperationKind.clean.rawValue, style: .secondary)
+    private let runButton = ARIFIButton(title: "EJECUTAR PROCESO", style: .primary)
+    private let injectButton = ARIFIButton(title: "INYECTAR CONFIGURACIÓN", style: .secondary)
+    private let cleanButton = ARIFIButton(title: "LIMPIAR SESIÓN", style: .destructive)
     private let statusLabel = UILabel()
     private let stackView = UIStackView()
 
@@ -52,19 +52,19 @@ final class OperationView: UIView {
             statusLabel.text = nil
             statusLabel.isHidden = true
         case .checking:
-            statusLabel.text = "Checking..."
+            statusLabel.text = "Comprobando entorno..."
             statusLabel.isHidden = false
         case .running:
-            runButton.setLoading(true, title: "Running...")
-            statusLabel.text = "Running..."
+            runButton.setLoading(true, title: "EJECUTANDO...")
+            statusLabel.text = "Ejecutando proceso..."
             statusLabel.isHidden = false
         case .injecting:
-            injectButton.setLoading(true, title: "Injecting...")
-            statusLabel.text = "Injecting..."
+            injectButton.setLoading(true, title: "INYECTANDO...")
+            statusLabel.text = "Aplicando configuración..."
             statusLabel.isHidden = false
         case .cleaning:
-            cleanButton.setLoading(true, title: "Cleaning...")
-            statusLabel.text = "Cleaning..."
+            cleanButton.setLoading(true, title: "LIMPIANDO...")
+            statusLabel.text = "Limpiando sesión..."
             statusLabel.isHidden = false
         case .succeeded(let message):
             statusLabel.text = message
@@ -142,7 +142,7 @@ final class OperationView: UIView {
     }
 
     private func updateSubtitle() {
-        titleLabel.text = "\(selectedGame.rawValue) - \(selectedMode.rawValue)"
+        titleLabel.text = "\(selectedGame.rawValue) / \(selectedMode.rawValue)"
         subtitleLabel.text = nil
     }
 

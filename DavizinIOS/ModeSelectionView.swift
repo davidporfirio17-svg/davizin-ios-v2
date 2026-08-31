@@ -40,26 +40,26 @@ final class ModeSelectionView: UIView {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
-        categoryLabel.text = "CHEAT"
+        categoryLabel.text = "02 / CONFIGURACIÓN"
         categoryLabel.textColor = AppTheme.tertiaryText
         categoryLabel.font = AppTheme.captionFont()
         categoryLabel.textAlignment = .center
         categoryLabel.adjustsFontForContentSizeCategory = true
 
-        titleLabel.text = "Select Cheat"
+        titleLabel.text = "Configura tu perfil"
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = AppTheme.titleFont()
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
 
-        subtitleLabel.text = "Choose the Cheat you want to use."
+        subtitleLabel.text = "Elige el modo que quieres activar en esta sesión."
         subtitleLabel.textColor = AppTheme.secondaryText
         subtitleLabel.font = AppTheme.bodyFont()
         subtitleLabel.textAlignment = .center
         subtitleLabel.numberOfLines = 0
         subtitleLabel.adjustsFontForContentSizeCategory = true
 
-        footerLabel.text = "Make sure you use correct method to inject ."
+        footerLabel.text = "Revisa tu selección antes de ejecutar la operación."
         footerLabel.textColor = AppTheme.secondaryText
         footerLabel.font = AppTheme.captionFont()
         footerLabel.textAlignment = .center

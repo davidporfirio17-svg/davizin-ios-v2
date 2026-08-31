@@ -11,8 +11,9 @@ final class LoginView: UIView {
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let keyField = UITextField()
-    private let continueButton = ARIFIButton(title: "Continue", style: .primary)
+    private let continueButton = ARIFIButton(title: "ENTRAR AL PANEL", style: .primary)
     private let statusLabel = UILabel()
+    private let compatLabel = UILabel()
     private let stackView = UIStackView()
 
     override init(frame: CGRect) {
@@ -27,8 +28,8 @@ final class LoginView: UIView {
 
     func setChecking(_ checking: Bool) {
         keyField.isEnabled = !checking
-        continueButton.setLoading(checking, title: "Checking...")
-        statusLabel.text = checking ? "Checking your key..." : nil
+        continueButton.setLoading(checking, title: "VERIFICANDO...")
+        statusLabel.text = checking ? "Validando credenciales..." : nil
         statusLabel.isHidden = !checking
     }
 
@@ -43,17 +44,24 @@ final class LoginView: UIView {
         setStatus(nil)
     }
 
+    /// Muestra el estado de compatibilidad del dispositivo (verde/rojo/amarillo).
+    func setCompatibility(_ text: String, color: UIColor) {
+        compatLabel.text = text
+        compatLabel.textColor = color
+        compatLabel.isHidden = text.isEmpty
+    }
+
     private func configure() {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
-        titleLabel.text = "Davizin iOS"
+        titleLabel.text = "DAVIZIN / CORE"
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = AppTheme.titleFont()
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
 
-        subtitleLabel.text = "Enter your access key to continue."
+        subtitleLabel.text = "Activa tu sesión para desbloquear el panel de operaciones."
         subtitleLabel.textColor = AppTheme.secondaryText
         subtitleLabel.font = AppTheme.bodyFont()
         subtitleLabel.textAlignment = .center
@@ -69,7 +77,7 @@ final class LoginView: UIView {
         keyField.layer.cornerCurve = .continuous
         keyField.layer.borderWidth = 1.0
         keyField.layer.borderColor = AppTheme.separator.cgColor
-        keyField.placeholder = "Access key"
+        keyField.placeholder = "PEGA TU KEY DE ACCESO"
         keyField.autocorrectionType = .no
         keyField.autocapitalizationType = .allCharacters
         keyField.returnKeyType = .continue
@@ -88,12 +96,18 @@ final class LoginView: UIView {
         statusLabel.numberOfLines = 0
         statusLabel.isHidden = true
 
+        compatLabel.font = UIFont.systemFont(ofSize: 13.0, weight: .bold)
+        compatLabel.textAlignment = .center
+        compatLabel.numberOfLines = 0
+        compatLabel.isHidden = true
+
         stackView.axis = .vertical
         stackView.alignment = .fill
         stackView.spacing = 12.0
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
+        stackView.addArrangedSubview(compatLabel)
         stackView.addArrangedSubview(keyField)
         stackView.addArrangedSubview(continueButton)
         stackView.addArrangedSubview(statusLabel)

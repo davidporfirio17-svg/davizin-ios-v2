@@ -194,4 +194,34 @@ class InjectorService {
         return InjectorResult(success: true,
             message: "¡Restaurado! Cierra y abre Free Fire.")
     }
+
+    /// Resultado del chequeo de compatibilidad del dispositivo.
+    enum Compat {
+        case compatible          // puede acceder al contenedor -> puede inyectar
+        case noGameInstalled     // Free Fire no esta instalado
+        case notCompatible       // el juego esta pero no se puede acceder (iOS no compatible)
+    }
+
+    /// Prueba REAL si el dispositivo puede inyectar, intentando acceder al
+    /// contenedor de Free Fire (MAX o normal) via MCM. No inyecta nada.
+    static func checkCompatibility() -> Compat {
+        let fm = FileManager.default
+        let bundles = ["com.dts.freefiremax", "com.dts.freefireth"]
+
+        var algunInstalado = false
+        for bid in bundles {
+            var err: NSString?
+            if let container = DavizinGetContainerPath(bid, &err) {
+                // Conseguimos el contenedor: probamos que exista y sea accesible
+                if fm.fileExists(atPath: container) {
+                    return .compatible
+                }
+                algunInstalado = true
+            }
+        }
+        // Si obtuvimos algun path pero no accesible -> instalado pero no compatible
+        // Si nunca obtuvimos path -> el juego no esta instalado
+        return algunInstalado ? .notCompatible : .noGameInstalled
+    }
+
 }

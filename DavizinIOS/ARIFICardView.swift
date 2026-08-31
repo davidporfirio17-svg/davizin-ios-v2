@@ -1,6 +1,5 @@
-import UIKit
-
 final class ARIFICardView: UIView {
+    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let contentView = UIView()
     private var contentConstraints: [NSLayoutConstraint] = []
 
@@ -10,9 +9,7 @@ final class ARIFICardView: UIView {
         bottom: AppTheme.cardPadding,
         right: AppTheme.cardPadding
     ) {
-        didSet {
-            updateContentConstraints()
-        }
+        didSet { updateContentConstraints() }
     }
 
     override init(frame: CGRect) {
@@ -27,10 +24,7 @@ final class ARIFICardView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        layer.shadowPath = UIBezierPath(
-            roundedRect: bounds,
-            cornerRadius: AppTheme.cardCornerRadius
-        ).cgPath
+        layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: AppTheme.cardCornerRadius).cgPath
     }
 
     func addContent(_ view: UIView) {
@@ -42,11 +36,22 @@ final class ARIFICardView: UIView {
     private func configure() {
         backgroundColor = AppTheme.card
         layer.cornerRadius = AppTheme.cardCornerRadius
+        layer.cornerCurve = .continuous
         layer.masksToBounds = false
-        layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOpacity = 0.34
-        layer.shadowRadius = 22.0
-        layer.shadowOffset = CGSize(width: 0.0, height: 10.0)
+        layer.borderWidth = 1.0
+        layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
+        layer.shadowColor = AppTheme.accentWarm.cgColor
+        layer.shadowOpacity = 0.28
+        layer.shadowRadius = 28.0
+        layer.shadowOffset = CGSize(width: 0.0, height: 16.0)
+
+        blurView.translatesAutoresizingMaskIntoConstraints = false
+        blurView.layer.cornerRadius = AppTheme.cardCornerRadius
+        blurView.layer.cornerCurve = .continuous
+        blurView.clipsToBounds = true
+        blurView.alpha = 0.72
+        addSubview(blurView)
+        blurView.arifiPinEdges(to: self)
 
         contentView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(contentView)
