@@ -1,3 +1,5 @@
+import UIKit
+
 protocol ARIFIHeaderViewDelegate: AnyObject {
     func headerViewDidTapBack(_ headerView: ARIFIHeaderView)
     func headerViewDidTapClose(_ headerView: ARIFIHeaderView)

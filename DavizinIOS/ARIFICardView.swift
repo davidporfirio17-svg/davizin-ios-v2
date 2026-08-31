@@ -1,3 +1,5 @@
+import UIKit
+
 final class ARIFICardView: UIView {
     private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let contentView = UIView()

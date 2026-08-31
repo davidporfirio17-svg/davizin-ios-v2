@@ -1,3 +1,5 @@
+import UIKit
+
 enum ARIFIButtonStyle {
     case primary
     case secondary
