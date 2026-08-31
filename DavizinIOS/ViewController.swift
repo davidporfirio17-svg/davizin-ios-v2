@@ -237,7 +237,7 @@ final class ViewController: UIViewController {
 
     private func showLogin(animated: Bool) {
         currentStage = .login
-        headerView.title = "Davizin"
+        headerView.title = "Nyxel External"
         headerView.showsBackButton = false
 
         let screen = LoginView()
