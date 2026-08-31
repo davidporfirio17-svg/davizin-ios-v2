@@ -68,6 +68,10 @@ final class ViewController: UIViewController {
         headerView.countdownText = text
     }
 
+    func setCountdownColor(_ color: UIColor) {
+        headerView.setCountdownColor(color)
+    }
+
     /// Muestra un mensaje personalizado del panel al cliente (popup con estilo Davizin).
     func showNotice(_ message: String, completion: @escaping () -> Void) {
         let overlay = UIView()

@@ -55,7 +55,7 @@ final class LoginView: UIView {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
-        titleLabel.text = "DAVIZIN / CORE"
+        titleLabel.text = "DAVIZIN"
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = AppTheme.titleFont()
         titleLabel.textAlignment = .center

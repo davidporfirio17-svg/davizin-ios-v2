@@ -19,6 +19,13 @@ final class DavizinBridge {
 
     func connect(to viewController: ViewController) {
         self.vc = viewController
+        // Restaurar el ultimo juego y modo elegidos
+        if let g = UserDefaults.standard.string(forKey: "dz_last_game"), let game = ARIFIGame(rawValue: g) {
+            selectedGame = game
+        }
+        if let m = UserDefaults.standard.string(forKey: "dz_last_mode"), let mode = ARIFIMode(rawValue: m) {
+            selectedMode = mode
+        }
         viewController.simulateUIStates = false
 
         // Login: validar key con Cloudflare
@@ -29,12 +36,14 @@ final class DavizinBridge {
         // Game selection: el usuario elige y avanza
         viewController.onGameSelected = { [weak self] game in
             self?.selectedGame = game
+            UserDefaults.standard.set(game.rawValue, forKey: "dz_last_game")
             self?.vc?.showModeSelectionScreen()
         }
 
         // Mode selection: guardamos el modo y avanzamos
         viewController.onModeSelected = { [weak self] mode in
             self?.selectedMode = mode
+            UserDefaults.standard.set(mode.rawValue, forKey: "dz_last_mode")
             self?.vc?.showOperationScreen()
         }
 
@@ -109,6 +118,7 @@ final class DavizinBridge {
                 guard let self = self else { return }
                 let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
                 DispatchQueue.main.async {
+                    self.hapticFeedback(success: result.success)
                     self.vc?.setOperationState(
                         result.success
                             ? .succeeded(result.message)
@@ -124,6 +134,7 @@ final class DavizinBridge {
                 guard let self = self else { return }
                 let result = InjectorService.uninject(game: game)
                 DispatchQueue.main.async {
+                    self.hapticFeedback(success: result.success)
                     self.vc?.setOperationState(
                         result.success
                             ? .succeeded(result.message)
@@ -140,6 +151,7 @@ final class DavizinBridge {
         countdownTimer?.invalidate()
         // Pintar de inmediato al arrancar
         vc?.setCountdownText(countdownString())
+        vc?.setCountdownColor(countdownColor())
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             if self.remainingSeconds > 0 {
@@ -147,6 +159,7 @@ final class DavizinBridge {
             }
             // Actualizar el contador visible en el header cada segundo
             self.vc?.setCountdownText(self.countdownString())
+            self.vc?.setCountdownColor(self.countdownColor())
         }
     }
 
@@ -157,6 +170,17 @@ final class DavizinBridge {
         let s = remainingSeconds % 60
         if d > 0 { return String(format: "⏳ %dd %02dh %02dm %02ds", d, h, m, s) }
         return String(format: "⏳ %02d:%02d:%02d", h, m, s)
+    }
+
+    /// Color del contador segun el tiempo restante.
+    private func countdownColor() -> UIColor {
+        if remainingSeconds <= 3600 {          // menos de 1 hora -> rojo
+            return AppTheme.failure
+        } else if remainingSeconds <= 86400 {  // menos de 1 dia -> amarillo
+            return AppTheme.accentWarm
+        } else {                                // mas de 1 dia -> verde
+            return AppTheme.success
+        }
     }
 
     // MARK: - Restaurar sesion
@@ -171,4 +195,11 @@ final class DavizinBridge {
         let rem = max(0, total - elapsed)
         return rem > 0 ? (key, rem) : nil
     }
+
+    /// Vibracion segun resultado: exito (suave) o error (fuerte).
+    private func hapticFeedback(success: Bool) {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(success ? .success : .error)
+    }
+
 }

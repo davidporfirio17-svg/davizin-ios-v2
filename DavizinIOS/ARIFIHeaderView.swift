@@ -19,6 +19,11 @@ final class ARIFIHeaderView: UIView {
         }
     }
 
+    /// Color del contador (verde/amarillo/rojo segun tiempo restante).
+    func setCountdownColor(_ color: UIColor) {
+        countdownLabel.textColor = color
+    }
+
     var showsBackButton: Bool = true {
         didSet { backButton.isHidden = !showsBackButton }
     }
