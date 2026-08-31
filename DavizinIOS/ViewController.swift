@@ -233,7 +233,7 @@ final class ViewController: UIViewController {
 
     private func showLogin(animated: Bool) {
         currentStage = .login
-        headerView.title = "Davizin Core"
+        headerView.title = "Davizin"
         headerView.showsBackButton = false
 
         let screen = LoginView()
@@ -296,8 +296,29 @@ final class ViewController: UIViewController {
         screen.delegate = self
         screen.selectedGame = selectedGame
         screen.selectedMode = selectedMode
+        let gameToOpen = selectedGame
+        screen.onOpenGame = { [weak self] in
+            self?.openGame(gameToOpen)
+        }
         operationView = screen
         display(screen, animated: animated)
+    }
+
+    /// Abre Free Fire (MAX o normal) usando su esquema de URL.
+    private func openGame(_ game: ARIFIGame) {
+        let scheme: String
+        switch game {
+        case .freeFireMax: scheme = "freefiremax://"
+        case .freeFire:    scheme = "freefireth://"
+        }
+        if let url = URL(string: scheme) {
+            UIApplication.shared.open(url, options: [:]) { success in
+                if !success {
+                    // Si el esquema falla, intentar abrir por bundle (fallback)
+                    // No siempre funciona pero es un intento extra
+                }
+            }
+        }
     }
 
     private func display(_ screen: UIView, animated: Bool) {
@@ -387,7 +408,8 @@ extension ViewController: ARIFIHeaderViewDelegate {
     }
 
     func headerViewDidTapClose(_ headerView: ARIFIHeaderView) {
-        onClose?()
+        // La X regresa directo a la pantalla de la key (login)
+        showLogin(animated: true)
     }
 }
 

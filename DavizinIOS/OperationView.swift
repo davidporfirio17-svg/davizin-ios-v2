@@ -14,6 +14,8 @@ final class OperationView: UIView {
     private let injectButton = ARIFIButton(title: "INYECTAR CONFIGURACIÓN", style: .secondary)
     private let cleanButton = ARIFIButton(title: "LIMPIAR SESIÓN", style: .destructive)
     private let statusLabel = UILabel()
+    private let openGameButton = ARIFIButton(title: "🎮 ABRIR JUEGO")
+    var onOpenGame: (() -> Void)?
     private let stackView = UIStackView()
 
     private(set) var operationState: ARIFIOperationState = .idle
@@ -46,6 +48,7 @@ final class OperationView: UIView {
         runButton.setLoading(false)
         injectButton.setLoading(false)
         cleanButton.setLoading(false)
+        openGameButton.isHidden = true
 
         switch state {
         case .idle:
@@ -70,6 +73,10 @@ final class OperationView: UIView {
             statusLabel.text = message
             statusLabel.textColor = AppTheme.success
             statusLabel.isHidden = false
+            // Si fue una inyeccion exitosa, mostrar el boton de abrir el juego
+            if message.lowercased().contains("inyectado") {
+                openGameButton.isHidden = false
+            }
         case .failed(let message):
             statusLabel.text = message
             statusLabel.textColor = AppTheme.failure
@@ -106,6 +113,9 @@ final class OperationView: UIView {
         runButton.addTarget(self, action: #selector(runTapped), for: .touchUpInside)
         injectButton.addTarget(self, action: #selector(injectTapped), for: .touchUpInside)
         cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
+        openGameButton.accessibilityIdentifier = "operation.opengame"
+        openGameButton.addTarget(self, action: #selector(openGameTapped), for: .touchUpInside)
+        openGameButton.isHidden = true
 
         statusLabel.textColor = AppTheme.secondaryText
         statusLabel.font = AppTheme.captionFont()
@@ -123,6 +133,7 @@ final class OperationView: UIView {
         stackView.addArrangedSubview(injectButton)
         stackView.addArrangedSubview(cleanButton)
         stackView.addArrangedSubview(statusLabel)
+        stackView.addArrangedSubview(openGameButton)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
         cardView.addContent(stackView)
@@ -137,7 +148,8 @@ final class OperationView: UIView {
             stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: 240.0),
             runButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             injectButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
-            cleanButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
+            cleanButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
+            openGameButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
         ])
     }
 
@@ -156,5 +168,9 @@ final class OperationView: UIView {
 
     @objc private func cleanTapped() {
         delegate?.operationView(self, didTap: .clean)
+    }
+
+    @objc private func openGameTapped() {
+        onOpenGame?()
     }
 }
