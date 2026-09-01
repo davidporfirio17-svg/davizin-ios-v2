@@ -15,6 +15,8 @@ struct ARIFIMode: Hashable, Codable, Identifiable {
     let accessTier: String
     let pathMax: String?
     let pathNormal: String?
+    let oneTime: Bool
+    let consumed: Bool
 
     var rawValue: String { id }
     var displayName: String { label }
@@ -23,11 +25,11 @@ struct ARIFIMode: Hashable, Codable, Identifiable {
     static let pecho = ARIFIMode(id: "pecho", label: "Pecho", enabled: true, noticeTitle: "✅ Pecho — Estable", noticeBody: "Modo recomendado para uso normal.", noticeLevel: "green", noticeEnabled: true)
     static let body100 = ARIFIMode(id: "body100", label: "Body 100%", enabled: true, noticeTitle: "🛑 Body 100% — Cuidado", noticeBody: "Revisa el comportamiento después de cada actualización.", noticeLevel: "red", noticeEnabled: true)
 
-    init(id: String, label: String, enabled: Bool, noticeTitle: String = "", noticeBody: String = "", noticeLevel: String = "yellow", noticeEnabled: Bool = true, accessTier: String = "basic", pathMax: String? = nil, pathNormal: String? = nil) {
-        self.id = id; self.label = label; self.enabled = enabled; self.noticeTitle = noticeTitle; self.noticeBody = noticeBody; self.noticeLevel = noticeLevel; self.noticeEnabled = noticeEnabled; self.accessTier = accessTier; self.pathMax = pathMax; self.pathNormal = pathNormal
+    init(id: String, label: String, enabled: Bool, noticeTitle: String = "", noticeBody: String = "", noticeLevel: String = "yellow", noticeEnabled: Bool = true, accessTier: String = "basic", pathMax: String? = nil, pathNormal: String? = nil, oneTime: Bool = false, consumed: Bool = false) {
+        self.id = id; self.label = label; self.enabled = enabled; self.noticeTitle = noticeTitle; self.noticeBody = noticeBody; self.noticeLevel = noticeLevel; self.noticeEnabled = noticeEnabled; self.accessTier = accessTier; self.pathMax = pathMax; self.pathNormal = pathNormal; self.oneTime = oneTime; self.consumed = consumed
     }
 
-    private enum CodingKeys: String, CodingKey { case id, label, enabled, noticeTitle, noticeBody, noticeLevel, noticeEnabled, accessTier, pathMax, pathNormal }
+    private enum CodingKeys: String, CodingKey { case id, label, enabled, noticeTitle, noticeBody, noticeLevel, noticeEnabled, accessTier, pathMax, pathNormal, oneTime, consumed }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
@@ -40,6 +42,8 @@ struct ARIFIMode: Hashable, Codable, Identifiable {
         accessTier = try c.decodeIfPresent(String.self, forKey: .accessTier) ?? "basic"
         pathMax = try c.decodeIfPresent(String.self, forKey: .pathMax)
         pathNormal = try c.decodeIfPresent(String.self, forKey: .pathNormal)
+        oneTime = try c.decodeIfPresent(Bool.self, forKey: .oneTime) ?? false
+        consumed = try c.decodeIfPresent(Bool.self, forKey: .consumed) ?? false
     }
 }
 
@@ -59,6 +63,13 @@ enum ARIFIModeCatalog {
         let clean = modes.filter { isSafeID($0.id) && !$0.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard let data = try? JSONEncoder().encode(clean) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
+    }
+    static func markConsumed(_ id: String) {
+        let updated = all().map { mode in
+            guard mode.id == id else { return mode }
+            return ARIFIMode(id: mode.id, label: mode.label, enabled: false, noticeTitle: mode.noticeTitle, noticeBody: mode.noticeBody, noticeLevel: mode.noticeLevel, noticeEnabled: mode.noticeEnabled, accessTier: mode.accessTier, pathMax: mode.pathMax, pathNormal: mode.pathNormal, oneTime: mode.oneTime, consumed: true)
+        }
+        save(updated)
     }
     private static func isSafeID(_ id: String) -> Bool {
         guard id.count >= 1, id.count <= 32 else { return false }

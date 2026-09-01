@@ -99,6 +99,39 @@ final class DavizinBridge {
 
     // MARK: - Operaciones
 
+    private func performInjection(game: ARIFIGame, mode: ARIFIMode, key: String, hwid: String) {
+        vc?.setOperationState(.injecting)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
+            if result.success && mode.oneTime && mode.id == "holograma" {
+                self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
+            } else {
+                DispatchQueue.main.async {
+                    self.hapticFeedback(success: result.success)
+                    self.vc?.setOperationState(result.success ? .succeeded(result.message) : .failed(result.message))
+                }
+            }
+        }
+    }
+
+    private func consumeOneTimeMode(mode: ARIFIMode, key: String, hwid: String, result: InjectorResult) {
+        guard let url = URL(string: "https://dz.davidporfirio17.workers.dev/consume-mode") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["key": key, "hwid": hwid, "mode": mode.id])
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
+            let ok = (response as? HTTPURLResponse)?.statusCode == 200 && ((try? JSONSerialization.jsonObject(with: data ?? Data()) as? [String: Any])?["success"] as? Bool == true)
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.hapticFeedback(success: ok)
+                if ok { ARIFIModeCatalog.markConsumed(mode.id) }
+                self.vc?.setOperationState(ok ? .succeeded(result.message) : .failed("La inyección se realizó, pero no se pudo confirmar el consumo de Holograma. No vuelvas a intentarlo hasta revisar la conexión."))
+            }
+        }.resume()
+    }
+
     private func handleOperation(_ operation: ARIFIOperationKind) {
         switch operation {
 
@@ -109,22 +142,18 @@ final class DavizinBridge {
             }
 
         case .inject:
-            vc?.setOperationState(.injecting)
             let mode = selectedMode
             let game = selectedGame
             let key = sessionKey
             let hwid = sessionHWID
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else { return }
-                let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
-                DispatchQueue.main.async {
-                    self.hapticFeedback(success: result.success)
-                    self.vc?.setOperationState(
-                        result.success
-                            ? .succeeded(result.message)
-                            : .failed(result.message)
-                    )
+            if mode.oneTime && mode.id == "holograma" && !mode.consumed {
+                vc?.showNotice("⚠️ Holograma Pro — uso único\n\nUna vez inyectado correctamente, Holograma desaparecerá definitivamente de esta key. Si eliminas Free Fire o borras sus archivos, no será posible recuperarlo con esta misma key. Para volver a utilizarlo necesitarás una key Pro nueva. ¿Deseas continuar?") { [weak self] in
+                    self?.vc?.showNotice("🔴 Confirmación final\n\nEsta acción consumirá permanentemente Holograma de esta key y no se puede deshacer. ¿Confirmas la inyección?") { [weak self] in
+                        self?.performInjection(game: game, mode: mode, key: key, hwid: hwid)
+                    }
                 }
+            } else {
+                performInjection(game: game, mode: mode, key: key, hwid: hwid)
             }
 
         case .clean:
