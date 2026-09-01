@@ -17,8 +17,7 @@ private func destFileName(for game: ARIFIGame) -> String {
     case .freeFireMax:
         return "assetindexer.PENojQAQf9a1l6Dzjs0n1Z3rtVU~3D"
     case .freeFire:
-        // TODO: reemplazar por el nombre real del archivo de Free Fire normal
-        return "assetindexer.PENojQAQf9a1l6Dzjs0n1Z3rtVU~3D"
+        return "assetindexer.H5ak1JM1Eck~2FxRcJrEp~2FMzeuqmY~3D"
     }
 }
 
