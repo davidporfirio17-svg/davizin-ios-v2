@@ -99,7 +99,7 @@ class InjectorService {
     /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
     private static func downloadResource(for mode: ARIFIMode, game: ARIFIGame, key: String, hwid: String) -> Data? {
         guard !key.isEmpty else { return nil }
-        guard let url = URL(string: "\(kCacheBaseURL)/cache/\(remoteSlot(for: mode, game: game))") else { return nil }
+        guard let url = URL(string: "\(kCacheBaseURL)/avatar/\(remoteSlot(for: mode, game: game))") else { return nil }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
