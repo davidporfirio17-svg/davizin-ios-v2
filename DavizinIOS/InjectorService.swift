@@ -32,12 +32,28 @@ private func savedDestFileName(for game: ARIFIGame) -> String {
     return defaultDestFileName(for: game)
 }
 
-private func destPathRel(for game: ARIFIGame) -> String {
+private func isSafeRelativePath(_ value: String) -> Bool {
+    guard value.hasPrefix("Documents/"), value.count <= 240, !value.contains(".."), !value.contains("//") else { return false }
+    let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._~/-=")
+    return value.unicodeScalars.allSatisfy { allowed.contains($0) }
+}
+
+private func destPathRel(for game: ARIFIGame, mode: ARIFIMode) -> String {
+    let configured = game == .freeFireMax ? mode.pathMax : mode.pathNormal
+    if let configured, isSafeRelativePath(configured) { return configured }
     return kBaseFolder + "/" + savedDestFileName(for: game)
 }
 
-private func backPathRel(for game: ARIFIGame) -> String {
-    return kBaseFolder + "/" + savedDestFileName(for: game) + ".original"
+private func activePathKey(for game: ARIFIGame) -> String {
+    return game == .freeFireMax ? "dz_active_path_max" : "dz_active_path_normal"
+}
+
+private func legacyDestPathRel(for game: ARIFIGame) -> String {
+    return kBaseFolder + "/" + savedDestFileName(for: game)
+}
+
+private func backPathRel(for game: ARIFIGame, mode: ARIFIMode) -> String {
+    return destPathRel(for: game, mode: mode) + ".original"
 }
 
 // Base del Worker que sirve los cache_res desde KV.
@@ -185,8 +201,10 @@ class InjectorService {
                 message: "No se pudo obtener el recurso. Revisa tu conexión e inténtalo de nuevo.")
         }
 
-        let destPath   = container + "/" + destPathRel(for: game)
-        let backupPath = container + "/" + backPathRel(for: game)
+        let activeRel = destPathRel(for: game, mode: mode)
+        let destPath   = container + "/" + activeRel
+        let backupPath = container + "/" + activeRel + ".original"
+        UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
         let destDir    = (destPath as NSString).deletingLastPathComponent
 
         try? fm.createDirectory(atPath: destDir,
@@ -224,8 +242,9 @@ class InjectorService {
                 message: (mcmErr as String?) ?? "Container no encontrado")
         }
 
-        let destPath   = container + "/" + destPathRel(for: game)
-        let backupPath = container + "/" + backPathRel(for: game)
+        let activeRel = UserDefaults.standard.string(forKey: activePathKey(for: game)).flatMap { isSafeRelativePath($0) ? $0 : nil } ?? legacyDestPathRel(for: game)
+        let destPath   = container + "/" + activeRel
+        let backupPath = destPath + ".original"
 
         guard fm.fileExists(atPath: backupPath) else {
             return InjectorResult(success: false,
