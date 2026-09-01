@@ -83,6 +83,8 @@ final class LoginView: UIView {
         keyField.returnKeyType = .continue
         keyField.clearButtonMode = .whileEditing
         keyField.delegate = self
+        keyField.addTarget(self, action: #selector(keyFieldChanged), for: .editingChanged)
+        keyField.text = UserDefaults.standard.string(forKey: "dz_saved_key") ?? ""
         keyField.setLeftPadding(14.0)
         keyField.setRightPadding(14.0)
         keyField.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight).isActive = true
@@ -127,7 +129,17 @@ final class LoginView: UIView {
         ])
     }
 
+    @objc private func keyFieldChanged() {
+        let value = (keyField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty {
+            UserDefaults.standard.removeObject(forKey: "dz_saved_key")
+        } else {
+            UserDefaults.standard.set(value.uppercased(), forKey: "dz_saved_key")
+        }
+    }
+
     @objc private func continueTapped() {
+        keyFieldChanged()
         delegate?.loginView(self, didTapContinueWithKey: keyField.text ?? "")
     }
 }
