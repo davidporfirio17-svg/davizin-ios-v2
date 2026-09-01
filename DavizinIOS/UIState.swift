@@ -16,28 +16,55 @@ struct ARIFIMode: Hashable, Codable, Identifiable {
     let id: String
     let label: String
     let enabled: Bool
+    let noticeTitle: String
+    let noticeBody: String
+    let noticeLevel: String
+    let noticeEnabled: Bool
 
     var rawValue: String { id }
     var displayName: String { label }
 
-    static let drag = ARIFIMode(id: "drag", label: "Drag", enabled: true)
-    static let pecho = ARIFIMode(id: "pecho", label: "Pecho", enabled: true)
-    static let body100 = ARIFIMode(id: "body100", label: "Body 100%", enabled: true)
+    static let drag = ARIFIMode(id: "drag", label: "Drag", enabled: true, noticeTitle: "Drag — Precaución", noticeBody: "Modo para mejorar el arrastre y la precisión. Puede variar según la actualización.", noticeLevel: "yellow", noticeEnabled: true)
+    static let pecho = ARIFIMode(id: "pecho", label: "Pecho", enabled: true, noticeTitle: "Pecho — Estable", noticeBody: "Modo recomendado para uso normal.", noticeLevel: "green", noticeEnabled: true)
+    static let body100 = ARIFIMode(id: "body100", label: "Body 100%", enabled: true, noticeTitle: "Body 100% — Precaución", noticeBody: "Revisa el comportamiento después de cada actualización.", noticeLevel: "red", noticeEnabled: true)
+
+    init(id: String, label: String, enabled: Bool, noticeTitle: String = "", noticeBody: String = "", noticeLevel: String = "yellow", noticeEnabled: Bool = true) {
+        self.id = id
+        self.label = label
+        self.enabled = enabled
+        self.noticeTitle = noticeTitle
+        self.noticeBody = noticeBody
+        self.noticeLevel = noticeLevel
+        self.noticeEnabled = noticeEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, label, enabled, noticeTitle, noticeBody, noticeLevel, noticeEnabled }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        label = try c.decode(String.self, forKey: .label)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        noticeTitle = try c.decodeIfPresent(String.self, forKey: .noticeTitle) ?? ""
+        noticeBody = try c.decodeIfPresent(String.self, forKey: .noticeBody) ?? ""
+        noticeLevel = try c.decodeIfPresent(String.self, forKey: .noticeLevel) ?? "yellow"
+        noticeEnabled = try c.decodeIfPresent(Bool.self, forKey: .noticeEnabled) ?? true
+    }
 }
 
 enum ARIFIModeCatalog {
-    private static let storageKey = "dz_remote_mode_config_v2"
+    private static let storageKey = "dz_remote_mode_config_v3"
     private static let defaults: [ARIFIMode] = [.drag, .pecho, .body100]
 
     static func all() -> [ARIFIMode] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let saved = try? JSONDecoder().decode([ARIFIMode].self, from: data) else { return defaults }
-        let known = Set(defaults.map(\.id))
-        return saved.filter { known.contains($0.id) || isSafeDynamicID($0.id) }
+        for key in [storageKey, "dz_remote_mode_config_v2"] {
+            guard let data = UserDefaults.standard.data(forKey: key), let saved = try? JSONDecoder().decode([ARIFIMode].self, from: data) else { continue }
+            return saved.filter { isSafeDynamicID($0.id) && !$0.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        }
+        return defaults
     }
 
     static func enabledModes() -> [ARIFIMode] { all().filter(\.enabled) }
-
     static func mode(id: String) -> ARIFIMode? { all().first { $0.id == id } }
 
     static func save(_ modes: [ARIFIMode]) {
@@ -48,7 +75,7 @@ enum ARIFIModeCatalog {
 
     private static func isSafeDynamicID(_ id: String) -> Bool {
         guard id.count >= 1, id.count <= 32 else { return false }
-        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" )
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
         return id.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 }

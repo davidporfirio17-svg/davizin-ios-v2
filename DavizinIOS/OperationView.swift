@@ -10,6 +10,10 @@ final class OperationView: UIView {
     private let cardView = ARIFICardView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
+    private let noticeCard = UIView()
+    private let noticeTitleLabel = UILabel()
+    private let noticeBodyLabel = UILabel()
+    private let noticeStack = UIStackView()
     private let runButton = ARIFIButton(title: "EJECUTAR PROCESO", style: .primary)
     private let injectButton = ARIFIButton(title: "INYECTAR CONFIGURACIÓN", style: .secondary)
     private let cleanButton = ARIFIButton(title: "LIMPIAR SESIÓN", style: .destructive)
@@ -29,6 +33,7 @@ final class OperationView: UIView {
     var selectedMode: ARIFIMode = .drag {
         didSet {
             updateSubtitle()
+            updateNotice()
         }
     }
 
@@ -107,6 +112,26 @@ final class OperationView: UIView {
         subtitleLabel.isHidden = true
         updateSubtitle()
 
+        noticeTitleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        noticeTitleLabel.numberOfLines = 0
+        noticeBodyLabel.font = AppTheme.captionFont()
+        noticeBodyLabel.numberOfLines = 0
+        noticeStack.axis = .vertical
+        noticeStack.spacing = 4.0
+        noticeStack.translatesAutoresizingMaskIntoConstraints = false
+        noticeStack.addArrangedSubview(noticeTitleLabel)
+        noticeStack.addArrangedSubview(noticeBodyLabel)
+        noticeCard.layer.cornerRadius = 10.0
+        noticeCard.layer.borderWidth = 1.0
+        noticeCard.addSubview(noticeStack)
+        NSLayoutConstraint.activate([
+            noticeStack.leadingAnchor.constraint(equalTo: noticeCard.leadingAnchor, constant: 12.0),
+            noticeStack.trailingAnchor.constraint(equalTo: noticeCard.trailingAnchor, constant: -12.0),
+            noticeStack.topAnchor.constraint(equalTo: noticeCard.topAnchor, constant: 10.0),
+            noticeStack.bottomAnchor.constraint(equalTo: noticeCard.bottomAnchor, constant: -10.0)
+        ])
+        updateNotice()
+
         runButton.accessibilityIdentifier = "operation.runExploit"
         injectButton.accessibilityIdentifier = "operation.inject"
         cleanButton.accessibilityIdentifier = "operation.clean"
@@ -129,6 +154,7 @@ final class OperationView: UIView {
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
+        stackView.addArrangedSubview(noticeCard)
         stackView.addArrangedSubview(runButton)
         stackView.addArrangedSubview(injectButton)
         stackView.addArrangedSubview(cleanButton)
@@ -156,6 +182,24 @@ final class OperationView: UIView {
     private func updateSubtitle() {
         titleLabel.text = "\(selectedGame.rawValue) / \(selectedMode.displayName)"
         subtitleLabel.text = nil
+    }
+
+    private func updateNotice() {
+        let visible = selectedMode.noticeEnabled && !selectedMode.noticeTitle.isEmpty && !selectedMode.noticeBody.isEmpty
+        noticeCard.isHidden = !visible
+        guard visible else { return }
+        let tint: UIColor
+        switch selectedMode.noticeLevel.lowercased() {
+        case "green": tint = .systemGreen
+        case "red": tint = .systemRed
+        default: tint = .systemYellow
+        }
+        noticeCard.backgroundColor = tint.withAlphaComponent(0.12)
+        noticeCard.layer.borderColor = tint.withAlphaComponent(0.55).cgColor
+        noticeTitleLabel.textColor = tint
+        noticeBodyLabel.textColor = AppTheme.secondaryText
+        noticeTitleLabel.text = selectedMode.noticeTitle
+        noticeBodyLabel.text = selectedMode.noticeBody
     }
 
     @objc private func runTapped() {
