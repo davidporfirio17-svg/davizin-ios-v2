@@ -112,11 +112,7 @@ final class ModeSelectionView: UIView {
     }
 
     private func accessibilityIdentifier(for mode: ARIFIMode) -> String {
-        switch mode {
-        case .drag:    return "mode.drag"
-        case .pecho:   return "mode.pecho"
-        case .body100: return "mode.body100"
-        }
+        return "mode." + mode.id
     }
 
     @objc private func modeTapped(_ sender: ARIFIButton) {

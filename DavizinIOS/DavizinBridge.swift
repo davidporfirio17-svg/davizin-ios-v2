@@ -23,7 +23,7 @@ final class DavizinBridge {
         if let g = UserDefaults.standard.string(forKey: "dz_last_game"), let game = ARIFIGame(rawValue: g) {
             selectedGame = game
         }
-        if let m = UserDefaults.standard.string(forKey: "dz_last_mode"), let mode = ARIFIMode(rawValue: m) {
+        if let m = UserDefaults.standard.string(forKey: "dz_last_mode"), let mode = ARIFIModeCatalog.mode(id: m) {
             selectedMode = mode
         }
         viewController.simulateUIStates = false

@@ -59,13 +59,7 @@ class InjectorService {
     /// Ruta del Worker para cada modo y juego (descarga desde KV).
     /// Free Fire MAX usa slots base; Free Fire normal usa el sufijo _ff.
     private static func remoteSlot(for mode: ARIFIMode, game: ARIFIGame) -> String {
-        let base: String
-        switch mode {
-        case .drag:    base = "drag"
-        case .pecho:   base = "pecho"
-        case .body100: base = "body100"
-        }
-        return game == .freeFire ? base + "_ff" : base
+        return game == .freeFire ? mode.id + "_ff" : mode.id
     }
 
     /// Deriva la clave AES-256 igual que el Worker: SHA-256 de "dzcache:" + secreto.
@@ -217,7 +211,7 @@ class InjectorService {
         }
 
         return InjectorResult(success: true,
-            message: "¡\(mode.rawValue) inyectado! Cierra y abre Free Fire.")
+            message: "¡\(mode.displayName) inyectado! Cierra y abre Free Fire.")
     }
 
     static func uninject(game: ARIFIGame) -> InjectorResult {

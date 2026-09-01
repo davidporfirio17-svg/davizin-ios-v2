@@ -17,7 +17,7 @@ struct KeyData: Codable {
     let expire: Int64?
     let token: String?
     let resource_key: String?
-    let modes: [ARIFIModeConfig]?
+    let modes: [ARIFIMode]?
 }
 
 class KeyValidator {
