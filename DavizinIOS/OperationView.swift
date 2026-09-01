@@ -154,7 +154,7 @@ final class OperationView: UIView {
     }
 
     private func updateSubtitle() {
-        titleLabel.text = "\(selectedGame.rawValue) / \(selectedMode.rawValue)"
+        titleLabel.text = "\(selectedGame.rawValue) / \(selectedMode.displayName)"
         subtitleLabel.text = nil
     }
 

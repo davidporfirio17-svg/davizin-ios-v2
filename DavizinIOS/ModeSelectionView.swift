@@ -77,8 +77,12 @@ final class ModeSelectionView: UIView {
 
         var buttonConstraints: [NSLayoutConstraint] = []
 
-        for (index, mode) in ARIFIMode.allCases.enumerated() {
-            let button = ARIFIButton(title: mode.rawValue)
+        let activeModes = ARIFIModeCatalog.enabledModes()
+        if activeModes.isEmpty {
+            footerLabel.text = "No hay modos activos. Activa al menos uno desde el panel."
+        }
+        for (index, mode) in activeModes.enumerated() {
+            let button = ARIFIButton(title: mode.displayName)
             button.accessibilityIdentifier = accessibilityIdentifier(for: mode)
             button.tag = index
             button.addTarget(self, action: #selector(modeTapped(_:)), for: .touchUpInside)
@@ -116,7 +120,7 @@ final class ModeSelectionView: UIView {
     }
 
     @objc private func modeTapped(_ sender: ARIFIButton) {
-        let cases = ARIFIMode.allCases
+        let cases = ARIFIModeCatalog.enabledModes()
         guard sender.tag >= 0, sender.tag < cases.count else { return }
         let mode = cases[sender.tag]
         setSelectedMode(mode)

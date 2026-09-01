@@ -281,6 +281,9 @@ final class ViewController: UIViewController {
 
     private func showModeSelection(animated: Bool) {
         currentStage = .modeSelection
+        if let firstActive = ARIFIModeCatalog.enabledModes().first, !ARIFIModeCatalog.enabledModes().contains(selectedMode) {
+            selectedMode = firstActive
+        }
         headerView.title = "Configurar / \(selectedGame.rawValue)"
         headerView.showsBackButton = true
 
@@ -292,8 +295,12 @@ final class ViewController: UIViewController {
     }
 
     private func showOperation(animated: Bool) {
+        guard ARIFIModeCatalog.enabledModes().contains(selectedMode) else {
+            showModeSelection(animated: animated)
+            return
+        }
         currentStage = .operation
-        headerView.title = "Control / \(selectedMode.rawValue)"
+        headerView.title = "Control / \(selectedMode.displayName)"
         headerView.showsBackButton = true
 
         let screen = OperationView()

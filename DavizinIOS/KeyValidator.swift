@@ -17,6 +17,7 @@ struct KeyData: Codable {
     let expire: Int64?
     let token: String?
     let resource_key: String?
+    let modes: [ARIFIModeConfig]?
 }
 
 class KeyValidator {
@@ -116,6 +117,7 @@ class KeyValidator {
                             completion(false, "Respuesta no válida. Servidor no autorizado.", 0, nil)
                             return
                         }
+                        if let modes = resp.data?.modes { ARIFIModeCatalog.save(modes) }
                     }
 
                     completion(resp.success, resp.message ?? "ok", rem, resp.notice)

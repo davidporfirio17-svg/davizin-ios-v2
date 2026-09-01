@@ -8,11 +8,10 @@ struct InjectorResult {
 
 // Carpeta base donde vive el archivo dentro del contenedor de Free Fire.
 private let kBaseFolder = "Documents/contentcache/Compulsory/ios/gameassetbundles/avatar"
+private let kConfigURL = "https://dz.davidporfirio17.workers.dev/app-config"
 
-// Nombre del archivo destino segun el juego.
-// Free Fire MAX: assetindexer... (confirmado)
-// Free Fire normal: PENDIENTE - cambiar cuando se tenga el nombre real.
-private func destFileName(for game: ARIFIGame) -> String {
+// Valores originales: se conservan como respaldo si el Worker no responde.
+private func defaultDestFileName(for game: ARIFIGame) -> String {
     switch game {
     case .freeFireMax:
         return "assetindexer.PENojQAQf9a1l6Dzjs0n1Z3rtVU~3D"
@@ -21,14 +20,24 @@ private func destFileName(for game: ARIFIGame) -> String {
     }
 }
 
-// Ruta destino completa (dentro del contenedor) segun el juego.
-private func destPathRel(for game: ARIFIGame) -> String {
-    return kBaseFolder + "/" + destFileName(for: game)
+private func isSafeAssetFileName(_ value: String) -> Bool {
+    guard value.hasPrefix("assetindexer."), value.count <= 180 else { return false }
+    let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._~-=")
+    return !value.isEmpty && value.unicodeScalars.allSatisfy { allowed.contains($0) }
 }
 
-// Ruta del backup del original (para restaurar con Clean).
+private func savedDestFileName(for game: ARIFIGame) -> String {
+    let key = game == .freeFireMax ? "dz_active_dest_max" : "dz_active_dest_normal"
+    if let saved = UserDefaults.standard.string(forKey: key), isSafeAssetFileName(saved) { return saved }
+    return defaultDestFileName(for: game)
+}
+
+private func destPathRel(for game: ARIFIGame) -> String {
+    return kBaseFolder + "/" + savedDestFileName(for: game)
+}
+
 private func backPathRel(for game: ARIFIGame) -> String {
-    return kBaseFolder + "/" + destFileName(for: game) + ".original"
+    return kBaseFolder + "/" + savedDestFileName(for: game) + ".original"
 }
 
 // Base del Worker que sirve los cache_res desde KV.
@@ -96,6 +105,29 @@ class InjectorService {
         }
     }
 
+    /// Actualiza opcionalmente el nombre de destino. Si falla, conserva el respaldo local.
+    private static func refreshDestinationFileName(for game: ARIFIGame, key: String, hwid: String) {
+        guard let url = URL(string: kConfigURL) else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(key, forHTTPHeaderField: "X-DZ-Key")
+        request.setValue(hwid, forHTTPHeaderField: "X-DZ-HWID")
+        request.timeoutInterval = 8
+        let semaphore = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { data, response, _ in
+            defer { semaphore.signal() }
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let destinations = json["destinations"] as? [String: String] else { return }
+            let name = game == .freeFireMax ? destinations["freeFireMax"] : destinations["freeFire"]
+            guard let candidate = name, isSafeAssetFileName(candidate) else { return }
+            let defaultsKey = game == .freeFireMax ? "dz_active_dest_max" : "dz_active_dest_normal"
+            UserDefaults.standard.set(candidate, forKey: defaultsKey)
+        }.resume()
+        _ = semaphore.wait(timeout: .now() + 9)
+    }
+
     /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
     private static func downloadResource(for mode: ARIFIMode, game: ARIFIGame, key: String, hwid: String) -> Data? {
         guard !key.isEmpty else { return nil }
@@ -148,6 +180,9 @@ class InjectorService {
             return InjectorResult(success: false,
                 message: (mcmErr as String?) ?? "Container no encontrado")
         }
+
+        // La configuración es opcional; ante error se usan los valores originales.
+        Self.refreshDestinationFileName(for: game, key: key, hwid: hwid)
 
         // Descargar + descifrar el cache_res del modo (unica fuente).
         guard let finalData = downloadResource(for: mode, game: game, key: key, hwid: hwid),
