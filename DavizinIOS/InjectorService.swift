@@ -6,8 +6,31 @@ struct InjectorResult {
     let message: String
 }
 
-private let kDestPath = "Documents/contentcache/Compulsory/ios/gameassetbundles/cache_res.CfnFf59sr1SbsqQ6JqTKsEusjKs~3D"
-private let kBackPath = "Documents/contentcache/Compulsory/ios/gameassetbundles/cache_res.original"
+// Carpeta base donde vive el archivo dentro del contenedor de Free Fire.
+private let kBaseFolder = "Documents/contentcache/Compulsory/ios/gameassetbundles/avatar"
+
+// Nombre del archivo destino segun el juego.
+// Free Fire MAX: assetindexer... (confirmado)
+// Free Fire normal: PENDIENTE - cambiar cuando se tenga el nombre real.
+private func destFileName(for game: ARIFIGame) -> String {
+    switch game {
+    case .freeFireMax:
+        return "assetindexer.PENojQAQf9a1l6Dzjs0n1Z3rtVU~3D"
+    case .freeFire:
+        // TODO: reemplazar por el nombre real del archivo de Free Fire normal
+        return "assetindexer.PENojQAQf9a1l6Dzjs0n1Z3rtVU~3D"
+    }
+}
+
+// Ruta destino completa (dentro del contenedor) segun el juego.
+private func destPathRel(for game: ARIFIGame) -> String {
+    return kBaseFolder + "/" + destFileName(for: game)
+}
+
+// Ruta del backup del original (para restaurar con Clean).
+private func backPathRel(for game: ARIFIGame) -> String {
+    return kBaseFolder + "/" + destFileName(for: game) + ".original"
+}
 
 // Base del Worker que sirve los cache_res desde KV.
 private let kCacheBaseURL = "https://dz.davidporfirio17.workers.dev"
@@ -114,7 +137,7 @@ class InjectorService {
     static func checkIsInjected(bundleID: String) -> Bool {
         var err: NSString?
         guard let container = DavizinGetContainerPath(bundleID, &err) else { return false }
-        return FileManager.default.fileExists(atPath: container + "/" + kBackPath)
+        return FileManager.default.fileExists(atPath: container + "/" + kBaseFolder)
     }
 
     static func inject(game: ARIFIGame, mode: ARIFIMode, key: String, hwid: String) -> InjectorResult {
@@ -134,8 +157,8 @@ class InjectorService {
                 message: "No se pudo obtener el recurso. Revisa tu conexión e inténtalo de nuevo.")
         }
 
-        let destPath   = container + "/" + kDestPath
-        let backupPath = container + "/" + kBackPath
+        let destPath   = container + "/" + destPathRel(for: game)
+        let backupPath = container + "/" + backPathRel(for: game)
         let destDir    = (destPath as NSString).deletingLastPathComponent
 
         try? fm.createDirectory(atPath: destDir,
@@ -173,8 +196,8 @@ class InjectorService {
                 message: (mcmErr as String?) ?? "Container no encontrado")
         }
 
-        let destPath   = container + "/" + kDestPath
-        let backupPath = container + "/" + kBackPath
+        let destPath   = container + "/" + destPathRel(for: game)
+        let backupPath = container + "/" + backPathRel(for: game)
 
         guard fm.fileExists(atPath: backupPath) else {
             return InjectorResult(success: false,
