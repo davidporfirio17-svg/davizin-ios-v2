@@ -1,5 +1,10 @@
 import UIKit
 
+// MARK: - ARIFIButton v2
+// Press feedback: scale(0.97), 150ms — recipe "Button press" de animate/RECIPES.md,
+// portado a UIKit con spring en vez de cubic-bezier (nativo UIKit no anima bien
+// cubic-bezier + transform combinados en highlighted state, spring da mejor feel físico).
+
 enum ARIFIButtonStyle {
     case primary
     case secondary
@@ -18,8 +23,15 @@ final class ARIFIButton: UIButton {
     override var isHighlighted: Bool {
         didSet {
             updateAppearance()
-            UIView.animate(withDuration: 0.18, delay: 0.0, usingSpringWithDamping: 0.72, initialSpringVelocity: 0.4, options: [.allowUserInteraction, .beginFromCurrentState]) {
-                self.transform = self.isHighlighted ? CGAffineTransform(scaleX: 0.975, y: 0.975) : .identity
+            // Recipe "Button press": scale(0.97), no scale(0) nunca.
+            UIView.animate(
+                withDuration: AppTheme.durationButtonPress,
+                delay: 0.0,
+                usingSpringWithDamping: 0.72,
+                initialSpringVelocity: 0.4,
+                options: [.allowUserInteraction, .beginFromCurrentState]
+            ) {
+                self.transform = self.isHighlighted ? CGAffineTransform(scaleX: 0.97, y: 0.97) : .identity
             }
         }
     }
@@ -104,22 +116,22 @@ final class ARIFIButton: UIButton {
             titleColor = selectedVisual ? AppTheme.background : AppTheme.primaryText
             borderColor = selectedVisual ? AppTheme.accent : UIColor.white.withAlphaComponent(0.10)
         case .destructive:
-            baseColor = UIColor(red: 0.24, green: 0.07, blue: 0.08, alpha: 1.0)
+            baseColor = UIColor(red: 0.20, green: 0.05, blue: 0.06, alpha: 1.0)
             titleColor = UIColor(red: 1.0, green: 0.55, blue: 0.48, alpha: 1.0)
             borderColor = AppTheme.failure.withAlphaComponent(0.45)
         }
 
         let enabledAlpha: CGFloat = isEnabled ? 1.0 : 0.45
-        let highlightAlpha: CGFloat = isHighlighted ? 0.72 : 1.0
+        let highlightAlpha: CGFloat = isHighlighted ? 0.80 : 1.0
         let visualAlpha = enabledAlpha * highlightAlpha
         backgroundColor = baseColor.withAlphaComponent(visualAlpha)
         setTitleColor(titleColor.withAlphaComponent(visualAlpha), for: .normal)
         layer.borderWidth = selectedVisual || style != .secondary ? 1.0 : 0.0
         layer.borderColor = borderColor.withAlphaComponent(visualAlpha).cgColor
         layer.shadowColor = selectedVisual || style == .primary ? AppTheme.accent.cgColor : UIColor.clear.cgColor
-        layer.shadowOpacity = selectedVisual || style == .primary ? 0.22 : 0.0
-        layer.shadowRadius = 12.0
-        layer.shadowOffset = CGSize(width: 0, height: 5)
+        layer.shadowOpacity = selectedVisual || style == .primary ? 0.28 : 0.0
+        layer.shadowRadius = 14.0
+        layer.shadowOffset = CGSize(width: 0, height: 6)
         spinner.color = titleColor
     }
 }

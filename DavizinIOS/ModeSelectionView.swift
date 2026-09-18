@@ -2,6 +2,8 @@ import UIKit
 
 protocol ModeSelectionViewDelegate: AnyObject {
     func modeSelectionView(_ view: ModeSelectionView, didSelect mode: ARIFIMode)
+    /// El VC decide cómo presentar el sheet nativo (necesita un UIViewController real).
+    func modeSelectionViewDidRequestSheet(_ view: ModeSelectionView)
 }
 
 final class ModeSelectionView: UIView {
@@ -12,6 +14,7 @@ final class ModeSelectionView: UIView {
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let footerLabel = UILabel()
+    private let sheetTriggerButton = ARIFIButton(title: "◈ Elegir desde lista", style: .primary)
     private let stackView = UIStackView()
 
     /// Un botón por cada caso de ARIFIMode, en el mismo orden del enum.
@@ -66,6 +69,9 @@ final class ModeSelectionView: UIView {
         footerLabel.numberOfLines = 0
         footerLabel.adjustsFontForContentSizeCategory = true
 
+        sheetTriggerButton.addTarget(self, action: #selector(sheetTriggerTapped), for: .touchUpInside)
+        sheetTriggerButton.accessibilityIdentifier = "mode.openSheet"
+
         stackView.axis = .vertical
         stackView.alignment = .fill
         stackView.spacing = 12.0
@@ -74,15 +80,18 @@ final class ModeSelectionView: UIView {
         stackView.addArrangedSubview(categoryLabel)
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
+        stackView.addArrangedSubview(sheetTriggerButton)
 
-        var buttonConstraints: [NSLayoutConstraint] = []
+        var buttonConstraints: [NSLayoutConstraint] = [
+            sheetTriggerButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
+        ]
 
         let activeModes = ARIFIModeCatalog.enabledModes()
         if activeModes.isEmpty {
             footerLabel.text = "No hay modos activos. Activa al menos uno desde el panel."
         }
         for (index, mode) in activeModes.enumerated() {
-            let button = ARIFIButton(title: mode.displayName)
+            let button = ARIFIButton(title: mode.displayName, style: .secondary)
             button.accessibilityIdentifier = accessibilityIdentifier(for: mode)
             button.tag = index
             button.addTarget(self, action: #selector(modeTapped(_:)), for: .touchUpInside)
@@ -113,6 +122,10 @@ final class ModeSelectionView: UIView {
 
     private func accessibilityIdentifier(for mode: ARIFIMode) -> String {
         return "mode." + mode.id
+    }
+
+    @objc private func sheetTriggerTapped() {
+        delegate?.modeSelectionViewDidRequestSheet(self)
     }
 
     @objc private func modeTapped(_ sender: ARIFIButton) {

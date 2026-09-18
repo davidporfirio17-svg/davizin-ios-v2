@@ -24,12 +24,12 @@ final class ARIFIAnimatedBackgroundView: UIView {
     private var displayLink: CADisplayLink?
     private var elapsed: CGFloat = 0
 
-    // ── Paleta sunset glassmorphism ───────────────────────────────
+    // ── Paleta electric galaxy ──────────────────────────────────────
     private let colors: [UIColor] = [
-        UIColor(red: 1.00, green: 0.47, blue: 0.42, alpha: 1), // coral
-        UIColor(red: 1.00, green: 0.72, blue: 0.40, alpha: 1), // ambar
-        UIColor(red: 0.76, green: 0.28, blue: 0.52, alpha: 1), // rosa plum
-        UIColor(red: 0.61, green: 1.00, blue: 0.80, alpha: 1)  // menta
+        UIColor(red: 0.0, green: 0.784, blue: 1.0, alpha: 1),   // #00C8FF azul eléctrico
+        UIColor(red: 0.0, green: 0.42, blue: 0.90, alpha: 1),   // #006BE6 azul profundo
+        UIColor(red: 0.42, green: 0.20, blue: 1.0, alpha: 1),   // #6B33FF violeta galaxia
+        UIColor(white: 1.0, alpha: 1)                            // blanco puro (estrella)
     ]
 
     // ── Init ──────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ final class ARIFIAnimatedBackgroundView: UIView {
     deinit { displayLink?.invalidate() }
 
     private func setup() {
-        backgroundColor = UIColor(red: 0.16, green: 0.055, blue: 0.13, alpha: 1)
+        backgroundColor = UIColor(red: 0.024, green: 0.027, blue: 0.043, alpha: 1)
         isUserInteractionEnabled = false
         layer.masksToBounds = true
         buildNodes()
@@ -178,7 +178,7 @@ final class ARIFIAnimatedBackgroundView: UIView {
             let waveR = waveT * max(w, h) * 0.8
             let waveAlpha = (1 - waveT / 0.7) * 0.06
             let waveX = w * 0.5, waveY = h * 0.4
-            let waveColor = UIColor(red: 1.00, green: 0.47, blue: 0.42, alpha: waveAlpha)
+            let waveColor = UIColor(red: 0.0, green: 0.784, blue: 1.0, alpha: waveAlpha)
             ctx.setStrokeColor(waveColor.cgColor)
             ctx.setLineWidth(1.5)
             ctx.strokeEllipse(in: CGRect(x: waveX - waveR, y: waveY - waveR, width: waveR*2, height: waveR*2))

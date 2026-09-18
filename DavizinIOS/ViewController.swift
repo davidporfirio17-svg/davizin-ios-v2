@@ -61,6 +61,14 @@ final class ViewController: UIViewController {
 
     func setOperationState(_ state: ARIFIOperationState) {
         operationView?.setState(state)
+        switch state {
+        case .succeeded(let message):
+            ARIFIToastCenter.shared.show(title: "Operación completada", subtitle: message, kind: .success)
+        case .failed(let message):
+            ARIFIToastCenter.shared.show(title: "Operación fallida", subtitle: message, kind: .danger)
+        default:
+            break
+        }
     }
 
     /// Actualiza el contador de tiempo restante en el header.
@@ -391,7 +399,7 @@ final class ViewController: UIViewController {
             case .runExploit:
                 message = "Run complete"
             case .inject:
-                message = "Injection complete"
+                message = "¡\(self.selectedMode.displayName) inyectado! (simulación)"
             case .clean:
                 message = "Successfully cleaned !"
             }
@@ -445,6 +453,25 @@ extension ViewController: ModeSelectionViewDelegate {
         selectedMode = mode
         onModeSelected?(mode)
         showOperation(animated: true)
+    }
+
+    /// Presenta el mapa de mision con los modos activos (reemplaza el sheet).
+    func modeSelectionViewDidRequestSheet(_ view: ModeSelectionView) {
+        let map = MissionMapViewController(modes: ARIFIModeCatalog.enabledModes(), gameName: selectedGame.rawValue)
+        map.delegate = self
+        map.modalPresentationStyle = .fullScreen
+        present(map, animated: true)
+    }
+}
+
+extension ViewController: MissionMapDelegate {
+    func missionMap(_ vc: MissionMapViewController, didSelect mode: ARIFIMode) {
+        modeSelectionView?.setSelectedMode(mode)
+        selectedMode = mode
+        onModeSelected?(mode)
+        vc.dismiss(animated: true) { [weak self] in
+            self?.showOperation(animated: true)
+        }
     }
 }
 

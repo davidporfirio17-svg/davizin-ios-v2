@@ -14,26 +14,36 @@ final class OperationView: UIView {
     private let noticeTitleLabel = UILabel()
     private let noticeBodyLabel = UILabel()
     private let noticeStack = UIStackView()
-    private let runButton = ARIFIButton(title: "EJECUTAR PROCESO", style: .primary)
-    private let injectButton = ARIFIButton(title: "INYECTAR CONFIGURACIÓN", style: .secondary)
+
+    // Estado 1 (antes de inyectar): solo estos dos son visibles.
+    private let runButton = ARIFIButton(title: "EJECUTAR PROCESO", style: .secondary)
+    private let injectButton = ARIFIButton(title: "MANTÉN PARA INYECTAR", style: .primary)
+
+    // Estado 2 (despues de inyectar con exito): solo estos dos son visibles.
     private let cleanButton = ARIFIButton(title: "LIMPIAR SESIÓN", style: .destructive)
-    private let statusLabel = UILabel()
-    private let openGameButton = ARIFIButton(title: "🎮 ABRIR JUEGO")
+    private let openGameButton = ARIFIButton(title: "ABRIR JUEGO")
     var onOpenGame: (() -> Void)?
+
+    private let statusLabel = UILabel()
     private let stackView = UIStackView()
+
+    // Hold-to-confirm: anillo de progreso sobre injectButton
+    private let holdRingLayer = CAShapeLayer()
+    private var holdTimer: Timer?
+    private var holdProgress: CGFloat = 0
+    private let holdDuration: TimeInterval = 0.65
 
     private(set) var operationState: ARIFIOperationState = .idle
 
     var selectedGame: ARIFIGame = .freeFireMax {
-        didSet {
-            updateSubtitle()
-        }
+        didSet { updateSubtitle() }
     }
 
     var selectedMode: ARIFIMode = .drag {
         didSet {
             updateSubtitle()
             updateNotice()
+            showPreInjectButtons(animated: false)
         }
     }
 
@@ -51,9 +61,7 @@ final class OperationView: UIView {
         operationState = state
         statusLabel.textColor = AppTheme.secondaryText
         runButton.setLoading(false)
-        injectButton.setLoading(false)
         cleanButton.setLoading(false)
-        openGameButton.isHidden = true
 
         switch state {
         case .idle:
@@ -67,7 +75,6 @@ final class OperationView: UIView {
             statusLabel.text = "Ejecutando proceso..."
             statusLabel.isHidden = false
         case .injecting:
-            injectButton.setLoading(true, title: "INYECTANDO...")
             statusLabel.text = "Aplicando configuración..."
             statusLabel.isHidden = false
         case .cleaning:
@@ -78,20 +85,26 @@ final class OperationView: UIView {
             statusLabel.text = message
             statusLabel.textColor = AppTheme.success
             statusLabel.isHidden = false
-            // Si fue una inyeccion exitosa, mostrar el boton de abrir el juego
             if message.lowercased().contains("inyectado") {
-                openGameButton.isHidden = false
+                HapticsService.success()
+                SoundService.shared.playChime()
+                showPostInjectButtons(animated: true)
+            } else {
+                // Exito de "Ejecutar" o "Limpiar" -> se queda/regresa al estado pre-inyeccion.
+                showPreInjectButtons(animated: true)
             }
         case .failed(let message):
             statusLabel.text = message
             statusLabel.textColor = AppTheme.failure
             statusLabel.isHidden = false
+            HapticsService.warning()
         }
 
         let enabled = !state.isBusy
         runButton.isEnabled = enabled
         injectButton.isEnabled = enabled
         cleanButton.isEnabled = enabled
+        openGameButton.isEnabled = enabled
     }
 
     private func configure() {
@@ -100,7 +113,7 @@ final class OperationView: UIView {
 
         titleLabel.text = ""
         titleLabel.textColor = AppTheme.primaryText
-        titleLabel.font = AppTheme.titleFont()
+        titleLabel.font = AppTheme.titleFont(22)
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
 
@@ -135,12 +148,17 @@ final class OperationView: UIView {
         runButton.accessibilityIdentifier = "operation.runExploit"
         injectButton.accessibilityIdentifier = "operation.inject"
         cleanButton.accessibilityIdentifier = "operation.clean"
-        runButton.addTarget(self, action: #selector(runTapped), for: .touchUpInside)
-        injectButton.addTarget(self, action: #selector(injectTapped), for: .touchUpInside)
-        cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
         openGameButton.accessibilityIdentifier = "operation.opengame"
+
+        runButton.addTarget(self, action: #selector(runTapped), for: .touchUpInside)
+        cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
         openGameButton.addTarget(self, action: #selector(openGameTapped), for: .touchUpInside)
-        openGameButton.isHidden = true
+
+        // Inyectar usa hold-to-confirm, no touchUpInside simple.
+        let holdGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleHoldGesture(_:)))
+        holdGesture.minimumPressDuration = 0
+        injectButton.addGestureRecognizer(holdGesture)
+        setupHoldRing()
 
         statusLabel.textColor = AppTheme.secondaryText
         statusLabel.font = AppTheme.captionFont()
@@ -158,8 +176,8 @@ final class OperationView: UIView {
         stackView.addArrangedSubview(runButton)
         stackView.addArrangedSubview(injectButton)
         stackView.addArrangedSubview(cleanButton)
-        stackView.addArrangedSubview(statusLabel)
         stackView.addArrangedSubview(openGameButton)
+        stackView.addArrangedSubview(statusLabel)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
         cardView.addContent(stackView)
@@ -177,6 +195,36 @@ final class OperationView: UIView {
             cleanButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             openGameButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
         ])
+
+        showPreInjectButtons(animated: false)
+    }
+
+    // MARK: - Maquina de estados de botones
+
+    func showPreInjectButtons(animated: Bool) {
+        setButtonsVisible(run: true, inject: true, clean: false, openGame: false, animated: animated)
+    }
+
+    private func showPostInjectButtons(animated: Bool) {
+        setButtonsVisible(run: false, inject: false, clean: true, openGame: true, animated: animated)
+    }
+
+    private func setButtonsVisible(run: Bool, inject: Bool, clean: Bool, openGame: Bool, animated: Bool) {
+        let apply = {
+            self.runButton.isHidden = !run
+            self.injectButton.isHidden = !inject
+            self.cleanButton.isHidden = !clean
+            self.openGameButton.isHidden = !openGame
+            self.runButton.alpha = run ? 1 : 0
+            self.injectButton.alpha = inject ? 1 : 0
+            self.cleanButton.alpha = clean ? 1 : 0
+            self.openGameButton.alpha = openGame ? 1 : 0
+        }
+        if animated {
+            UIView.animate(withDuration: AppTheme.durationModal, delay: 0, options: [.curveEaseOut], animations: apply)
+        } else {
+            apply()
+        }
     }
 
     private func updateSubtitle() {
@@ -190,9 +238,9 @@ final class OperationView: UIView {
         guard visible else { return }
         let tint: UIColor
         switch selectedMode.noticeLevel.lowercased() {
-        case "green": tint = .systemGreen
-        case "red": tint = .systemRed
-        default: tint = .systemYellow
+        case "green": tint = AppTheme.success
+        case "red": tint = AppTheme.failure
+        default: tint = AppTheme.warm
         }
         noticeCard.backgroundColor = tint.withAlphaComponent(0.12)
         noticeCard.layer.borderColor = tint.withAlphaComponent(0.55).cgColor
@@ -202,12 +250,79 @@ final class OperationView: UIView {
         noticeBodyLabel.text = selectedMode.noticeBody
     }
 
-    @objc private func runTapped() {
-        delegate?.operationView(self, didTap: .runExploit)
+    // MARK: - Hold-to-confirm
+
+    private func setupHoldRing() {
+        holdRingLayer.strokeColor = AppTheme.accentHot.cgColor
+        holdRingLayer.fillColor = UIColor.clear.cgColor
+        holdRingLayer.lineWidth = 3
+        holdRingLayer.strokeEnd = 0
+        holdRingLayer.opacity = 0
+        injectButton.layer.addSublayer(holdRingLayer)
     }
 
-    @objc private func injectTapped() {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let bounds = injectButton.bounds
+        guard bounds.width > 0 else { return }
+        let path = UIBezierPath(roundedRect: bounds.insetBy(dx: 1.5, dy: 1.5), cornerRadius: AppTheme.controlCornerRadius)
+        holdRingLayer.path = path.cgPath
+        holdRingLayer.frame = bounds
+    }
+
+    @objc private func handleHoldGesture(_ gesture: UILongPressGestureRecognizer) {
+        guard injectButton.isEnabled else { return }
+        switch gesture.state {
+        case .began:
+            startHold()
+        case .ended, .cancelled, .failed:
+            cancelHold()
+        default:
+            break
+        }
+    }
+
+    private func startHold() {
+        holdProgress = 0
+        holdRingLayer.opacity = 1
+        SoundService.shared.startHoldTone()
+        HapticsService.light()
+        holdTimer?.invalidate()
+        holdTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
+            guard let self = self else { timer.invalidate(); return }
+            self.holdProgress += CGFloat(1.0 / 60.0 / self.holdDuration)
+            self.holdRingLayer.strokeEnd = min(self.holdProgress, 1.0)
+            SoundService.shared.updateHoldTone(pct: Double(min(self.holdProgress, 1.0)) * 100)
+            if self.holdProgress >= 1.0 {
+                timer.invalidate()
+                self.holdTimer = nil
+                self.completeHold()
+            }
+        }
+    }
+
+    private func cancelHold() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        SoundService.shared.stopHoldTone()
+        UIView.animate(withDuration: 0.2) {
+            self.holdRingLayer.strokeEnd = 0
+            self.holdRingLayer.opacity = 0
+        }
+    }
+
+    private func completeHold() {
+        SoundService.shared.stopHoldTone()
+        UIView.animate(withDuration: 0.15) {
+            self.holdRingLayer.opacity = 0
+        } completion: { _ in
+            self.holdRingLayer.strokeEnd = 0
+        }
         delegate?.operationView(self, didTap: .inject)
+    }
+
+    @objc private func runTapped() {
+        delegate?.operationView(self, didTap: .runExploit)
     }
 
     @objc private func cleanTapped() {
@@ -215,6 +330,7 @@ final class OperationView: UIView {
     }
 
     @objc private func openGameTapped() {
+        SoundService.shared.playClick()
         onOpenGame?()
     }
 }
