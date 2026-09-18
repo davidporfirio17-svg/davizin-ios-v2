@@ -21,7 +21,7 @@ final class ViewController: UIViewController {
 
     private var loginView: LoginView?
     private var gameSelectionView: GameSelectionView?
-    private var modeSelectionView: ModeSelectionView?
+    private var missionMapView: MissionMapView?
     private var operationView: OperationView?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -295,10 +295,10 @@ final class ViewController: UIViewController {
         headerView.title = "Configurar / \(selectedGame.rawValue)"
         headerView.showsBackButton = true
 
-        let screen = ModeSelectionView()
+        let screen = MissionMapView()
         screen.delegate = self
-        screen.setSelectedMode(selectedMode)
-        modeSelectionView = screen
+        screen.setModes(ARIFIModeCatalog.enabledModes(), selected: selectedMode)
+        missionMapView = screen
         display(screen, animated: animated)
     }
 
@@ -448,30 +448,11 @@ extension ViewController: GameSelectionViewDelegate {
     }
 }
 
-extension ViewController: ModeSelectionViewDelegate {
-    func modeSelectionView(_ view: ModeSelectionView, didSelect mode: ARIFIMode) {
+extension ViewController: MissionMapViewDelegate {
+    func missionMapView(_ view: MissionMapView, didSelect mode: ARIFIMode) {
         selectedMode = mode
         onModeSelected?(mode)
         showOperation(animated: true)
-    }
-
-    /// Presenta el mapa de mision con los modos activos (reemplaza el sheet).
-    func modeSelectionViewDidRequestSheet(_ view: ModeSelectionView) {
-        let map = MissionMapViewController(modes: ARIFIModeCatalog.enabledModes(), gameName: selectedGame.rawValue)
-        map.delegate = self
-        map.modalPresentationStyle = .fullScreen
-        present(map, animated: true)
-    }
-}
-
-extension ViewController: MissionMapDelegate {
-    func missionMap(_ vc: MissionMapViewController, didSelect mode: ARIFIMode) {
-        modeSelectionView?.setSelectedMode(mode)
-        selectedMode = mode
-        onModeSelected?(mode)
-        vc.dismiss(animated: true) { [weak self] in
-            self?.showOperation(animated: true)
-        }
     }
 }
 

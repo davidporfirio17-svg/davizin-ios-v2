@@ -1,43 +1,53 @@
 import UIKit
 
-// MARK: - MissionMapViewController — reemplaza ARIFIModeSheet.
-// Nodos conectados por curvas (CAShapeLayer), con respiracion idle (glow en loop)
-// y una particula que viaja por cada linea. Al tocar un nodo, se selecciona
-// y navega directo a OperationView, como en el HTML aprobado.
-// Los nodos se posicionan con frames directos (no Auto Layout) porque sus
-// posiciones son porcentuales sobre un canvas de alto fijo — mas simple y
-// predecible que constraints relativas con multiplicadores dinamicos.
+// MARK: - MissionMapView — reemplaza ModeSelectionView como pantalla de "elegir modo".
+// Es una UIView (no un UIViewController) para vivir dentro del mismo
+// contentContainerView que Login/Entorno/Operacion, y asi heredar el
+// header persistente (con back, X, y el reloj de countdown).
+// Nodos conectados por curvas (CAShapeLayer), respiracion idle, y una
+// particula que viaja por cada linea.
 
-protocol MissionMapDelegate: AnyObject {
-    func missionMap(_ vc: MissionMapViewController, didSelect mode: ARIFIMode)
+protocol MissionMapViewDelegate: AnyObject {
+    func missionMapView(_ view: MissionMapView, didSelect mode: ARIFIMode)
 }
 
-final class MissionMapViewController: UIViewController {
-    weak var delegate: MissionMapDelegate?
-    private let modes: [ARIFIMode]
-    private let gameName: String
+final class MissionMapView: UIView {
+    weak var delegate: MissionMapViewDelegate?
+    private var modes: [ARIFIMode] = []
     private var nodeViews: [MissionNodeView] = []
     private let scrollView = UIScrollView()
     private let canvas = UIView()
-    private let canvasHeight: CGFloat = 520
+    private let canvasHeight: CGFloat = 460
     private var connectionsDrawn = false
 
     private let positions: [CGPoint] = [
         CGPoint(x: 0.30, y: 0.08),
-        CGPoint(x: 0.42, y: 0.34),
+        CGPoint(x: 0.62, y: 0.34),
         CGPoint(x: 0.32, y: 0.62)
     ]
 
-    init(modes: [ARIFIMode], gameName: String) {
-        self.modes = modes
-        self.gameName = gameName
-        super.init(nibName: nil, bundle: nil)
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        configure()
     }
-    required init?(coder: NSCoder) { fatalError() }
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configure()
+    }
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = AppTheme.background
+    func setModes(_ modes: [ARIFIMode], selected: ARIFIMode?) {
+        self.modes = modes
+        nodeViews.forEach { $0.removeFromSuperview() }
+        nodeViews.removeAll()
+        canvas.layer.sublayers?.removeAll()
+        connectionsDrawn = false
+        buildNodes(selected: selected)
+        setNeedsLayout()
+    }
+
+    private func configure() {
+        backgroundColor = .clear
+        translatesAutoresizingMaskIntoConstraints = false
 
         let eyebrow = UILabel()
         eyebrow.text = "02 — CONFIGURACIÓN"
@@ -64,18 +74,20 @@ final class MissionMapViewController: UIViewController {
         scrollView.showsVerticalScrollIndicator = false
         canvas.translatesAutoresizingMaskIntoConstraints = false
 
-        view.addSubview(headerStack)
-        view.addSubview(scrollView)
+        addSubview(headerStack)
+        addSubview(scrollView)
         scrollView.addSubview(canvas)
 
         NSLayoutConstraint.activate([
-            headerStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
-            headerStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            headerStack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+            headerStack.centerXAnchor.constraint(equalTo: centerXAnchor),
+            headerStack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 20),
+            headerStack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20),
 
-            scrollView.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 16),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            scrollView.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 14),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             canvas.topAnchor.constraint(equalTo: scrollView.topAnchor),
             canvas.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
@@ -84,32 +96,30 @@ final class MissionMapViewController: UIViewController {
             canvas.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             canvas.heightAnchor.constraint(equalToConstant: canvasHeight)
         ])
-
-        buildNodes()
     }
 
-    private func buildNodes() {
+    private func buildNodes(selected: ARIFIMode?) {
         for (index, mode) in modes.enumerated() {
             let node = MissionNodeView(mode: mode, index: index)
             node.onTap = { [weak self] in self?.selectNode(at: index) }
+            if let selected = selected, selected.id == mode.id {
+                node.setSelected(true)
+            }
             canvas.addSubview(node)
             nodeViews.append(node)
         }
     }
 
-    override func viewWillLayoutSubviews() {
-        super.viewWillLayoutSubviews()
-        let w = canvas.bounds.width > 0 ? canvas.bounds.width : UIScreen.main.bounds.width
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let w = canvas.bounds.width > 0 ? canvas.bounds.width : bounds.width
+        guard w > 0 else { return }
         for (index, node) in nodeViews.enumerated() {
             let pos = positions[index % positions.count]
             let size: CGFloat = 92
             node.frame = CGRect(x: pos.x * w - size / 2, y: pos.y * canvasHeight, width: size, height: size)
         }
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        if !connectionsDrawn && canvas.bounds.width > 0 {
+        if !connectionsDrawn && nodeViews.allSatisfy({ $0.frame != .zero }) {
             connectionsDrawn = true
             drawConnections()
         }
@@ -125,7 +135,7 @@ final class MissionMapViewController: UIViewController {
             let end = nodeViews[i + 1].center
             let path = UIBezierPath()
             path.move(to: start)
-            let control = CGPoint(x: (start.x + end.x) / 2 - 40, y: (start.y + end.y) / 2)
+            let control = CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 30)
             path.addQuadCurve(to: end, controlPoint: control)
 
             let track = CAShapeLayer()
@@ -187,7 +197,7 @@ final class MissionMapViewController: UIViewController {
         let mode = modes[index]
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self = self else { return }
-            self.delegate?.missionMap(self, didSelect: mode)
+            self.delegate?.missionMapView(self, didSelect: mode)
         }
     }
 }
