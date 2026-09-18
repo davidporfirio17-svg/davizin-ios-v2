@@ -17,14 +17,23 @@ final class MissionMapView: UIView {
     private var nodeViews: [MissionNodeView] = []
     private let scrollView = UIScrollView()
     private let canvas = UIView()
-    private let canvasHeight: CGFloat = 460
+    private var canvasHeight: CGFloat = 460
     private var connectionsDrawn = false
+    private var canvasHeightConstraint: NSLayoutConstraint?
 
-    private let positions: [CGPoint] = [
-        CGPoint(x: 0.30, y: 0.08),
-        CGPoint(x: 0.62, y: 0.34),
-        CGPoint(x: 0.32, y: 0.62)
-    ]
+    /// Genera posiciones en zigzag para cualquier cantidad de modos (ya no
+    /// esta fijo a 3 — antes, si el Worker mandaba mas modos, se dibujaban
+    /// encima de los primeros y los tapaban).
+    private func generatePositions(count: Int) -> [CGPoint] {
+        guard count > 0 else { return [] }
+        var points: [CGPoint] = []
+        for i in 0..<count {
+            let side: CGFloat = i % 2 == 0 ? 0.30 : 0.62
+            let y = 0.08 + (CGFloat(i) * 0.30)
+            points.append(CGPoint(x: side, y: y))
+        }
+        return points
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -41,6 +50,8 @@ final class MissionMapView: UIView {
         nodeViews.removeAll()
         canvas.layer.sublayers?.removeAll()
         connectionsDrawn = false
+        canvasHeight = max(460, 140 + CGFloat(modes.count) * 130)
+        canvasHeightConstraint?.constant = canvasHeight
         buildNodes(selected: selected)
         setNeedsLayout()
     }
@@ -96,6 +107,7 @@ final class MissionMapView: UIView {
             canvas.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             canvas.heightAnchor.constraint(equalToConstant: canvasHeight)
         ])
+        canvasHeightConstraint = canvas.constraints.first { $0.firstAttribute == .height }
     }
 
     private func buildNodes(selected: ARIFIMode?) {
@@ -113,9 +125,10 @@ final class MissionMapView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         let w = canvas.bounds.width > 0 ? canvas.bounds.width : bounds.width
-        guard w > 0 else { return }
+        guard w > 0, !nodeViews.isEmpty else { return }
+        let positions = generatePositions(count: nodeViews.count)
         for (index, node) in nodeViews.enumerated() {
-            let pos = positions[index % positions.count]
+            let pos = positions[index]
             let size: CGFloat = 92
             node.frame = CGRect(x: pos.x * w - size / 2, y: pos.y * canvasHeight, width: size, height: size)
         }

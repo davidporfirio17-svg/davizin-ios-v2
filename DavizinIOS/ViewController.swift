@@ -22,6 +22,8 @@ final class ViewController: UIViewController {
     private var loginView: LoginView?
     private var gameSelectionView: GameSelectionView?
     private var missionMapView: MissionMapView?
+    private var profileView: ProfileView?
+    private var stageBeforeProfile: ARIFIScreenStage = .modeSelection
     private var operationView: OperationView?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -247,6 +249,7 @@ final class ViewController: UIViewController {
         currentStage = .login
         headerView.title = "Nyxel External"
         headerView.showsBackButton = false
+        headerView.showsAvatarButton = false
 
         let screen = LoginView()
         screen.delegate = self
@@ -279,6 +282,7 @@ final class ViewController: UIViewController {
         currentStage = .gameSelection
         headerView.title = "Seleccionar entorno"
         headerView.showsBackButton = true
+        headerView.showsAvatarButton = true
 
         let screen = GameSelectionView()
         screen.delegate = self
@@ -289,7 +293,7 @@ final class ViewController: UIViewController {
 
     private func showModeSelection(animated: Bool) {
         currentStage = .modeSelection
-        if let firstActive = ARIFIModeCatalog.enabledModes().first, !ARIFIModeCatalog.enabledModes().contains(selectedMode) {
+        if let firstActive = ARIFIModeCatalog.enabledModes(for: selectedGame).first, !ARIFIModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) {
             selectedMode = firstActive
         }
         headerView.title = "Configurar / \(selectedGame.rawValue)"
@@ -297,13 +301,13 @@ final class ViewController: UIViewController {
 
         let screen = MissionMapView()
         screen.delegate = self
-        screen.setModes(ARIFIModeCatalog.enabledModes(), selected: selectedMode)
+        screen.setModes(ARIFIModeCatalog.enabledModes(for: selectedGame), selected: selectedMode)
         missionMapView = screen
         display(screen, animated: animated)
     }
 
     private func showOperation(animated: Bool) {
-        guard ARIFIModeCatalog.enabledModes().contains(selectedMode) else {
+        guard ARIFIModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) else {
             showModeSelection(animated: animated)
             return
         }
@@ -320,6 +324,20 @@ final class ViewController: UIViewController {
             self?.openGame(gameToOpen)
         }
         operationView = screen
+        display(screen, animated: animated)
+    }
+
+    /// Perfil: accesible desde el avatar del header en cualquier pantalla (excepto login).
+    private func showProfile(animated: Bool) {
+        stageBeforeProfile = currentStage == .profile ? stageBeforeProfile : currentStage
+        currentStage = .profile
+        headerView.title = "Perfil de cuenta"
+        headerView.showsBackButton = true
+
+        let screen = ProfileView()
+        screen.delegate = self
+        screen.refresh()
+        profileView = screen
         display(screen, animated: animated)
     }
 
@@ -417,6 +435,13 @@ final class ViewController: UIViewController {
             showGameSelection(animated: true)
         case .operation:
             showModeSelection(animated: true)
+        case .profile:
+            switch stageBeforeProfile {
+            case .operation: showOperation(animated: true)
+            case .modeSelection: showModeSelection(animated: true)
+            case .gameSelection: showGameSelection(animated: true)
+            default: showModeSelection(animated: true)
+            }
         }
     }
 }
@@ -428,6 +453,31 @@ extension ViewController: ARIFIHeaderViewDelegate {
 
     func headerViewDidTapClose(_ headerView: ARIFIHeaderView) {
         // La X regresa directo a la pantalla de la key (login)
+        showLogin(animated: true)
+    }
+
+    func headerViewDidTapAvatar(_ headerView: ARIFIHeaderView) {
+        guard currentStage != .login, currentStage != .profile else { return }
+        showProfile(animated: true)
+    }
+
+    func headerViewDidLongPressAvatar(_ headerView: ARIFIHeaderView) {
+        guard currentStage != .login else { return }
+        let alert = UIAlertController(
+            title: "¿Cerrar sesión?",
+            message: "Vas a regresar a la pantalla de la key.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Cerrar sesión", style: .destructive) { [weak self] _ in
+            self?.showLogin(animated: true)
+        })
+        present(alert, animated: true)
+    }
+}
+
+extension ViewController: ProfileViewDelegate {
+    func profileViewDidTapLogout(_ view: ProfileView) {
         showLogin(animated: true)
     }
 }

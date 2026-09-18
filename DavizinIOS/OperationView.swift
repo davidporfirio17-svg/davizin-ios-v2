@@ -31,7 +31,7 @@ final class OperationView: UIView {
     private let holdRingLayer = CAShapeLayer()
     private var holdTimer: Timer?
     private var holdProgress: CGFloat = 0
-    private let holdDuration: TimeInterval = 0.65
+    private let holdDuration: TimeInterval = 0.5
 
     private(set) var operationState: ARIFIOperationState = .idle
 
@@ -88,6 +88,7 @@ final class OperationView: UIView {
             if message.lowercased().contains("inyectado") {
                 HapticsService.success()
                 SoundService.shared.playChime()
+                SessionStats.recordInjection()
                 showPostInjectButtons(animated: true)
             } else {
                 // Exito de "Ejecutar" o "Limpiar" -> se queda/regresa al estado pre-inyeccion.
@@ -157,6 +158,8 @@ final class OperationView: UIView {
         // Inyectar usa hold-to-confirm, no touchUpInside simple.
         let holdGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleHoldGesture(_:)))
         holdGesture.minimumPressDuration = 0
+        holdGesture.allowableMovement = 300 // muy tolerante: antes 10pt por default cancelaba el hold con solo mover el dedo un poco
+        holdGesture.cancelsTouchesInView = false
         injectButton.addGestureRecognizer(holdGesture)
         setupHoldRing()
 

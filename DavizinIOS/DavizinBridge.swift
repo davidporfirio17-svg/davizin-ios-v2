@@ -81,20 +81,50 @@ final class DavizinBridge {
 
                 self?.startCountdown()
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // Si el cliente tiene un mensaje personalizado, mostrarlo antes de continuar
-                    if let notice = notice, !notice.isEmpty {
-                        self?.vc?.showNotice(notice) {
+                // Jala la lista de modos real desde el Worker (visibilidad por
+                // modo Y por juego) ANTES de mostrar el mapa. Si falla o no
+                // responde, se queda con lo que ya tenia guardado localmente.
+                self?.syncRemoteModes {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if let notice = notice, !notice.isEmpty {
+                            self?.vc?.showNotice(notice) {
+                                self?.vc?.showGameSelectionScreen()
+                            }
+                        } else {
                             self?.vc?.showGameSelectionScreen()
                         }
-                    } else {
-                        self?.vc?.showGameSelectionScreen()
                     }
                 }
             } else {
                 self?.vc?.setLoginStatus(message ?? "Key invalida", success: false)
             }
         }
+    }
+
+    /// Sincroniza el catalogo de modos con el Worker: visibilidad por modo Y
+    /// por juego (enabledFreeFire / enabledFreeFireMax). Ajusta la URL si tu
+    /// endpoint real en el panel tiene otra ruta — este es el contrato esperado:
+    /// GET https://dz.davidporfirio17.workers.dev/config/modes
+    /// -> [{ "id": "pecho", "label": "Pecho", "enabled": true,
+    ///       "enabledFreeFire": false, "enabledFreeFireMax": true, ... }, ...]
+    /// Si el fetch falla, no truena nada: se queda con el catalogo local
+    /// (el ultimo que se guardo, o los 3 modos por default la primera vez).
+    private func syncRemoteModes(completion: @escaping () -> Void) {
+        guard let url = URL(string: "https://dz.davidporfirio17.workers.dev/config/modes") else {
+            completion()
+            return
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 6
+
+        URLSession.shared.dataTask(with: request) { data, response, _ in
+            defer { DispatchQueue.main.async { completion() } }
+            guard let data = data,
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let modes = try? JSONDecoder().decode([ARIFIMode].self, from: data),
+                  !modes.isEmpty else { return }
+            ARIFIModeCatalog.save(modes)
+        }.resume()
     }
 
     // MARK: - Operaciones

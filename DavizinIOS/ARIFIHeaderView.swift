@@ -3,6 +3,8 @@ import UIKit
 protocol ARIFIHeaderViewDelegate: AnyObject {
     func headerViewDidTapBack(_ headerView: ARIFIHeaderView)
     func headerViewDidTapClose(_ headerView: ARIFIHeaderView)
+    func headerViewDidTapAvatar(_ headerView: ARIFIHeaderView)
+    func headerViewDidLongPressAvatar(_ headerView: ARIFIHeaderView)
 }
 
 final class ARIFIHeaderView: UIView {
@@ -33,6 +35,13 @@ final class ARIFIHeaderView: UIView {
     private let backButton = UIButton(type: .system)
     private let closeButton = UIButton(type: .system)
     private let statusDot = UIView()
+    private let avatarButton = UIButton(type: .system)
+    private let avatarLabel = UILabel()
+
+    /// Oculta el avatar en pantallas donde no aplica (ej: login, sin sesion).
+    var showsAvatarButton: Bool = true {
+        didSet { avatarButton.isHidden = !showsAvatarButton }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -73,6 +82,25 @@ final class ARIFIHeaderView: UIView {
         addSubview(backButton)
         addSubview(closeButton)
 
+        avatarButton.translatesAutoresizingMaskIntoConstraints = false
+        avatarButton.backgroundColor = AppTheme.background
+        avatarButton.layer.cornerRadius = 15.0
+        avatarButton.layer.borderWidth = 1.5
+        avatarButton.layer.borderColor = AppTheme.hairlineStrong.cgColor
+        avatarButton.addTarget(self, action: #selector(avatarTapped), for: .touchUpInside)
+        let avatarLongPress = UILongPressGestureRecognizer(target: self, action: #selector(avatarLongPressed(_:)))
+        avatarLongPress.minimumPressDuration = 0.45
+        avatarButton.addGestureRecognizer(avatarLongPress)
+
+        avatarLabel.text = "N"
+        avatarLabel.font = .systemFont(ofSize: 11, weight: .black)
+        avatarLabel.textColor = AppTheme.primaryText
+        avatarLabel.textAlignment = .center
+        avatarLabel.isUserInteractionEnabled = false
+        avatarLabel.translatesAutoresizingMaskIntoConstraints = false
+        avatarButton.addSubview(avatarLabel)
+        addSubview(avatarButton)
+
         countdownLabel.translatesAutoresizingMaskIntoConstraints = false
         countdownLabel.textColor = AppTheme.accent
         countdownLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 10.0, weight: .bold)
@@ -92,10 +120,16 @@ final class ARIFIHeaderView: UIView {
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -12.0),
             countdownLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
             countdownLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3.0),
-            backButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8.0),
+            backButton.leadingAnchor.constraint(equalTo: avatarButton.trailingAnchor, constant: 6.0),
             backButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            backButton.widthAnchor.constraint(equalToConstant: 38.0),
-            backButton.heightAnchor.constraint(equalToConstant: 38.0),
+            backButton.widthAnchor.constraint(equalToConstant: 34.0),
+            backButton.heightAnchor.constraint(equalToConstant: 34.0),
+            avatarButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8.0),
+            avatarButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            avatarButton.widthAnchor.constraint(equalToConstant: 30.0),
+            avatarButton.heightAnchor.constraint(equalToConstant: 30.0),
+            avatarLabel.centerXAnchor.constraint(equalTo: avatarButton.centerXAnchor),
+            avatarLabel.centerYAnchor.constraint(equalTo: avatarButton.centerYAnchor),
             closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8.0),
             closeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             closeButton.widthAnchor.constraint(equalToConstant: 38.0),
@@ -122,5 +156,14 @@ final class ARIFIHeaderView: UIView {
         } else if sender === closeButton {
             delegate?.headerViewDidTapClose(self)
         }
+    }
+
+    @objc private func avatarTapped() {
+        delegate?.headerViewDidTapAvatar(self)
+    }
+
+    @objc private func avatarLongPressed(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        delegate?.headerViewDidLongPressAvatar(self)
     }
 }

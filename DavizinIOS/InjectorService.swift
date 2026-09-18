@@ -53,7 +53,20 @@ private func legacyDestPathRel(for game: ARIFIGame) -> String {
 }
 
 private func backPathRel(for game: ARIFIGame, mode: ARIFIMode) -> String {
-    return destPathRel(for: game, mode: mode) + ".original"
+    return disguisedBackupPath(for: destPathRel(for: game, mode: mode))
+}
+
+/// Nombre de respaldo disfrazado: antes era "<archivo>.original", que se ve
+/// obvio en Filza/cualquier explorador de archivos (delata que algo se tocó).
+/// Ahora se genera un nombre determinista con el mismo patron visual que un
+/// asset real de Unity ("assetindexer.<hash>"), sin extension rara, y vive
+/// en la misma carpeta — se mezcla con los demas archivos de assets reales.
+private func disguisedBackupPath(for relPath: String) -> String {
+    let folder = (relPath as NSString).deletingLastPathComponent
+    let digest = SHA256.hash(data: Data(relPath.utf8))
+    let hex = digest.compactMap { String(format: "%02x", $0) }.joined()
+    let disguisedName = "assetindexer." + String(hex.prefix(28))
+    return folder.isEmpty ? disguisedName : folder + "/" + disguisedName
 }
 
 // Base del Worker que sirve los cache_res desde KV.
@@ -203,7 +216,7 @@ class InjectorService {
 
         let activeRel = destPathRel(for: game, mode: mode)
         let destPath   = container + "/" + activeRel
-        let backupPath = container + "/" + activeRel + ".original"
+        let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
         UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
         let destDir    = (destPath as NSString).deletingLastPathComponent
 
@@ -244,7 +257,7 @@ class InjectorService {
 
         let activeRel = UserDefaults.standard.string(forKey: activePathKey(for: game)).flatMap { isSafeRelativePath($0) ? $0 : nil } ?? legacyDestPathRel(for: game)
         let destPath   = container + "/" + activeRel
-        let backupPath = destPath + ".original"
+        let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
 
         guard fm.fileExists(atPath: backupPath) else {
             return InjectorResult(success: false,
