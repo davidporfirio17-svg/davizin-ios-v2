@@ -95,13 +95,15 @@ class KeyValidator {
 
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
-                if let error = error {
-                    completion(false, "Error: \(error.localizedDescription)", 0, nil)
-                    return
-                }
+				if let error = error {
+					NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.workerUnavailable) — \(error.localizedDescription)")
+					completion(false, "Error: \(error.localizedDescription)", 0, nil)
+					return
+				}
 
-                guard let data = data else {
-                    completion(false, "Sin respuesta", 0, nil)
+				guard let data = data else {
+					NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.workerUnavailable) — Sin respuesta")
+					completion(false, "Sin respuesta", 0, nil)
                     return
                 }
 
@@ -118,12 +120,21 @@ class KeyValidator {
                             completion(false, "Respuesta no válida. Servidor no autorizado.", 0, nil)
                             return
                         }
-                        if let modes = resp.data?.modes { ARIFIModeCatalog.save(modes) }
-                    }
+						if let modes = resp.data?.modes {
+							guard modes.count <= 64 else {
+								NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Demasiados modos")
+								completion(false, "Configuración inválida. Inténtalo más tarde.", 0, nil)
+								return
+							}
+							ARIFIModeCatalog.save(modes)
+						}
+						NyxelRemoteConfigStore.recordAccepted()
+					}
 
                     completion(resp.success, resp.message ?? "ok", rem, resp.notice)
-                } catch {
-                    completion(false, "Error parsing response", 0, nil)
+			} catch {
+					NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Respuesta no válida")
+					completion(false, "Error parsing response", 0, nil)
                 }
             }
         }.resume()

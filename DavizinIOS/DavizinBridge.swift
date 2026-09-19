@@ -135,6 +135,11 @@ final class DavizinBridge {
     }
 
     private func handleOperation(_ operation: ARIFIOperationKind) {
+        guard !NyxelSafety.isSafeMode else {
+            vc?.setOperationState(.failed("\(NyxelErrorCode.safeMode) — Modo seguro activo. No se ejecutó ninguna operación."))
+            return
+        }
+
         switch operation {
 
         case .runExploit:

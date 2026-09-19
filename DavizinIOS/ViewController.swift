@@ -373,9 +373,23 @@ final class ViewController: UIViewController {
         headerView.title = "Perfil de cuenta"
         headerView.showsBackButton = true
 
-        let screen = ProfileView()
-        screen.delegate = self
-        screen.refresh()
+		let screen = ProfileView()
+		screen.delegate = self
+		screen.onSafeModeChanged = { [weak self] enabled in
+			let message = enabled
+				? "Modo seguro activo: las operaciones están bloqueadas."
+				: "Modo seguro desactivado. Verifica el sistema antes de operar."
+			ARIFIToastCenter.shared.show(
+				title: enabled ? "Modo seguro" : "Modo operativo",
+				subtitle: message,
+				kind: enabled ? .warning : .success
+			)
+			self?.headerView.setSystemCompatibility(
+				"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • \(enabled ? "Seguro" : "Verificado")",
+				color: enabled ? AppTheme.accentWarm : AppTheme.success
+			)
+		}
+		screen.refresh()
         profileView = screen
         display(screen, animated: animated)
     }
