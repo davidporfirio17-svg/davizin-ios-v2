@@ -20,6 +20,8 @@ final class ViewController: UIViewController {
     private var currentStage: ARIFIScreenStage = .login
     private var selectedGame: ARIFIGame = .freeFireMax
     private var selectedMode: ARIFIMode = .drag
+    private var activeKey: String?
+    private var activeRemainingSeconds: Int = 0
 
     private var loginView: LoginView?
     private var gameSelectionView: GameSelectionView?
@@ -82,6 +84,12 @@ final class ViewController: UIViewController {
 
     func setCountdownColor(_ color: UIColor) {
         headerView.setCountdownColor(color)
+    }
+
+    func setAccountSession(key: String?, remainingSeconds: Int) {
+        activeKey = key
+        activeRemainingSeconds = max(0, remainingSeconds)
+        profileView?.setAccount(key: key, remainingSeconds: activeRemainingSeconds)
     }
 
     /// Muestra un mensaje personalizado del panel al cliente (popup con estilo Davizin).
@@ -406,9 +414,10 @@ final class ViewController: UIViewController {
 		headerView.showsBackButton = true
 		headerView.showsAvatarButton = false
 
-		let screen = ProfileView()
-		screen.delegate = self
-		screen.refresh()
+        let screen = ProfileView()
+        screen.delegate = self
+        screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds)
+        screen.refresh()
         profileView = screen
         display(screen, animated: animated)
     }
@@ -579,6 +588,7 @@ extension ViewController: ARIFIHeaderViewDelegate {
 
 extension ViewController: ProfileViewDelegate {
     func profileViewDidTapLogout(_ view: ProfileView) {
+        setAccountSession(key: nil, remainingSeconds: 0)
         showLogin(animated: true)
     }
 }

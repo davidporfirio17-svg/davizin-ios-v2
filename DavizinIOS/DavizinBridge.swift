@@ -70,6 +70,7 @@ final class DavizinBridge {
             if success && remaining > 0 {
                 self?.vc?.setLoginStatus("Acceso concedido ✓", success: true)
                 self?.remainingSeconds = remaining
+                self?.vc?.setAccountSession(key: upperKey, remainingSeconds: remaining)
 
                 // Guardar credenciales para las descargas de cache_res
                 self?.sessionKey = upperKey
@@ -191,6 +192,7 @@ final class DavizinBridge {
             // Actualizar el contador visible en el header cada segundo
             self.vc?.setCountdownText(self.countdownString())
             self.vc?.setCountdownColor(self.countdownColor())
+            self.vc?.setAccountSession(key: self.sessionKey, remainingSeconds: self.remainingSeconds)
         }
     }
 

@@ -47,8 +47,13 @@ final class ProfileView: UIView {
     private let rankBadge = UIView()
     private let rankLabel = UILabel()
     private let countValueLabel = UILabel()
+    private let keyValueLabel = UILabel()
+    private let expirationValueLabel = UILabel()
+    private let accountStatusLabel = UILabel()
     private let diagnosticsLabel = UILabel()
     private let logoutButton = ARIFIButton(title: "CERRAR SESIÓN", style: .destructive)
+    private var activeKey: String?
+    private var activeRemainingSeconds: Int = 0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -69,6 +74,16 @@ final class ProfileView: UIView {
         rankBadge.backgroundColor = tier.color.withAlphaComponent(0.12)
         countValueLabel.text = "\(count)"
         diagnosticsLabel.text = diagnosticText()
+        keyValueLabel.text = maskedKey(activeKey)
+        expirationValueLabel.text = formattedRemaining(activeRemainingSeconds)
+        accountStatusLabel.text = activeKey == nil ? "Sin validar" : (activeRemainingSeconds > 0 ? "Activa" : "Expirada")
+        accountStatusLabel.textColor = activeRemainingSeconds > 0 ? AppTheme.success : AppTheme.failure
+    }
+
+    func setAccount(key: String?, remainingSeconds: Int) {
+        activeKey = key
+        activeRemainingSeconds = max(0, remainingSeconds)
+        refresh()
     }
 
     private func configure() {
@@ -119,13 +134,16 @@ final class ProfileView: UIView {
         sectionTitle.textColor = AppTheme.accent
 
         let countRow = makeRow(label: "Inyecciones totales", valueLabel: countValueLabel)
+        let keyRow = makeRow(label: "Key", valueLabel: keyValueLabel)
+        let statusRow = makeRow(label: "Estado", valueLabel: accountStatusLabel)
+        let expirationRow = makeRow(label: "Expira en", valueLabel: expirationValueLabel)
         diagnosticsLabel.font = UIFont.monospacedSystemFont(ofSize: 10, weight: .medium)
         diagnosticsLabel.textColor = AppTheme.secondaryText
         diagnosticsLabel.numberOfLines = 0
         diagnosticsLabel.text = diagnosticText()
 
         let card = ARIFICardView()
-        let cardStack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, countRow, diagnosticsLabel, logoutButton])
+        let cardStack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, keyRow, statusRow, expirationRow, countRow, diagnosticsLabel, logoutButton])
         cardStack.axis = .vertical
         cardStack.spacing = 16
         cardStack.setCustomSpacing(24, after: heroStack)
@@ -139,8 +157,10 @@ final class ProfileView: UIView {
         NSLayoutConstraint.activate([
             avatarCircle.widthAnchor.constraint(equalToConstant: 62),
             avatarCircle.heightAnchor.constraint(equalToConstant: 62),
-            avatarLabel.centerXAnchor.constraint(equalTo: avatarCircle.centerXAnchor),
-            avatarLabel.centerYAnchor.constraint(equalTo: avatarCircle.centerYAnchor),
+            avatarLabel.leadingAnchor.constraint(equalTo: avatarCircle.leadingAnchor),
+            avatarLabel.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor),
+            avatarLabel.topAnchor.constraint(equalTo: avatarCircle.topAnchor),
+            avatarLabel.bottomAnchor.constraint(equalTo: avatarCircle.bottomAnchor),
             rankBadge.heightAnchor.constraint(equalToConstant: 22),
             rankLabel.leadingAnchor.constraint(equalTo: rankBadge.leadingAnchor, constant: 10),
             rankLabel.trailingAnchor.constraint(equalTo: rankBadge.trailingAnchor, constant: -10),
@@ -182,6 +202,26 @@ final class ProfileView: UIView {
     private func diagnosticText() -> String {
         let system = NyxelSupportPolicy.currentSystemDescription
         let compatibility = NyxelSupportPolicy.isCurrentSystemSupported ? "Compatible" : "No compatible"
-        return "Sistema: \(system)\nCompatibilidad: \(compatibility)\nConfiguración: \(NyxelRemoteConfigStore.status) (\(NyxelRemoteConfigStore.ageDescription))"
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        return "Sistema: \(system)\nCompatibilidad: \(compatibility)\nHora local: \(formatter.string(from: Date()))\nNyxel: v\(appVersion)\nConfiguración: \(NyxelRemoteConfigStore.status) (\(NyxelRemoteConfigStore.ageDescription))"
+    }
+
+    private func maskedKey(_ key: String?) -> String {
+        guard let key, !key.isEmpty else { return "—" }
+        let normalized = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.count > 8 else { return String(repeating: "•", count: normalized.count) }
+        return "\(normalized.prefix(4))••••\(normalized.suffix(4))"
+    }
+
+    private func formattedRemaining(_ seconds: Int) -> String {
+        guard seconds > 0 else { return activeKey == nil ? "—" : "Expirada" }
+        let d = seconds / 86400
+        let h = (seconds % 86400) / 3600
+        let m = (seconds % 3600) / 60
+        let s = seconds % 60
+        if d > 0 { return String(format: "%dd %02dh %02dm", d, h, m) }
+        return String(format: "%02dh %02dm %02ds", h, m, s)
     }
 }
