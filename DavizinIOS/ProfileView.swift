@@ -40,7 +40,6 @@ private func currentRankTier(for count: Int) -> RankTier {
 
 final class ProfileView: UIView {
     weak var delegate: ProfileViewDelegate?
-    var onSafeModeChanged: ((Bool) -> Void)?
 
     private let avatarCircle = UIView()
     private let avatarLabel = UILabel()
@@ -49,7 +48,6 @@ final class ProfileView: UIView {
     private let rankLabel = UILabel()
     private let countValueLabel = UILabel()
     private let diagnosticsLabel = UILabel()
-    private let safeModeSwitch = UISwitch()
     private let logoutButton = ARIFIButton(title: "CERRAR SESIÓN", style: .destructive)
 
     override init(frame: CGRect) {
@@ -70,7 +68,6 @@ final class ProfileView: UIView {
         rankBadge.layer.borderColor = tier.color.withAlphaComponent(0.5).cgColor
         rankBadge.backgroundColor = tier.color.withAlphaComponent(0.12)
         countValueLabel.text = "\(count)"
-        safeModeSwitch.isOn = NyxelSafety.isSafeMode
         diagnosticsLabel.text = diagnosticText()
     }
 
@@ -94,7 +91,7 @@ final class ProfileView: UIView {
         avatarLabel.translatesAutoresizingMaskIntoConstraints = false
         avatarCircle.addSubview(avatarLabel)
 
-        nameLabel.text = "Davizin"
+        nameLabel.text = "CUENTA ACTIVA"
         nameLabel.font = AppTheme.titleFont(19)
         nameLabel.textColor = AppTheme.primaryText
 
@@ -122,23 +119,13 @@ final class ProfileView: UIView {
         sectionTitle.textColor = AppTheme.accent
 
         let countRow = makeRow(label: "Inyecciones totales", valueLabel: countValueLabel)
-        let safeModeLabel = UILabel()
-        safeModeLabel.text = "Modo seguro"
-        safeModeLabel.font = .systemFont(ofSize: 13, weight: .medium)
-        safeModeLabel.textColor = AppTheme.secondaryText
-        safeModeSwitch.onTintColor = AppTheme.accentWarm
-        let safeModeRow = UIStackView(arrangedSubviews: [safeModeLabel, safeModeSwitch])
-        safeModeRow.axis = .horizontal
-        safeModeRow.alignment = .center
-        safeModeRow.distribution = .equalSpacing
-
         diagnosticsLabel.font = UIFont.monospacedSystemFont(ofSize: 10, weight: .medium)
         diagnosticsLabel.textColor = AppTheme.secondaryText
         diagnosticsLabel.numberOfLines = 0
         diagnosticsLabel.text = diagnosticText()
 
         let card = ARIFICardView()
-        let cardStack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, countRow, safeModeRow, diagnosticsLabel, logoutButton])
+        let cardStack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, countRow, diagnosticsLabel, logoutButton])
         cardStack.axis = .vertical
         cardStack.spacing = 16
         cardStack.setCustomSpacing(24, after: heroStack)
@@ -148,7 +135,6 @@ final class ProfileView: UIView {
         addSubview(card)
 
         logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
-        safeModeSwitch.addTarget(self, action: #selector(safeModeChanged), for: .valueChanged)
 
         NSLayoutConstraint.activate([
             avatarCircle.widthAnchor.constraint(equalToConstant: 62),
@@ -193,20 +179,9 @@ final class ProfileView: UIView {
         delegate?.profileViewDidTapLogout(self)
     }
 
-    @objc private func safeModeChanged() {
-        if safeModeSwitch.isOn {
-            NyxelSafety.enableSafeMode()
-        } else {
-            NyxelSafety.disableSafeMode()
-        }
-        diagnosticsLabel.text = diagnosticText()
-        onSafeModeChanged?(safeModeSwitch.isOn)
-    }
-
     private func diagnosticText() -> String {
         let system = NyxelSupportPolicy.currentSystemDescription
         let compatibility = NyxelSupportPolicy.isCurrentSystemSupported ? "Compatible" : "No compatible"
-        let mode = NyxelSafety.isSafeMode ? "ACTIVO" : "desactivado"
-        return "Sistema: \(system)\nCompatibilidad: \(compatibility)\nConfiguración: \(NyxelRemoteConfigStore.status) (\(NyxelRemoteConfigStore.ageDescription))\nModo seguro: \(mode)"
+        return "Sistema: \(system)\nCompatibilidad: \(compatibility)\nConfiguración: \(NyxelRemoteConfigStore.status) (\(NyxelRemoteConfigStore.ageDescription))"
     }
 }

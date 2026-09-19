@@ -63,7 +63,7 @@
 			F26 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=MissionMapViewController.swift;sourceTree="<group>";};
 			F27 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ProfileView.swift;sourceTree="<group>";};
 			F28 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NyxelSupportPolicy.swift;sourceTree="<group>";};
-			F29 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NyxelSafety.swift;sourceTree="<group>";};
+			F29 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NyxelDiagnostics.swift;sourceTree="<group>";};
 			F30 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ARIFIBottomNavView.swift;sourceTree="<group>";};
 			FR1 = {isa=PBXFileReference;lastKnownFileType=folder.assetcatalog;path=Assets.xcassets;sourceTree="<group>";};
 		FR3 = {isa=PBXFileReference;lastKnownFileType=file.storyboard;path=LaunchScreen.storyboard;sourceTree="<group>";};

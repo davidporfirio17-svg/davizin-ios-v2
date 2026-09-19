@@ -1,32 +1,6 @@
 import Foundation
 
-/// Controles locales de seguridad que permiten detener operaciones sin borrar la sesión.
-enum NyxelSafety {
-    private static let safeModeKey = "nyxel.safeMode"
-    private static let safeModeReasonKey = "nyxel.safeModeReason"
-
-    static var isSafeMode: Bool {
-        get { UserDefaults.standard.bool(forKey: safeModeKey) }
-        set { UserDefaults.standard.set(newValue, forKey: safeModeKey) }
-    }
-
-    static var safeModeReason: String {
-        get { UserDefaults.standard.string(forKey: safeModeReasonKey) ?? "Activado manualmente" }
-        set { UserDefaults.standard.set(newValue, forKey: safeModeReasonKey) }
-    }
-
-    static func enableSafeMode(reason: String = "Activado manualmente") {
-        safeModeReason = reason
-        isSafeMode = true
-    }
-
-    static func disableSafeMode() {
-        isSafeMode = false
-    }
-}
-
 enum NyxelErrorCode {
-    static let safeMode = "NYX-000"
     static let unsupportedSystem = "NYX-001"
     static let workerUnavailable = "NYX-002"
     static let invalidConfiguration = "NYX-003"

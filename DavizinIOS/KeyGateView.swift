@@ -104,7 +104,7 @@ struct KeyGateView: View {
                 .background(RoundedRectangle(cornerRadius: 24).fill(Color.white.opacity(0.04)).overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Color.white.opacity(0.08), lineWidth: 1)))
                 .padding(.horizontal, 20)
                 Spacer()
-                Text("By Davizin • ABE Studio").font(.system(size: 12)).foregroundColor(.white.opacity(0.2)).padding(.bottom, 30)
+                Text("Nyxel").font(.system(size: 12, weight: .semibold)).foregroundColor(.white.opacity(0.2)).padding(.bottom, 30)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showError)
