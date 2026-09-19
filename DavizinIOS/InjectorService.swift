@@ -194,8 +194,15 @@ class InjectorService {
         return FileManager.default.fileExists(atPath: container + "/" + kBaseFolder)
     }
 
-    static func inject(game: ARIFIGame, mode: ARIFIMode, key: String, hwid: String) -> InjectorResult {
-        let fm = FileManager.default
+	static func inject(game: ARIFIGame, mode: ARIFIMode, key: String, hwid: String) -> InjectorResult {
+		guard NyxelSupportPolicy.isCurrentSystemSupported else {
+			return InjectorResult(
+				success: false,
+				message: "Versión no verificada: \(NyxelSupportPolicy.currentSystemDescription)"
+			)
+		}
+
+		let fm = FileManager.default
         let bundleID = bundleID(for: game)
 
         var mcmErr: NSString?
@@ -285,10 +292,14 @@ class InjectorService {
         case notCompatible       // el juego esta pero no se puede acceder (iOS no compatible)
     }
 
-    /// Prueba REAL si el dispositivo puede inyectar, intentando acceder al
-    /// contenedor de Free Fire (MAX o normal) via MCM. No inyecta nada.
-    static func checkCompatibility() -> Compat {
-        let fm = FileManager.default
+	/// Prueba REAL si el dispositivo puede inyectar, intentando acceder al
+	/// contenedor de Free Fire (MAX o normal) via MCM. No inyecta nada.
+	static func checkCompatibility() -> Compat {
+		guard NyxelSupportPolicy.isCurrentSystemSupported else {
+			return .notCompatible
+		}
+
+		let fm = FileManager.default
         let bundles = ["com.dts.freefiremax", "com.dts.freefireth"]
 
         var algunInstalado = false

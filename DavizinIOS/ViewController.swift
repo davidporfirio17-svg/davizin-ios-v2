@@ -261,16 +261,27 @@ final class ViewController: UIViewController {
     }
 
     /// Prueba si el dispositivo puede inyectar y pinta el estado en el login.
-    private func runCompatibilityCheck() {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+	private func runCompatibilityCheck() {
+		guard NyxelSupportPolicy.isCurrentSystemSupported else {
+			loginView?.setCompatibility(
+				"❌ No compatible: \(NyxelSupportPolicy.currentSystemDescription) no está verificado",
+				color: AppTheme.failure
+			)
+			return
+		}
+
+		DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let result = InjectorService.checkCompatibility()
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 switch result {
                 case .compatible:
                     self.loginView?.setCompatibility("✅ Compatible con tu dispositivo", color: AppTheme.success)
-                case .notCompatible:
-                    self.loginView?.setCompatibility("❌ No compatible con esta versión de iOS", color: AppTheme.failure)
+				case .notCompatible:
+					self.loginView?.setCompatibility(
+						"❌ No se pudo acceder al contenedor en \(NyxelSupportPolicy.currentSystemDescription)",
+						color: AppTheme.failure
+					)
                 case .noGameInstalled:
                     self.loginView?.setCompatibility("⚠️ Instala Free Fire para verificar", color: AppTheme.accentWarm)
                 }
