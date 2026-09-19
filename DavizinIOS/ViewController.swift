@@ -69,8 +69,10 @@ final class ViewController: UIViewController {
         operationView?.setState(state)
         switch state {
         case .succeeded(let message):
+            NyxelActivityLog.record("Operación completada")
             ARIFIToastCenter.shared.show(title: "Operación completada", subtitle: message, kind: .success)
         case .failed(let message):
+            NyxelActivityLog.record("Operación fallida")
             ARIFIToastCenter.shared.show(title: "Operación fallida", subtitle: message, kind: .danger)
         default:
             break
@@ -422,6 +424,7 @@ final class ViewController: UIViewController {
             KeyValidator.validate(key: key) { [weak self, weak screen] success, message, remaining, _ in
                 guard let self else { return }
                 if success && remaining > 0 {
+                    NyxelActivityLog.record("Datos del Worker actualizados")
                     self.setAccountSession(key: key, remainingSeconds: remaining)
                     screen?.setAccount(key: key, remainingSeconds: remaining)
                     ARIFIToastCenter.shared.show(title: "Datos actualizados", subtitle: "La key y el Worker están sincronizados.", kind: .success)
@@ -446,8 +449,9 @@ final class ViewController: UIViewController {
 			urls = ["freefireth://", "freefire://"].compactMap(URL.init(string:))
 		}
 
-		func showOpenError() {
-			self.operationView?.showGameOpenResult(success: false)
+			func showOpenError() {
+				NyxelActivityLog.record("No se pudo abrir \(game.rawValue)")
+				self.operationView?.showGameOpenResult(success: false)
 			let alert = UIAlertController(
 				title: "No se pudo abrir el juego",
 				message: "No se encontró el esquema de \(game.rawValue). Verifica que el juego esté instalado y prueba de nuevo.",
@@ -465,6 +469,7 @@ final class ViewController: UIViewController {
 
 				UIApplication.shared.open(urls[index], options: [:]) { success in
 					if success {
+						NyxelActivityLog.record("\(game.rawValue) abierto")
 						DispatchQueue.main.async {
 							self.operationView?.showGameOpenResult(success: true)
 						}
@@ -617,6 +622,7 @@ extension ViewController: LoginViewDelegate {
 extension ViewController: GameSelectionViewDelegate {
     func gameSelectionView(_ view: GameSelectionView, didSelect game: ARIFIGame) {
         selectedGame = game
+        NyxelActivityLog.record("Juego seleccionado: \(game.rawValue)")
         onGameSelected?(game)
         showModeSelection(animated: true)
     }
@@ -625,6 +631,7 @@ extension ViewController: GameSelectionViewDelegate {
 extension ViewController: MissionMapViewDelegate {
     func missionMapView(_ view: MissionMapView, didSelect mode: ARIFIMode) {
         selectedMode = mode
+        NyxelActivityLog.record("Modo seleccionado: \(mode.displayName)")
         onModeSelected?(mode)
         showOperation(animated: true)
     }

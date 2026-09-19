@@ -68,6 +68,7 @@ final class DavizinBridge {
             self?.vc?.setLoginChecking(false)
 
             if success && remaining > 0 {
+                NyxelActivityLog.record("Key validada")
                 self?.vc?.setLoginStatus("Acceso concedido ✓", success: true)
                 self?.remainingSeconds = remaining
                 self?.vc?.setAccountSession(key: upperKey, remainingSeconds: remaining)

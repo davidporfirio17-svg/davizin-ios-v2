@@ -44,6 +44,8 @@ final class ProfileView: UIView {
     private let serviceStatusLabel = UILabel()
     private let diagnosticsLabel = UILabel()
     private let activityLabel = UILabel()
+    private let gamesLabel = UILabel()
+    private let historyLabel = UILabel()
     private let refreshButton = UIButton(type: .system)
     private let logoutButton = ARIFIButton(title: "CERRAR SESIÓN", style: .destructive)
     private let progressTrack = CAShapeLayer()
@@ -79,6 +81,9 @@ final class ProfileView: UIView {
         serviceStatusLabel.text = "●  \(NyxelRemoteConfigStore.status)"
         serviceStatusLabel.textColor = NyxelRemoteConfigStore.status == "Configuración válida" ? AppTheme.success : AppTheme.warm
         diagnosticsLabel.text = diagnosticText()
+        gamesLabel.text = NyxelInstalledGames.statusText()
+        let history = NyxelActivityLog.entries
+        historyLabel.text = history.isEmpty ? "HISTORIAL\nSin actividad registrada" : "HISTORIAL\n" + history.joined(separator: "\n")
         let formatter = DateFormatter(); formatter.dateFormat = "HH:mm:ss"
         activityLabel.text = "Última actividad  •  Perfil consultado a las \(formatter.string(from: Date()))"
         updateProgressRing()
@@ -146,6 +151,12 @@ final class ProfileView: UIView {
         activityLabel.font = .systemFont(ofSize: 10, weight: .medium)
         activityLabel.textColor = AppTheme.tertiaryText
         activityLabel.numberOfLines = 0
+        gamesLabel.font = AppTheme.monoFont(10)
+        gamesLabel.textColor = AppTheme.secondaryText
+        gamesLabel.numberOfLines = 0
+        historyLabel.font = AppTheme.monoFont(10)
+        historyLabel.textColor = AppTheme.tertiaryText
+        historyLabel.numberOfLines = 0
 
         refreshButton.setTitle("↻  ACTUALIZAR DATOS", for: .normal)
         refreshButton.setTitleColor(AppTheme.accent, for: .normal)
@@ -157,7 +168,7 @@ final class ProfileView: UIView {
         refreshButton.heightAnchor.constraint(equalToConstant: 38).isActive = true
 
         let card = ARIFICardView()
-        let stack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, keyRow, statusRow, expirationRow, countRow, serviceStatusLabel, diagnosticsLabel, refreshButton, activityLabel, logoutButton])
+        let stack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, keyRow, statusRow, expirationRow, countRow, serviceStatusLabel, diagnosticsLabel, gamesLabel, historyLabel, refreshButton, activityLabel, logoutButton])
         stack.axis = .vertical; stack.spacing = 13
         stack.setCustomSpacing(22, after: heroStack)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -176,7 +187,7 @@ final class ProfileView: UIView {
             rankLabel.trailingAnchor.constraint(equalTo: rankBadge.trailingAnchor, constant: -10), rankLabel.centerYAnchor.constraint(equalTo: rankBadge.centerYAnchor),
             card.centerXAnchor.constraint(equalTo: centerXAnchor), card.centerYAnchor.constraint(equalTo: centerYAnchor),
             card.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 22), card.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -22),
-            card.widthAnchor.constraint(lessThanOrEqualToConstant: AppTheme.contentMaximumWidth), stack.widthAnchor.constraint(greaterThanOrEqualToConstant: 240),
+            card.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 680 : AppTheme.contentMaximumWidth), stack.widthAnchor.constraint(greaterThanOrEqualToConstant: 240),
             logoutButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
         ])
         refresh()
