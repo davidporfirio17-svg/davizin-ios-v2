@@ -14,6 +14,8 @@ final class ViewController: UIViewController {
     private let animatedBackgroundView = ARIFIAnimatedBackgroundView()
     private let headerView = ARIFIHeaderView()
     private let contentContainerView = UIView()
+    private let bottomNavView = ARIFIBottomNavView()
+    private var bottomNavHeightConstraint: NSLayoutConstraint?
 
     private var currentStage: ARIFIScreenStage = .login
     private var selectedGame: ARIFIGame = .freeFireMax
@@ -228,6 +230,16 @@ final class ViewController: UIViewController {
         contentContainerView.backgroundColor = .clear
         view.addSubview(contentContainerView)
 
+        bottomNavView.onModes = { [weak self] in
+            self?.showModeSelection(animated: true)
+        }
+        bottomNavView.onProfile = { [weak self] in
+            self?.showProfile(animated: true)
+        }
+        view.addSubview(bottomNavView)
+        let bottomNavHeight = bottomNavView.heightAnchor.constraint(equalToConstant: 0)
+        bottomNavHeightConstraint = bottomNavHeight
+
         NSLayoutConstraint.activate([
             animatedBackgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             animatedBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -241,12 +253,26 @@ final class ViewController: UIViewController {
             contentContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             contentContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             contentContainerView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 4.0),
-            contentContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+            contentContainerView.bottomAnchor.constraint(equalTo: bottomNavView.topAnchor),
+            bottomNavView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomNavView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomNavView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            bottomNavHeight
         ])
+
+        bottomNavView.isHidden = true
+    }
+
+    private func setBottomNavigation(visible: Bool, selected: ARIFIBottomNavView.Item = .modes) {
+        bottomNavView.isHidden = !visible
+        bottomNavView.setSelected(selected)
+        bottomNavHeightConstraint?.constant = visible ? 68.0 : 0.0
+        UIView.animate(withDuration: 0.2) { self.view.layoutIfNeeded() }
     }
 
     private func showLogin(animated: Bool) {
         currentStage = .login
+        setBottomNavigation(visible: false)
         headerView.title = "Nyxel External"
         headerView.showsBackButton = false
         headerView.showsAvatarButton = false
@@ -319,9 +345,10 @@ final class ViewController: UIViewController {
 
     private func showGameSelection(animated: Bool) {
         currentStage = .gameSelection
-        headerView.title = "Seleccionar entorno"
-        headerView.showsBackButton = true
-        headerView.showsAvatarButton = true
+        setBottomNavigation(visible: true, selected: .modes)
+		headerView.title = "Seleccionar entorno"
+		headerView.showsBackButton = true
+		headerView.showsAvatarButton = false
 
         let screen = GameSelectionView()
         screen.delegate = self
@@ -332,11 +359,13 @@ final class ViewController: UIViewController {
 
     private func showModeSelection(animated: Bool) {
         currentStage = .modeSelection
+        setBottomNavigation(visible: true, selected: .modes)
         if let firstActive = ARIFIModeCatalog.enabledModes(for: selectedGame).first, !ARIFIModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) {
             selectedMode = firstActive
         }
-        headerView.title = "Configurar / \(selectedGame.rawValue)"
-        headerView.showsBackButton = true
+		headerView.title = "Configurar / \(selectedGame.rawValue)"
+		headerView.showsBackButton = true
+		headerView.showsAvatarButton = false
 
         let screen = MissionMapView()
         screen.delegate = self
@@ -346,13 +375,15 @@ final class ViewController: UIViewController {
     }
 
     private func showOperation(animated: Bool) {
+        setBottomNavigation(visible: true, selected: .modes)
         guard ARIFIModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) else {
             showModeSelection(animated: animated)
             return
         }
         currentStage = .operation
-        headerView.title = "Control / \(selectedMode.displayName)"
-        headerView.showsBackButton = true
+		headerView.title = "Control / \(selectedMode.displayName)"
+		headerView.showsBackButton = true
+		headerView.showsAvatarButton = false
 
         let screen = OperationView()
         screen.delegate = self
@@ -369,9 +400,11 @@ final class ViewController: UIViewController {
     /// Perfil: accesible desde el avatar del header en cualquier pantalla (excepto login).
     private func showProfile(animated: Bool) {
         stageBeforeProfile = currentStage == .profile ? stageBeforeProfile : currentStage
-        currentStage = .profile
-        headerView.title = "Perfil de cuenta"
-        headerView.showsBackButton = true
+		currentStage = .profile
+		setBottomNavigation(visible: true, selected: .profile)
+		headerView.title = "Perfil de cuenta"
+		headerView.showsBackButton = true
+		headerView.showsAvatarButton = false
 
 		let screen = ProfileView()
 		screen.delegate = self
