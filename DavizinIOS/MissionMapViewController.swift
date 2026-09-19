@@ -51,7 +51,7 @@ final class MissionMapView: UIView {
         nodeViews.removeAll()
         canvas.layer.sublayers?.removeAll()
         connectionsDrawn = false
-        canvasHeight = max(400, 130 + CGFloat(modes.count) * 100)
+        canvasHeight = max(500, 220 + CGFloat(modes.count) * 150)
         canvasHeightConstraint?.constant = canvasHeight
         buildNodes(selected: selected)
         setNeedsLayout()
@@ -94,7 +94,7 @@ final class MissionMapView: UIView {
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.showsVerticalScrollIndicator = false
-        scrollView.alwaysBounceVertical = true
+        scrollView.alwaysBounceVertical = false
         canvas.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(headerStack)
