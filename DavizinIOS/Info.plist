@@ -63,8 +63,9 @@
 	<string>16.0</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>freefiremax</string>
-		<string>freefireth</string>
+			<string>freefiremax</string>
+			<string>freefireth</string>
+			<string>freefire</string>
 	</array>
 </dict>
 </plist>

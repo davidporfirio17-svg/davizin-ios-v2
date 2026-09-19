@@ -263,6 +263,10 @@ final class ViewController: UIViewController {
     /// Prueba si el dispositivo puede inyectar y pinta el estado en el login.
 	private func runCompatibilityCheck() {
 		guard NyxelSupportPolicy.isCurrentSystemSupported else {
+			headerView.setSystemCompatibility(
+				"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • No compatible",
+				color: AppTheme.failure
+			)
 			loginView?.setCompatibility(
 				"❌ No compatible: \(NyxelSupportPolicy.currentSystemDescription) no está verificado",
 				color: AppTheme.failure
@@ -271,20 +275,44 @@ final class ViewController: UIViewController {
 		}
 
 		DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let result = InjectorService.checkCompatibility()
-            DispatchQueue.main.async {
+			let result = InjectorService.checkCompatibility()
+			DispatchQueue.main.async {
                 guard let self = self else { return }
                 switch result {
-                case .compatible:
-                    self.loginView?.setCompatibility("✅ Compatible con tu dispositivo", color: AppTheme.success)
+				case .compatible:
+					self.headerView.setSystemCompatibility(
+						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • Compatible",
+						color: AppTheme.success
+					)
+					self.loginView?.setCompatibility(
+						"✅ Compatible — \(NyxelSupportPolicy.currentSystemDescription)",
+						color: AppTheme.success
+					)
 				case .notCompatible:
+					self.headerView.setSystemCompatibility(
+						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • Sin acceso",
+						color: AppTheme.failure
+					)
 					self.loginView?.setCompatibility(
 						"❌ No se pudo acceder al contenedor en \(NyxelSupportPolicy.currentSystemDescription)",
 						color: AppTheme.failure
 					)
-                case .noGameInstalled:
-                    self.loginView?.setCompatibility("⚠️ Instala Free Fire para verificar", color: AppTheme.accentWarm)
-                }
+				case .noGameInstalled:
+					self.headerView.setSystemCompatibility(
+						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • Verificado",
+						color: AppTheme.accentWarm
+					)
+					self.loginView?.setCompatibility("⚠️ Instala Free Fire para verificar", color: AppTheme.accentWarm)
+				case .unsupportedSystem:
+					self.headerView.setSystemCompatibility(
+						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • No compatible",
+						color: AppTheme.failure
+					)
+					self.loginView?.setCompatibility(
+						"❌ No compatible — \(NyxelSupportPolicy.currentSystemDescription) no está verificado",
+						color: AppTheme.failure
+					)
+				}
             }
         }
     }
@@ -352,22 +380,44 @@ final class ViewController: UIViewController {
         display(screen, animated: animated)
     }
 
-    /// Abre Free Fire (MAX o normal) usando su esquema de URL.
-    private func openGame(_ game: ARIFIGame) {
-        let scheme: String
-        switch game {
-        case .freeFireMax: scheme = "freefiremax://"
-        case .freeFire:    scheme = "freefireth://"
-        }
-        if let url = URL(string: scheme) {
-            UIApplication.shared.open(url, options: [:]) { success in
-                if !success {
-                    // Si el esquema falla, intentar abrir por bundle (fallback)
-                    // No siempre funciona pero es un intento extra
-                }
-            }
-        }
-    }
+	/// Abre Free Fire (MAX o normal) usando su esquema de URL.
+	private func openGame(_ game: ARIFIGame) {
+		let urls: [URL]
+		switch game {
+		case .freeFireMax:
+			urls = ["freefiremax://", "freefire://"].compactMap(URL.init(string:))
+		case .freeFire:
+			urls = ["freefireth://", "freefire://"].compactMap(URL.init(string:))
+		}
+
+		func showOpenError() {
+			let alert = UIAlertController(
+				title: "No se pudo abrir el juego",
+				message: "No se encontró el esquema de \(game.rawValue). Verifica que el juego esté instalado y prueba de nuevo.",
+				preferredStyle: .alert
+			)
+			alert.addAction(UIAlertAction(title: "Entendido", style: .default))
+			present(alert, animated: true)
+		}
+
+		func attemptOpen(at index: Int) {
+			guard index < urls.count else {
+				showOpenError()
+				return
+			}
+
+			UIApplication.shared.open(urls[index], options: [:]) { success in
+				guard !success else { return }
+				DispatchQueue.main.async {
+					attemptOpen(at: index + 1)
+				}
+			}
+		}
+
+		// Se intenta directamente: canOpenURL puede devolver false por restricciones
+		// de consulta aun cuando el esquema pueda abrirse correctamente.
+		attemptOpen(at: 0)
+	}
 
     private func display(_ screen: UIView, animated: Bool) {
         contentContainerView.subviews.forEach { $0.removeFromSuperview() }

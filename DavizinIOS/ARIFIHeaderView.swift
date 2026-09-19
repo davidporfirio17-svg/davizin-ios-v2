@@ -21,10 +21,17 @@ final class ARIFIHeaderView: UIView {
         }
     }
 
-    /// Color del contador (verde/amarillo/rojo segun tiempo restante).
-    func setCountdownColor(_ color: UIColor) {
-        countdownLabel.textColor = color
-    }
+	/// Color del contador (verde/amarillo/rojo segun tiempo restante).
+	func setCountdownColor(_ color: UIColor) {
+		countdownLabel.textColor = color
+	}
+
+	/// Muestra la versión/build del sistema y el estado de compatibilidad.
+	func setSystemCompatibility(_ text: String, color: UIColor) {
+		systemLabel.text = text
+		systemLabel.textColor = color
+		systemLabel.isHidden = text.isEmpty
+	}
 
     var showsBackButton: Bool = true {
         didSet { backButton.isHidden = !showsBackButton }
@@ -35,8 +42,9 @@ final class ARIFIHeaderView: UIView {
     private let backButton = UIButton(type: .system)
     private let closeButton = UIButton(type: .system)
     private let statusDot = UIView()
-    private let avatarButton = UIButton(type: .system)
-    private let avatarLabel = UILabel()
+	private let avatarButton = UIButton(type: .system)
+	private let avatarLabel = UILabel()
+	private let systemLabel = UILabel()
 
     /// Oculta el avatar en pantallas donde no aplica (ej: login, sin sesion).
     var showsAvatarButton: Bool = true {
@@ -101,25 +109,40 @@ final class ARIFIHeaderView: UIView {
         avatarButton.addSubview(avatarLabel)
         addSubview(avatarButton)
 
-        countdownLabel.translatesAutoresizingMaskIntoConstraints = false
-        countdownLabel.textColor = AppTheme.accent
-        countdownLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 10.0, weight: .bold)
-        countdownLabel.textAlignment = .center
-        countdownLabel.isHidden = true
-        addSubview(countdownLabel)
+		countdownLabel.translatesAutoresizingMaskIntoConstraints = false
+		countdownLabel.textColor = AppTheme.accent
+		countdownLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 10.0, weight: .bold)
+		countdownLabel.textAlignment = .center
+		countdownLabel.isHidden = true
+		addSubview(countdownLabel)
 
-        NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: 60.0),
+		systemLabel.translatesAutoresizingMaskIntoConstraints = false
+		systemLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 8.5, weight: .semibold)
+		systemLabel.textAlignment = .center
+		systemLabel.numberOfLines = 1
+		systemLabel.adjustsFontSizeToFitWidth = true
+		systemLabel.minimumScaleFactor = 0.75
+		let systemIsSupported = NyxelSupportPolicy.isCurrentSystemSupported
+		systemLabel.text = "iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • \(systemIsSupported ? "Compatible" : "No compatible")"
+		systemLabel.textColor = systemIsSupported ? AppTheme.success : AppTheme.failure
+		addSubview(systemLabel)
+
+		NSLayoutConstraint.activate([
+			heightAnchor.constraint(equalToConstant: 72.0),
             statusDot.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18.0),
             statusDot.centerYAnchor.constraint(equalTo: centerYAnchor),
             statusDot.widthAnchor.constraint(equalToConstant: 8.0),
             statusDot.heightAnchor.constraint(equalToConstant: 8.0),
             titleLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 14.0),
+			titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 8.0),
             titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: backButton.trailingAnchor, constant: 12.0),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -12.0),
             countdownLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            countdownLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3.0),
+			countdownLabel.topAnchor.constraint(equalTo: systemLabel.bottomAnchor, constant: 2.0),
+			systemLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+			systemLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2.0),
+			systemLabel.leadingAnchor.constraint(greaterThanOrEqualTo: titleLabel.leadingAnchor),
+			systemLabel.trailingAnchor.constraint(lessThanOrEqualTo: titleLabel.trailingAnchor),
             backButton.leadingAnchor.constraint(equalTo: avatarButton.trailingAnchor, constant: 6.0),
             backButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             backButton.widthAnchor.constraint(equalToConstant: 34.0),

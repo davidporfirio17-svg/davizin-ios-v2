@@ -22,18 +22,20 @@ final class MissionMapView: UIView {
     private var canvasHeightConstraint: NSLayoutConstraint?
     private let scrollHint = UILabel()
 
-    /// Genera posiciones en zigzag para cualquier cantidad de modos (ya no
-    /// esta fijo a 3 — antes, si el Worker mandaba mas modos, se dibujaban
-    /// encima de los primeros y los tapaban).
-    private func generatePositions(count: Int) -> [CGPoint] {
-        guard count > 0 else { return [] }
-        var points: [CGPoint] = []
-        for i in 0..<count {
-            let side: CGFloat = i % 2 == 0 ? 0.28 : 0.60
-            let y = 0.08 + (CGFloat(i) * 0.22)
-            points.append(CGPoint(x: side, y: y))
-        }
-        return points
+	/// Genera posiciones en zigzag para cualquier cantidad de modos (ya no
+	/// esta fijo a 3 — antes, si el Worker mandaba mas modos, se dibujaban
+	/// encima de los primeros y los tapaban).
+	private func generatePositions(count: Int) -> [CGPoint] {
+		guard count > 0 else { return [] }
+		var points: [CGPoint] = []
+		let topInset: CGFloat = 48
+		let verticalSpacing: CGFloat = 108
+		for i in 0..<count {
+			let side: CGFloat = i % 2 == 0 ? 0.28 : 0.60
+			let y = (topInset + CGFloat(i) * verticalSpacing) / canvasHeight
+			points.append(CGPoint(x: side, y: y))
+		}
+		return points
     }
 
     override init(frame: CGRect) {
@@ -51,10 +53,13 @@ final class MissionMapView: UIView {
         nodeViews.removeAll()
         canvas.layer.sublayers?.removeAll()
         connectionsDrawn = false
-        canvasHeight = max(500, 220 + CGFloat(modes.count) * 150)
-        canvasHeightConstraint?.constant = canvasHeight
-        buildNodes(selected: selected)
-        setNeedsLayout()
+		// Cada modo ocupa una fila compacta, pero el lienzo siempre crece lo
+		// suficiente para que el último nodo quede dentro del área scrolleable.
+			canvasHeight = max(500, 150 + CGFloat(modes.count) * 108)
+			canvasHeightConstraint?.constant = canvasHeight
+			scrollView.setContentOffset(.zero, animated: false)
+			buildNodes(selected: selected)
+		setNeedsLayout()
     }
 
     private func configure() {
@@ -92,16 +97,21 @@ final class MissionMapView: UIView {
         headerStack.alignment = .center
         headerStack.translatesAutoresizingMaskIntoConstraints = false
 
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.alwaysBounceVertical = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.showsVerticalScrollIndicator = false
+		scrollView.alwaysBounceVertical = true
+		scrollView.directionalLockEnabled = false
+		scrollView.contentInsetAdjustmentBehavior = .never
         canvas.translatesAutoresizingMaskIntoConstraints = false
 
-        addSubview(headerStack)
-        addSubview(scrollView)
-        scrollView.addSubview(canvas)
+		addSubview(headerStack)
+		addSubview(scrollView)
+		scrollView.addSubview(canvas)
 
-        NSLayoutConstraint.activate([
+		let canvasHeightConstraint = canvas.heightAnchor.constraint(equalToConstant: canvasHeight)
+		self.canvasHeightConstraint = canvasHeightConstraint
+
+		NSLayoutConstraint.activate([
             headerStack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
             headerStack.centerXAnchor.constraint(equalTo: centerXAnchor),
             headerStack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 20),
@@ -121,11 +131,11 @@ final class MissionMapView: UIView {
             canvas.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             canvas.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
             canvas.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            canvas.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
-            canvas.heightAnchor.constraint(equalToConstant: canvasHeight)
-        ])
-        canvasHeightConstraint = canvas.constraints.first { $0.firstAttribute == .height }
-        scrollView.delegate = self
+			canvas.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+			canvasHeightConstraint
+		])
+		scrollView.isScrollEnabled = true
+		scrollView.delegate = self
     }
 
     /// Muestra "desliza para ver mas" solo si de verdad hay contenido oculto
@@ -157,8 +167,8 @@ final class MissionMapView: UIView {
         let positions = generatePositions(count: nodeViews.count)
         for (index, node) in nodeViews.enumerated() {
             let pos = positions[index]
-            let size: CGFloat = 74
-            node.frame = CGRect(x: pos.x * w - size / 2, y: pos.y * canvasHeight, width: size, height: size)
+			let size: CGFloat = 74
+			node.frame = CGRect(x: pos.x * w - size / 2, y: pos.y * canvasHeight, width: size, height: size)
         }
         if !connectionsDrawn && nodeViews.allSatisfy({ $0.frame != .zero }) {
             connectionsDrawn = true

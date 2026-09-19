@@ -286,17 +286,18 @@ class InjectorService {
     }
 
     /// Resultado del chequeo de compatibilidad del dispositivo.
-    enum Compat {
-        case compatible          // puede acceder al contenedor -> puede inyectar
-        case noGameInstalled     // Free Fire no esta instalado
-        case notCompatible       // el juego esta pero no se puede acceder (iOS no compatible)
+	enum Compat {
+		case compatible          // puede acceder al contenedor -> puede inyectar
+		case noGameInstalled     // Free Fire no esta instalado
+		case notCompatible       // el juego esta pero no se puede acceder (iOS no compatible)
+		case unsupportedSystem   // la versión/build del sistema no está verificada
     }
 
 	/// Prueba REAL si el dispositivo puede inyectar, intentando acceder al
 	/// contenedor de Free Fire (MAX o normal) via MCM. No inyecta nada.
 	static func checkCompatibility() -> Compat {
 		guard NyxelSupportPolicy.isCurrentSystemSupported else {
-			return .notCompatible
+			return .unsupportedSystem
 		}
 
 		let fm = FileManager.default

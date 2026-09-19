@@ -28,10 +28,13 @@ final class OperationView: UIView {
     private let stackView = UIStackView()
 
     // Hold-to-confirm: anillo de progreso sobre injectButton
-    private let holdRingLayer = CAShapeLayer()
-    private var holdTimer: Timer?
-    private var holdProgress: CGFloat = 0
-    private let holdDuration: TimeInterval = 0.5
+	private let holdRingLayer = CAShapeLayer()
+	private var holdTimer: Timer?
+	private var holdProgress: CGFloat = 0
+	// Tiempo reducido para que el botón responda más rápido sin activarse con
+	// un toque accidental.
+	private let holdDuration: TimeInterval = 0.32
+	private var isHoldingInject = false
 
     private(set) var operationState: ARIFIOperationState = .idle
 
@@ -155,13 +158,12 @@ final class OperationView: UIView {
         cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
         openGameButton.addTarget(self, action: #selector(openGameTapped), for: .touchUpInside)
 
-        // Inyectar usa hold-to-confirm, no touchUpInside simple.
-        let holdGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleHoldGesture(_:)))
-        holdGesture.minimumPressDuration = 0
-        holdGesture.allowableMovement = 300 // muy tolerante: antes 10pt por default cancelaba el hold con solo mover el dedo un poco
-        holdGesture.cancelsTouchesInView = false
-        injectButton.addGestureRecognizer(holdGesture)
-        setupHoldRing()
+		// Eventos directos de UIButton son más confiables que un
+		// UILongPressGestureRecognizer con duración cero: no se pierde el toque
+		// cuando el dedo se mueve ligeramente o la vista está animándose.
+		injectButton.addTarget(self, action: #selector(injectTouchDown), for: .touchDown)
+		injectButton.addTarget(self, action: #selector(injectTouchUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+		setupHoldRing()
 
         statusLabel.textColor = AppTheme.secondaryText
         statusLabel.font = AppTheme.captionFont()
@@ -273,17 +275,19 @@ final class OperationView: UIView {
         holdRingLayer.frame = bounds
     }
 
-    @objc private func handleHoldGesture(_ gesture: UILongPressGestureRecognizer) {
-        guard injectButton.isEnabled else { return }
-        switch gesture.state {
-        case .began:
-            startHold()
-        case .ended, .cancelled, .failed:
-            cancelHold()
-        default:
-            break
-        }
-    }
+	@objc private func injectTouchDown() {
+		guard injectButton.isEnabled, !isHoldingInject else { return }
+		isHoldingInject = true
+		startHold()
+	}
+
+	@objc private func injectTouchUp() {
+		guard isHoldingInject else { return }
+		isHoldingInject = false
+		if holdProgress < 1.0 {
+			cancelHold()
+		}
+	}
 
     private func startHold() {
         holdProgress = 0
@@ -314,8 +318,9 @@ final class OperationView: UIView {
         }
     }
 
-    private func completeHold() {
-        SoundService.shared.stopHoldTone()
+	private func completeHold() {
+		isHoldingInject = false
+		SoundService.shared.stopHoldTone()
         UIView.animate(withDuration: 0.15) {
             self.holdRingLayer.opacity = 0
         } completion: { _ in
