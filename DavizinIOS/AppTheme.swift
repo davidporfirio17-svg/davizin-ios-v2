@@ -21,9 +21,9 @@ enum AppTheme {
     static let warm            = UIColor(red: 1.000, green: 0.690, blue: 0.125, alpha: 1.0)   // #FFB020
     static let accentWarm      = warm  // alias: nombre usado en LoginView/DavizinBridge/ARIFICardView existentes
 
-    static let accent          = UIColor(red: 0.0, green: 1.0, blue: 0.761, alpha: 1.0)       // #00FFC2
-    static let accentHot       = UIColor(red: 0.498, green: 1.0, blue: 0.878, alpha: 1.0)     // #7FFFE0
-    static let accentDim       = UIColor(red: 0.0, green: 1.0, blue: 0.761, alpha: 0.14)
+    static var accent: UIColor { NyxelAppearanceStore.accent }
+    static var accentHot: UIColor { NyxelAppearanceStore.accentHot }
+    static var accentDim: UIColor { NyxelAppearanceStore.accentDim }
 
     // Alias de compatibilidad con codigo existente (ARIFIButton, LoginView) que
     // referencia nombres de la paleta anterior. Apuntan a los tokens nuevos.

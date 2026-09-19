@@ -31,6 +31,7 @@ private func currentRankTier(for count: Int) -> RankTier { rankTiers.last { coun
 final class ProfileView: UIView {
     weak var delegate: ProfileViewDelegate?
     var onRefreshRequested: (() -> Void)?
+    var onAppearanceChanged: (() -> Void)?
 
     private let avatarCircle = UIView()
     private let avatarImageView = UIImageView()
@@ -46,6 +47,9 @@ final class ProfileView: UIView {
     private let activityLabel = UILabel()
     private let gamesLabel = UILabel()
     private let historyLabel = UILabel()
+    private let deviceLabel = UILabel()
+    private let rankProgressLabel = UILabel()
+    private let appearanceControl = UISegmentedControl(items: ["Cian", "Fuego", "Violeta"])
     private let refreshButton = UIButton(type: .system)
     private let logoutButton = ARIFIButton(title: "CERRAR SESIÓN", style: .destructive)
     private let progressTrack = CAShapeLayer()
@@ -78,6 +82,10 @@ final class ProfileView: UIView {
         accountStatusLabel.textColor = activeRemainingSeconds > 0 ? AppTheme.success : AppTheme.failure
         expirationValueLabel.text = formattedRemaining(activeRemainingSeconds)
         countValueLabel.text = "\(count)"
+        let next = rankTiers.first(where: { $0.minCount > count })?.minCount
+        rankProgressLabel.text = next.map { "Progreso de rango: \(count)/\($0)" } ?? "Progreso de rango: máximo alcanzado"
+        deviceLabel.text = "DISPOSITIVO\n\(KeyValidator.getDeviceModel()) • \(NyxelSupportPolicy.currentSystemDescription)"
+        appearanceControl.selectedSegmentIndex = NyxelAppearanceStore.theme.rawValue
         serviceStatusLabel.text = "●  \(NyxelRemoteConfigStore.status)"
         serviceStatusLabel.textColor = NyxelRemoteConfigStore.status == "Configuración válida" ? AppTheme.success : AppTheme.warm
         diagnosticsLabel.text = diagnosticText()
@@ -157,6 +165,13 @@ final class ProfileView: UIView {
         historyLabel.font = AppTheme.monoFont(10)
         historyLabel.textColor = AppTheme.tertiaryText
         historyLabel.numberOfLines = 0
+        deviceLabel.font = AppTheme.monoFont(10)
+        deviceLabel.textColor = AppTheme.secondaryText
+        deviceLabel.numberOfLines = 0
+        rankProgressLabel.font = AppTheme.monoFont(10)
+        rankProgressLabel.textColor = AppTheme.accentHot
+        appearanceControl.selectedSegmentIndex = NyxelAppearanceStore.theme.rawValue
+        appearanceControl.addTarget(self, action: #selector(appearanceChanged), for: .valueChanged)
 
         refreshButton.setTitle("↻  ACTUALIZAR DATOS", for: .normal)
         refreshButton.setTitleColor(AppTheme.accent, for: .normal)
@@ -168,7 +183,7 @@ final class ProfileView: UIView {
         refreshButton.heightAnchor.constraint(equalToConstant: 38).isActive = true
 
         let card = ARIFICardView()
-        let stack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, keyRow, statusRow, expirationRow, countRow, serviceStatusLabel, diagnosticsLabel, gamesLabel, historyLabel, refreshButton, activityLabel, logoutButton])
+        let stack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, keyRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel, serviceStatusLabel, diagnosticsLabel, gamesLabel, historyLabel, appearanceControl, refreshButton, activityLabel, logoutButton])
         stack.axis = .vertical; stack.spacing = 13
         stack.setCustomSpacing(22, after: heroStack)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -212,6 +227,12 @@ final class ProfileView: UIView {
     }
 
     @objc private func logoutTapped() { SoundService.shared.playClick(); delegate?.profileViewDidTapLogout(self) }
+
+    @objc private func appearanceChanged() {
+        let theme = NyxelAppearanceStore.Theme(rawValue: appearanceControl.selectedSegmentIndex) ?? .cyan
+        NyxelAppearanceStore.setTheme(theme)
+        onAppearanceChanged?()
+    }
 
     private func maskedKey(_ key: String?) -> String {
         guard let key, !key.isEmpty else { return "—" }

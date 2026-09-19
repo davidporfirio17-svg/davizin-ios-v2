@@ -22,6 +22,8 @@ final class ViewController: UIViewController {
     private var selectedMode: ARIFIMode = .drag
     private var activeKey: String?
     private var activeRemainingSeconds: Int = 0
+    private var backgroundedAt: Date?
+    private let inactivityLockInterval: TimeInterval = 10 * 60
 
     private var loginView: LoginView?
     private var gameSelectionView: GameSelectionView?
@@ -214,7 +216,21 @@ final class ViewController: UIViewController {
         modalPresentationStyle = .fullScreen
         modalPresentationCapturesStatusBarAppearance = true
         configureBaseUI()
+        NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
         showLogin(animated: false)
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    @objc private func appDidEnterBackground() { backgroundedAt = Date() }
+
+    @objc private func appWillEnterForeground() {
+        guard let backgroundedAt, Date().timeIntervalSince(backgroundedAt) >= inactivityLockInterval else { return }
+        activeKey = nil
+        activeRemainingSeconds = 0
+        NyxelActivityLog.record("Sesión bloqueada por inactividad")
+        showLogin(animated: true)
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -419,6 +435,9 @@ final class ViewController: UIViewController {
         let screen = ProfileView()
         screen.delegate = self
         screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds)
+        screen.onAppearanceChanged = { [weak self] in
+            self?.showProfile(animated: true)
+        }
         screen.onRefreshRequested = { [weak self, weak screen] in
             guard let self, let key = self.activeKey, !key.isEmpty else { return }
             KeyValidator.validate(key: key) { [weak self, weak screen] success, message, remaining, _ in
@@ -499,7 +518,7 @@ final class ViewController: UIViewController {
         }
 
         screen.alpha = 0.0
-        screen.transform = CGAffineTransform(translationX: 0.0, y: 10.0)
+        screen.transform = CGAffineTransform(translationX: 0.0, y: 10.0).scaledBy(x: 0.985, y: 0.985)
         UIView.animate(
             withDuration: 0.28,
             delay: 0.0,
