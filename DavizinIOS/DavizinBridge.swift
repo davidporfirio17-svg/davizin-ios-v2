@@ -16,6 +16,7 @@ final class DavizinBridge {
     /// Credenciales de la sesion actual. Se usan para descargar el cache_res del Worker.
     private var sessionKey: String = ""
     private var sessionHWID: String = ""
+    private var operationInFlight = false
 
     func connect(to viewController: ViewController) {
         self.vc = viewController
@@ -77,10 +78,6 @@ final class DavizinBridge {
                 self?.sessionKey = upperKey
                 self?.sessionHWID = KeyValidator.getDeviceHWID()
 
-                UserDefaults.standard.set(upperKey, forKey: "dz_key")
-                UserDefaults.standard.set(remaining, forKey: "dz_remaining")
-                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "dz_saved_at")
-
                 self?.startCountdown()
 
                 // Los modos ya se guardaron en ARIFIModeCatalog dentro de
@@ -113,6 +110,7 @@ final class DavizinBridge {
             } else {
                 DispatchQueue.main.async {
                     self.hapticFeedback(success: result.success)
+                    self.operationInFlight = false
                     self.vc?.setOperationState(result.success ? .succeeded(result.message) : .failed(result.message))
                 }
             }
@@ -120,7 +118,11 @@ final class DavizinBridge {
     }
 
     private func consumeOneTimeMode(mode: ARIFIMode, key: String, hwid: String, result: InjectorResult) {
-        guard let url = URL(string: "https://dz.davidporfirio17.workers.dev/consume-mode") else { return }
+        guard let url = URL(string: "https://dz.davidporfirio17.workers.dev/consume-mode") else {
+            operationInFlight = false
+            vc?.setOperationState(.failed("NYX-002 — No se pudo confirmar la operación con el Worker."))
+            return
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -131,17 +133,46 @@ final class DavizinBridge {
                 guard let self = self else { return }
                 self.hapticFeedback(success: ok)
                 if ok { ARIFIModeCatalog.markConsumed(mode.id) }
+                self.operationInFlight = false
                 self.vc?.setOperationState(ok ? .succeeded(result.message) : .failed("La inyección se realizó, pero no se pudo confirmar el consumo de Holograma. No vuelvas a intentarlo hasta revisar la conexión."))
             }
         }.resume()
     }
 
     private func handleOperation(_ operation: ARIFIOperationKind) {
+        guard !operationInFlight else {
+            vc?.setOperationState(.failed("NYX-006 — Ya hay una operación en curso."))
+            return
+        }
+        guard !sessionKey.isEmpty else {
+            vc?.setOperationState(.failed("NYX-001 — Sesión no autorizada."))
+            return
+        }
+
+        operationInFlight = true
+        vc?.setOperationState(.checking)
+        let key = sessionKey
+        KeyValidator.validate(key: key) { [weak self] success, message, remaining, _ in
+            guard let self else { return }
+            guard success && remaining > 0 else {
+                self.operationInFlight = false
+                NyxelActivityLog.record("Operación bloqueada: key no autorizada")
+                self.vc?.setOperationState(.failed("NYX-001 — La key ya no está autorizada por el Worker."))
+                return
+            }
+            self.remainingSeconds = remaining
+            self.vc?.setAccountSession(key: key, remainingSeconds: remaining)
+            self.executeAuthorizedOperation(operation)
+        }
+    }
+
+    private func executeAuthorizedOperation(_ operation: ARIFIOperationKind) {
         switch operation {
 
         case .runExploit:
             vc?.setOperationState(.running)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                self?.operationInFlight = false
                 self?.vc?.setOperationState(.succeeded("Sistema listo ✓"))
             }
 
@@ -168,6 +199,7 @@ final class DavizinBridge {
                 let result = InjectorService.uninject(game: game)
                 DispatchQueue.main.async {
                     self.hapticFeedback(success: result.success)
+                    self.operationInFlight = false
                     self.vc?.setOperationState(
                         result.success
                             ? .succeeded(result.message)
@@ -215,19 +247,6 @@ final class DavizinBridge {
         } else {                                // mas de 1 dia -> verde
             return AppTheme.success
         }
-    }
-
-    // MARK: - Restaurar sesion
-
-    static func restoreSession() -> (key: String, remaining: Int)? {
-        guard let key = UserDefaults.standard.string(forKey: "dz_key"),
-              !key.isEmpty else { return nil }
-        let saved = UserDefaults.standard.double(forKey: "dz_saved_at")
-        let total = UserDefaults.standard.integer(forKey: "dz_remaining")
-        guard saved > 0, total > 0 else { return nil }
-        let elapsed = Int(Date().timeIntervalSince1970 - saved)
-        let rem = max(0, total - elapsed)
-        return rem > 0 ? (key, rem) : nil
     }
 
     /// Vibracion segun resultado: exito (suave) o error (fuerte).
