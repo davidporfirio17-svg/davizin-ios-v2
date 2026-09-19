@@ -417,6 +417,19 @@ final class ViewController: UIViewController {
         let screen = ProfileView()
         screen.delegate = self
         screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds)
+        screen.onRefreshRequested = { [weak self, weak screen] in
+            guard let self, let key = self.activeKey, !key.isEmpty else { return }
+            KeyValidator.validate(key: key) { [weak self, weak screen] success, message, remaining, _ in
+                guard let self else { return }
+                if success && remaining > 0 {
+                    self.setAccountSession(key: key, remainingSeconds: remaining)
+                    screen?.setAccount(key: key, remainingSeconds: remaining)
+                    ARIFIToastCenter.shared.show(title: "Datos actualizados", subtitle: "La key y el Worker están sincronizados.", kind: .success)
+                } else {
+                    ARIFIToastCenter.shared.show(title: "No se pudo actualizar", subtitle: message, kind: .danger)
+                }
+            }
+        }
         screen.refresh()
         profileView = screen
         display(screen, animated: animated)
