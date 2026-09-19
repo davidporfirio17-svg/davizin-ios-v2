@@ -108,8 +108,8 @@ final class MissionMapView: UIView {
 		addSubview(scrollView)
 		scrollView.addSubview(canvas)
 
-		let canvasHeightConstraint = canvas.heightAnchor.constraint(equalToConstant: canvasHeight)
-		self.canvasHeightConstraint = canvasHeightConstraint
+		let heightConstraint = canvas.heightAnchor.constraint(equalToConstant: canvasHeight)
+		self.canvasHeightConstraint = heightConstraint
 
 		NSLayoutConstraint.activate([
             headerStack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
@@ -132,7 +132,7 @@ final class MissionMapView: UIView {
             canvas.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
             canvas.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
 			canvas.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
-			canvasHeightConstraint
+			heightConstraint
 		])
 		scrollView.isScrollEnabled = true
 		scrollView.delegate = self
