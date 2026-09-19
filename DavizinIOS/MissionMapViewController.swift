@@ -76,27 +76,30 @@ final class MissionMapView: UIView {
         subtitle.font = .systemFont(ofSize: 12, weight: .regular)
         subtitle.textColor = AppTheme.secondaryText
 
-        let headerStack = UIStackView(arrangedSubviews: [eyebrow, title, subtitle])
+        // El aviso de scroll vive AQUI, pegado al titulo, no solo flotando
+        // abajo — asi se ve desde el primer momento, antes de que alguien
+        // ya haya intentado deslizar y se confunda.
+        scrollHint.text = "▾ desliza hacia abajo para ver más modos"
+        scrollHint.font = .systemFont(ofSize: 10.5, weight: .semibold)
+        scrollHint.textColor = AppTheme.accent
+        scrollHint.textAlignment = .center
+        scrollHint.alpha = 0
+
+        let headerStack = UIStackView(arrangedSubviews: [eyebrow, title, subtitle, scrollHint])
         headerStack.axis = .vertical
         headerStack.spacing = 4
+        headerStack.setCustomSpacing(8, after: subtitle)
         headerStack.alignment = .center
         headerStack.translatesAutoresizingMaskIntoConstraints = false
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.showsVerticalScrollIndicator = false
+        scrollView.alwaysBounceVertical = true
         canvas.translatesAutoresizingMaskIntoConstraints = false
-
-        scrollHint.text = "▾ desliza hacia abajo para ver más modos"
-        scrollHint.font = .systemFont(ofSize: 10.5, weight: .semibold)
-        scrollHint.textColor = AppTheme.tertiaryText
-        scrollHint.textAlignment = .center
-        scrollHint.alpha = 0
-        scrollHint.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(headerStack)
         addSubview(scrollView)
         scrollView.addSubview(canvas)
-        addSubview(scrollHint)
 
         NSLayoutConstraint.activate([
             headerStack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
@@ -109,14 +112,17 @@ final class MissionMapView: UIView {
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            canvas.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            canvas.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            canvas.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            canvas.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-            canvas.heightAnchor.constraint(equalToConstant: canvasHeight),
-
-            scrollHint.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
-            scrollHint.centerXAnchor.constraint(equalTo: centerXAnchor)
+            // Patron oficial de Apple para contenido scrollable con Auto Layout:
+            // las 4 esquinas del contenido van al contentLayoutGuide (define el
+            // tamano REAL scrolleable), y el ancho va al frameLayoutGuide (el
+            // viewport visible) — asi no hay ambiguedad de constraints, a
+            // diferencia del intento anterior que pineaba directo a scrollView.
+            canvas.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            canvas.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            canvas.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            canvas.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            canvas.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+            canvas.heightAnchor.constraint(equalToConstant: canvasHeight)
         ])
         canvasHeightConstraint = canvas.constraints.first { $0.firstAttribute == .height }
         scrollView.delegate = self
