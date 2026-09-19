@@ -42,7 +42,7 @@ final class ProfileView: UIView {
     weak var delegate: ProfileViewDelegate?
 
     private let avatarCircle = UIView()
-    private let avatarLabel = UILabel()
+    private let avatarLabel = UIImageView()
     private let nameLabel = UILabel()
     private let rankBadge = UIView()
     private let rankLabel = UILabel()
@@ -82,12 +82,12 @@ final class ProfileView: UIView {
         avatarCircle.layer.shadowColor = AppTheme.accent.cgColor
         avatarCircle.layer.shadowOpacity = 0.3
         avatarCircle.layer.shadowRadius = 14
+        avatarCircle.clipsToBounds = true
         avatarCircle.translatesAutoresizingMaskIntoConstraints = false
 
-        avatarLabel.text = "N"
-        avatarLabel.font = .systemFont(ofSize: 22, weight: .black)
-        avatarLabel.textColor = AppTheme.primaryText
-        avatarLabel.textAlignment = .center
+        avatarLabel.image = UIImage(named: "NyxelAvatar")
+        avatarLabel.contentMode = .scaleAspectFill
+        avatarLabel.clipsToBounds = true
         avatarLabel.translatesAutoresizingMaskIntoConstraints = false
         avatarCircle.addSubview(avatarLabel)
 

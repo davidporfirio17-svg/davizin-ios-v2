@@ -43,7 +43,7 @@ final class ARIFIHeaderView: UIView {
     private let closeButton = UIButton(type: .system)
     private let statusDot = UIView()
 	private let avatarButton = UIButton(type: .system)
-	private let avatarLabel = UILabel()
+	private let avatarImageView = UIImageView()
 	private let systemLabel = UILabel()
 
     /// Oculta el avatar en pantallas donde no aplica (ej: login, sin sesion).
@@ -92,7 +92,8 @@ final class ARIFIHeaderView: UIView {
 
         avatarButton.translatesAutoresizingMaskIntoConstraints = false
         avatarButton.backgroundColor = AppTheme.background
-        avatarButton.layer.cornerRadius = 15.0
+		avatarButton.layer.cornerRadius = 15.0
+		avatarButton.clipsToBounds = true
         avatarButton.layer.borderWidth = 1.5
         avatarButton.layer.borderColor = AppTheme.hairlineStrong.cgColor
         avatarButton.addTarget(self, action: #selector(avatarTapped), for: .touchUpInside)
@@ -100,13 +101,12 @@ final class ARIFIHeaderView: UIView {
         avatarLongPress.minimumPressDuration = 0.45
         avatarButton.addGestureRecognizer(avatarLongPress)
 
-        avatarLabel.text = "N"
-        avatarLabel.font = .systemFont(ofSize: 11, weight: .black)
-        avatarLabel.textColor = AppTheme.primaryText
-        avatarLabel.textAlignment = .center
-        avatarLabel.isUserInteractionEnabled = false
-        avatarLabel.translatesAutoresizingMaskIntoConstraints = false
-        avatarButton.addSubview(avatarLabel)
+		avatarImageView.image = UIImage(named: "NyxelAvatar")
+		avatarImageView.contentMode = .scaleAspectFill
+		avatarImageView.clipsToBounds = true
+		avatarImageView.isUserInteractionEnabled = false
+		avatarImageView.translatesAutoresizingMaskIntoConstraints = false
+		avatarButton.addSubview(avatarImageView)
         addSubview(avatarButton)
 
 		countdownLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -151,8 +151,10 @@ final class ARIFIHeaderView: UIView {
             avatarButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             avatarButton.widthAnchor.constraint(equalToConstant: 30.0),
             avatarButton.heightAnchor.constraint(equalToConstant: 30.0),
-            avatarLabel.centerXAnchor.constraint(equalTo: avatarButton.centerXAnchor),
-            avatarLabel.centerYAnchor.constraint(equalTo: avatarButton.centerYAnchor),
+			avatarImageView.leadingAnchor.constraint(equalTo: avatarButton.leadingAnchor),
+			avatarImageView.trailingAnchor.constraint(equalTo: avatarButton.trailingAnchor),
+			avatarImageView.topAnchor.constraint(equalTo: avatarButton.topAnchor),
+			avatarImageView.bottomAnchor.constraint(equalTo: avatarButton.bottomAnchor),
             closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8.0),
             closeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             closeButton.widthAnchor.constraint(equalToConstant: 38.0),
