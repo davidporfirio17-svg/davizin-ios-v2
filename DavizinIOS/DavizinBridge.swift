@@ -1,4 +1,5 @@
 import UIKit
+import LocalAuthentication
 
 /// Conecta el UI de ARIFIxIOS con la logica real de Davizin
 final class DavizinBridge {
@@ -177,18 +178,14 @@ final class DavizinBridge {
             }
 
         case .inject:
-            let mode = selectedMode
-            let game = selectedGame
-            let key = sessionKey
-            let hwid = sessionHWID
-            if mode.oneTime && mode.id == "holograma" && !mode.consumed {
-                vc?.showNotice("⚠️ Holograma Pro — uso único\n\nUna vez inyectado correctamente, Holograma desaparecerá definitivamente de esta key. Si eliminas Free Fire o borras sus archivos, no será posible recuperarlo con esta misma key. Para volver a utilizarlo necesitarás una key Pro nueva. ¿Deseas continuar?") { [weak self] in
-                    self?.vc?.showNotice("🔴 Confirmación final\n\nEsta acción consumirá permanentemente Holograma de esta key y no se puede deshacer. ¿Confirmas la inyección?") { [weak self] in
-                        self?.performInjection(game: game, mode: mode, key: key, hwid: hwid)
-                    }
+            authenticateForInjection { [weak self] allowed in
+                guard let self else { return }
+                guard allowed else {
+                    self.operationInFlight = false
+                    self.vc?.setOperationState(.failed("NYX-008 — Autenticación cancelada."))
+                    return
                 }
-            } else {
-                performInjection(game: game, mode: mode, key: key, hwid: hwid)
+                self.startInjectionFlow()
             }
 
         case .clean:
@@ -208,6 +205,38 @@ final class DavizinBridge {
                 }
             }
         }
+    }
+
+    private func authenticateForInjection(completion: @escaping (Bool) -> Void) {
+        guard UserDefaults.standard.bool(forKey: "nyxel.biometric.enabled") else {
+            completion(true)
+            return
+        }
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            completion(false)
+            return
+        }
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Confirma para ejecutar Inject en Nyxel") { success, _ in
+            DispatchQueue.main.async { completion(success) }
+        }
+    }
+
+    private func startInjectionFlow() {
+            let mode = selectedMode
+            let game = selectedGame
+            let key = sessionKey
+            let hwid = sessionHWID
+            if mode.oneTime && mode.id == "holograma" && !mode.consumed {
+                vc?.showNotice("⚠️ Holograma Pro — uso único\n\nUna vez inyectado correctamente, Holograma desaparecerá definitivamente de esta key. Si eliminas Free Fire o borras sus archivos, no será posible recuperarlo con esta misma key. Para volver a utilizarlo necesitarás una key Pro nueva. ¿Deseas continuar?") { [weak self] in
+                    self?.vc?.showNotice("🔴 Confirmación final\n\nEsta acción consumirá permanentemente Holograma de esta key y no se puede deshacer. ¿Confirmas la inyección?") { [weak self] in
+                        self?.performInjection(game: game, mode: mode, key: key, hwid: hwid)
+                    }
+                }
+            } else {
+                performInjection(game: game, mode: mode, key: key, hwid: hwid)
+            }
     }
 
     // MARK: - Countdown
