@@ -7,7 +7,7 @@ import Darwin
 enum NyxelSupportPolicy {
     static let verifiedIOS17Range = "17.0–17.7.x"
     static let verifiedIOS18Range = "18.0–18.7.1"
-    static let verifiedIOS26Range = "26.0–26.6.1"
+    static let verifiedIOS26Range = "26.0–26.6.2"
 
     static let verifiedIOS27Builds: [(beta: Int, publicBeta: Int?, build: String)] = [
         (1, nil, "24A5355q"),
@@ -64,7 +64,7 @@ enum NyxelSupportPolicy {
 
         if major == 26 {
             guard minor >= 0, patch >= 0 else { return false }
-            return minor < 6 || (minor == 6 && patch <= 1)
+            return minor < 6 || (minor == 6 && patch <= 2)
         }
 
         guard major == 27, minor == 0, patch == 0 else { return false }
