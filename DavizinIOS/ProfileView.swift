@@ -53,6 +53,7 @@ final class ProfileView: UIView {
     private let biometricSwitch = UISwitch()
     private let refreshButton = UIButton(type: .system)
     private let logoutButton = ARIFIButton(title: "CERRAR SESIÓN", style: .destructive)
+    private let scrollView = UIScrollView()
     private let progressTrack = CAShapeLayer()
     private let progressRing = CAShapeLayer()
     private var activeKey: String?
@@ -197,7 +198,12 @@ final class ProfileView: UIView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         card.translatesAutoresizingMaskIntoConstraints = false
         card.addContent(stack)
-        addSubview(card)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.alwaysBounceVertical = true
+        scrollView.showsVerticalScrollIndicator = true
+        scrollView.indicatorStyle = .white
+        addSubview(scrollView)
+        scrollView.addSubview(card)
 
         refreshButton.addTarget(self, action: #selector(refreshTapped), for: .touchUpInside)
         logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
@@ -208,8 +214,11 @@ final class ProfileView: UIView {
             avatarImageView.topAnchor.constraint(equalTo: avatarCircle.topAnchor), avatarImageView.bottomAnchor.constraint(equalTo: avatarCircle.bottomAnchor),
             rankBadge.heightAnchor.constraint(equalToConstant: 22), rankLabel.leadingAnchor.constraint(equalTo: rankBadge.leadingAnchor, constant: 10),
             rankLabel.trailingAnchor.constraint(equalTo: rankBadge.trailingAnchor, constant: -10), rankLabel.centerYAnchor.constraint(equalTo: rankBadge.centerYAnchor),
-            card.centerXAnchor.constraint(equalTo: centerXAnchor), card.centerYAnchor.constraint(equalTo: centerYAnchor),
-            card.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 22), card.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -22),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor), scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: topAnchor), scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            card.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor), card.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 22),
+            card.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -22),
+            card.leadingAnchor.constraint(greaterThanOrEqualTo: scrollView.leadingAnchor, constant: 22), card.trailingAnchor.constraint(lessThanOrEqualTo: scrollView.trailingAnchor, constant: -22),
             card.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 680 : AppTheme.contentMaximumWidth), stack.widthAnchor.constraint(greaterThanOrEqualToConstant: 240),
             logoutButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
         ])

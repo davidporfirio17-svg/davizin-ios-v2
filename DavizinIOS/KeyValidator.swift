@@ -82,13 +82,17 @@ class KeyValidator {
         let model = getDeviceModel()
         let ios = getIOSVersion()
         let upperKey = key.uppercased()
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+        let appBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
 
         let body: [String: Any] = [
             "key": upperKey,
             "username": upperKey,
             "hwid": hwid,
             "model": model,
-            "ios": ios
+            "ios": ios,
+            "app_version": appVersion,
+            "app_build": appBuild
         ]
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)

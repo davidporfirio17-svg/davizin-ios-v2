@@ -1,4 +1,39 @@
 import UIKit
+import Security
+
+private enum NyxelKeychain {
+    private static let service = "com.nyxel.session"
+    private static let account = "login-key"
+
+    static var key: String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func save(_ value: String) {
+        let data = Data(value.uppercased().utf8)
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
+        let attributes: [String: Any] = [kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) != errSecSuccess {
+            var item = query; attributes.forEach { item[$0.key] = $0.value }
+            SecItemAdd(item as CFDictionary, nil)
+        }
+    }
+
+    static func remove() {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
+        SecItemDelete(query as CFDictionary)
+    }
+}
 
 protocol LoginViewDelegate: AnyObject {
     func loginView(_ loginView: LoginView, didTapContinueWithKey key: String)
@@ -84,7 +119,7 @@ final class LoginView: UIView {
         keyField.clearButtonMode = .whileEditing
         keyField.delegate = self
         keyField.addTarget(self, action: #selector(keyFieldChanged), for: .editingChanged)
-		keyField.text = ""
+		keyField.text = NyxelKeychain.key
         keyField.setLeftPadding(14.0)
         keyField.setRightPadding(14.0)
         keyField.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight).isActive = true
@@ -130,7 +165,9 @@ final class LoginView: UIView {
     }
 
 	@objc private func keyFieldChanged() {
-		keyField.text = (keyField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+		let value = (keyField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+		keyField.text = value
+		if value.isEmpty { NyxelKeychain.remove() } else { NyxelKeychain.save(value) }
     }
 
     @objc private func continueTapped() {
