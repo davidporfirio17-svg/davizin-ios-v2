@@ -21,6 +21,7 @@ final class MissionMapView: UIView {
     private var connectionsDrawn = false
     private var canvasHeightConstraint: NSLayoutConstraint?
     private let scrollHint = UILabel()
+    private let modeStatusLabel = UILabel()
 
     /// Genera posiciones en zigzag para cualquier cantidad de modos (ya no
     /// esta fijo a 3 — antes, si el Worker mandaba mas modos, se dibujaban
@@ -53,9 +54,10 @@ final class MissionMapView: UIView {
         nodeViews.removeAll()
         canvas.layer.sublayers?.removeAll()
         connectionsDrawn = false
-		canvasHeight = max(500, 150 + CGFloat(modes.count) * 108)
-		canvasHeightConstraint?.constant = canvasHeight
-		scrollView.setContentOffset(.zero, animated: false)
+        canvasHeight = max(500, 150 + CGFloat(modes.count) * 108)
+        canvasHeightConstraint?.constant = canvasHeight
+        scrollView.setContentOffset(.zero, animated: false)
+        modeStatusLabel.text = modes.isEmpty ? "No hay modos disponibles" : "\(modes.count) modos disponibles"
         buildNodes(selected: selected)
         setNeedsLayout()
     }
@@ -88,7 +90,12 @@ final class MissionMapView: UIView {
         scrollHint.textAlignment = .center
         scrollHint.alpha = 0
 
-        let headerStack = UIStackView(arrangedSubviews: [eyebrow, title, subtitle, scrollHint])
+        modeStatusLabel.font = .systemFont(ofSize: 11, weight: .semibold)
+        modeStatusLabel.textColor = AppTheme.secondaryText
+        modeStatusLabel.textAlignment = .center
+        modeStatusLabel.text = "Sincronizando modos..."
+
+        let headerStack = UIStackView(arrangedSubviews: [eyebrow, title, subtitle, modeStatusLabel, scrollHint])
         headerStack.axis = .vertical
         headerStack.spacing = 4
         headerStack.setCustomSpacing(8, after: subtitle)
@@ -241,6 +248,7 @@ final class MissionMapView: UIView {
         nodeViews.forEach { $0.setSelected(false) }
         nodeViews[index].setSelected(true)
         let mode = modes[index]
+        modeStatusLabel.text = "Modo \(index + 1) de \(modes.count) • \(mode.displayName)"
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self = self else { return }
             self.delegate?.missionMapView(self, didSelect: mode)

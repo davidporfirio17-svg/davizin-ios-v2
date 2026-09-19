@@ -111,6 +111,26 @@ final class OperationView: UIView {
         openGameButton.isEnabled = enabled
     }
 
+    func setOpeningGame(_ opening: Bool) {
+        openGameButton.setLoading(opening, title: "ABRIENDO JUEGO...")
+        openGameButton.isEnabled = !opening
+        if opening {
+            statusLabel.text = "Intentando abrir \(selectedGame.rawValue)..."
+            statusLabel.textColor = AppTheme.accent
+            statusLabel.isHidden = false
+        }
+    }
+
+    func showGameOpenResult(success: Bool) {
+        openGameButton.setLoading(false)
+        openGameButton.isEnabled = true
+        statusLabel.text = success
+            ? "Juego abierto correctamente ✓"
+            : "NYX-004 — No se pudo abrir el juego"
+        statusLabel.textColor = success ? AppTheme.success : AppTheme.failure
+        statusLabel.isHidden = false
+    }
+
     private func configure() {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false

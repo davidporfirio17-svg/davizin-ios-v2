@@ -396,6 +396,7 @@ final class ViewController: UIViewController {
 
 	/// Abre Free Fire (MAX o normal) usando su esquema de URL.
 	private func openGame(_ game: ARIFIGame) {
+		operationView?.setOpeningGame(true)
 		let urls: [URL]
 		switch game {
 		case .freeFireMax:
@@ -405,6 +406,7 @@ final class ViewController: UIViewController {
 		}
 
 		func showOpenError() {
+			self.operationView?.showGameOpenResult(success: false)
 			let alert = UIAlertController(
 				title: "No se pudo abrir el juego",
 				message: "No se encontró el esquema de \(game.rawValue). Verifica que el juego esté instalado y prueba de nuevo.",
@@ -420,10 +422,15 @@ final class ViewController: UIViewController {
 				return
 			}
 
-			UIApplication.shared.open(urls[index], options: [:]) { success in
-				guard !success else { return }
-				DispatchQueue.main.async {
-					attemptOpen(at: index + 1)
+				UIApplication.shared.open(urls[index], options: [:]) { success in
+					if success {
+						DispatchQueue.main.async {
+							self.operationView?.showGameOpenResult(success: true)
+						}
+						return
+					}
+					DispatchQueue.main.async {
+						attemptOpen(at: index + 1)
 				}
 			}
 		}
