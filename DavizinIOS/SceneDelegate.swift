@@ -17,7 +17,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let splash = SplashViewController()
         splash.modalPresentationStyle = .fullScreen
         splash.onFinished = { [weak self] in
-            self?.afterSplash(in: window)
+            self?.showMainApp(in: window)
         }
 
         window.rootViewController = splash
@@ -25,26 +25,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.makeKeyAndVisible()
     }
 
-    /// 2. Consulta si hay un aviso activo publicado. Si lo hay, se muestra antes
-    ///    del login. Si no, entra directo — sin pantalla vacia, sin parpadeo.
-    private func afterSplash(in window: UIWindow) {
-        NoticeService.fetchActiveNotice { [weak self] notice in
-            DispatchQueue.main.async {
-                if let notice = notice {
-                    let noticeVC = NoticeViewController(notice: notice)
-                    noticeVC.modalPresentationStyle = .fullScreen
-                    noticeVC.onContinue = { [weak self] in
-                        self?.showMainApp(in: window)
-                    }
-                    window.rootViewController = noticeVC
-                } else {
-                    self?.showMainApp(in: window)
-                }
-            }
-        }
-    }
-
-    /// 3. Flujo principal real: login -> entorno -> mapa de mision -> operacion.
+    /// 2. Flujo principal real: login -> entorno -> mapa de mision -> operacion.
+    /// El aviso real (si el Worker tiene uno publicado en /anuncio) SI se
+    /// muestra, pero justo despues de validar la key — eso ya lo hace
+    /// DavizinBridge, porque el /check del Worker exige key+hwid: no existe
+    /// forma de consultar un aviso antes de que la persona escriba su key.
     private func showMainApp(in window: UIWindow) {
         let rootViewController = ViewController()
         rootViewController.modalPresentationStyle = .fullScreen

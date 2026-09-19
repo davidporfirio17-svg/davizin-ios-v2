@@ -42,7 +42,7 @@ struct ARIFIMode: Hashable, Codable, Identifiable {
         self.id = id; self.label = label; self.enabled = enabled; self.noticeTitle = noticeTitle; self.noticeBody = noticeBody; self.noticeLevel = noticeLevel; self.noticeEnabled = noticeEnabled; self.accessTier = accessTier; self.pathMax = pathMax; self.pathNormal = pathNormal; self.oneTime = oneTime; self.consumed = consumed; self.enabledFreeFire = enabledFreeFire; self.enabledFreeFireMax = enabledFreeFireMax
     }
 
-    private enum CodingKeys: String, CodingKey { case id, label, enabled, noticeTitle, noticeBody, noticeLevel, noticeEnabled, accessTier, pathMax, pathNormal, oneTime, consumed, enabledFreeFire, enabledFreeFireMax }
+    private enum CodingKeys: String, CodingKey { case id, label, enabled, noticeTitle, noticeBody, noticeLevel, noticeEnabled, accessTier, pathMax, pathNormal, oneTime, consumed, enabledFreeFire = "enabledNormal", enabledFreeFireMax = "enabledMax" }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)

@@ -20,6 +20,7 @@ final class MissionMapView: UIView {
     private var canvasHeight: CGFloat = 460
     private var connectionsDrawn = false
     private var canvasHeightConstraint: NSLayoutConstraint?
+    private let scrollHint = UILabel()
 
     /// Genera posiciones en zigzag para cualquier cantidad de modos (ya no
     /// esta fijo a 3 — antes, si el Worker mandaba mas modos, se dibujaban
@@ -28,8 +29,8 @@ final class MissionMapView: UIView {
         guard count > 0 else { return [] }
         var points: [CGPoint] = []
         for i in 0..<count {
-            let side: CGFloat = i % 2 == 0 ? 0.30 : 0.62
-            let y = 0.08 + (CGFloat(i) * 0.30)
+            let side: CGFloat = i % 2 == 0 ? 0.28 : 0.60
+            let y = 0.08 + (CGFloat(i) * 0.22)
             points.append(CGPoint(x: side, y: y))
         }
         return points
@@ -50,7 +51,7 @@ final class MissionMapView: UIView {
         nodeViews.removeAll()
         canvas.layer.sublayers?.removeAll()
         connectionsDrawn = false
-        canvasHeight = max(460, 140 + CGFloat(modes.count) * 130)
+        canvasHeight = max(400, 130 + CGFloat(modes.count) * 100)
         canvasHeightConstraint?.constant = canvasHeight
         buildNodes(selected: selected)
         setNeedsLayout()
@@ -85,9 +86,17 @@ final class MissionMapView: UIView {
         scrollView.showsVerticalScrollIndicator = false
         canvas.translatesAutoresizingMaskIntoConstraints = false
 
+        scrollHint.text = "▾ desliza hacia abajo para ver más modos"
+        scrollHint.font = .systemFont(ofSize: 10.5, weight: .semibold)
+        scrollHint.textColor = AppTheme.tertiaryText
+        scrollHint.textAlignment = .center
+        scrollHint.alpha = 0
+        scrollHint.translatesAutoresizingMaskIntoConstraints = false
+
         addSubview(headerStack)
         addSubview(scrollView)
         scrollView.addSubview(canvas)
+        addSubview(scrollHint)
 
         NSLayoutConstraint.activate([
             headerStack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
@@ -103,11 +112,24 @@ final class MissionMapView: UIView {
             canvas.topAnchor.constraint(equalTo: scrollView.topAnchor),
             canvas.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             canvas.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            canvas.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             canvas.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-            canvas.heightAnchor.constraint(equalToConstant: canvasHeight)
+            canvas.heightAnchor.constraint(equalToConstant: canvasHeight),
+
+            scrollHint.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+            scrollHint.centerXAnchor.constraint(equalTo: centerXAnchor)
         ])
         canvasHeightConstraint = canvas.constraints.first { $0.firstAttribute == .height }
+        scrollView.delegate = self
+    }
+
+    /// Muestra "desliza para ver mas" solo si de verdad hay contenido oculto
+    /// abajo, y lo desvanece en cuanto el usuario ya hizo scroll.
+    private func updateScrollHint() {
+        let hasMoreBelow = scrollView.contentSize.height > scrollView.bounds.height + 4
+        let alreadyScrolled = scrollView.contentOffset.y > 12
+        UIView.animate(withDuration: 0.2) {
+            self.scrollHint.alpha = (hasMoreBelow && !alreadyScrolled) ? 1 : 0
+        }
     }
 
     private func buildNodes(selected: ARIFIMode?) {
@@ -129,13 +151,14 @@ final class MissionMapView: UIView {
         let positions = generatePositions(count: nodeViews.count)
         for (index, node) in nodeViews.enumerated() {
             let pos = positions[index]
-            let size: CGFloat = 92
+            let size: CGFloat = 74
             node.frame = CGRect(x: pos.x * w - size / 2, y: pos.y * canvasHeight, width: size, height: size)
         }
         if !connectionsDrawn && nodeViews.allSatisfy({ $0.frame != .zero }) {
             connectionsDrawn = true
             drawConnections()
         }
+        updateScrollHint()
     }
 
     private func drawConnections() {
@@ -227,7 +250,7 @@ final class MissionNodeView: UIView {
         self.mode = mode
         super.init(frame: .zero)
         backgroundColor = AppTheme.card
-        layer.cornerRadius = 46
+        layer.cornerRadius = 37
         layer.borderWidth = 2.5
         layer.borderColor = AppTheme.hairlineStrong.cgColor
         isUserInteractionEnabled = true
@@ -306,5 +329,11 @@ private extension ARIFIMode {
         case "body100": return "●"
         default: return "▸"
         }
+    }
+}
+
+extension MissionMapView: UIScrollViewDelegate {
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateScrollHint()
     }
 }
