@@ -72,9 +72,6 @@ private func disguisedBackupPath(for relPath: String) -> String {
 // Base del Worker que sirve los cache_res desde KV.
 private let kCacheBaseURL = "https://dz.davidporfirio17.workers.dev"
 
-// Debe coincidir EXACTO con SIGN_SECRET del Worker (variable de entorno en Cloudflare).
-private let kSignSecret = "78ae85be57c27ab1525e0af061fa4ce012e2f2b1484209bf64dc8834be7e0fc4"
-
 class InjectorService {
 
     /// Bundle ID del contenedor segun el juego.
@@ -91,9 +88,10 @@ class InjectorService {
         return game == .freeFire ? mode.id + "_ff" : mode.id
     }
 
-    /// Deriva la clave AES-256 igual que el Worker: SHA-256 de "dzcache:" + secreto.
-    private static func cacheKey() -> SymmetricKey {
-        let material = Data(("dzcache:" + kSignSecret).utf8)
+    /// Deriva una clave AES-256 temporal desde la sesión efímera del Worker.
+    /// No existe una clave de recursos permanente dentro de la IPA.
+    private static func cacheKey(session: String) -> SymmetricKey {
+        let material = Data(("dzcache:session:" + session).utf8)
         let digest = SHA256.hash(data: material)
         return SymmetricKey(data: Data(digest))
     }
@@ -107,7 +105,7 @@ class InjectorService {
 
     /// Descifra un blob AES-GCM con formato [12 bytes IV][ciphertext+tag].
     /// Devuelve nil si el blob no es válido o la clave no corresponde.
-    private static func decrypt(_ blob: Data) -> Data? {
+    private static func decrypt(_ blob: Data, session: String) -> Data? {
         guard blob.count > 12 + 16 else { return nil }
         // Normalizar a un Data con indices desde 0 (una respuesta de red puede no estarlo,
         // y CryptoKit falla silenciosamente si los indices no arrancan en 0).
@@ -121,7 +119,7 @@ class InjectorService {
             let sealed = try AES.GCM.SealedBox(nonce: nonce,
                                                ciphertext: Data(cipherData),
                                                tag: Data(tagData))
-            let plain = try AES.GCM.open(sealed, using: cacheKey())
+            let plain = try AES.GCM.open(sealed, using: cacheKey(session: session))
             return plain
         } catch {
             return nil
@@ -157,6 +155,7 @@ class InjectorService {
     /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
     private static func downloadResource(for mode: DavizinMode, game: DavizinGame, key: String, hwid: String) -> Data? {
         guard !key.isEmpty else { return nil }
+        guard let session = KeyValidator.currentSessionToken, !session.isEmpty else { return nil }
         guard let url = URL(string: "\(kCacheBaseURL)/avatar/\(remoteSlot(for: mode, game: game))") else { return nil }
 
         var request = URLRequest(url: url)
@@ -183,7 +182,7 @@ class InjectorService {
             // 3) Si nada da un UnityFS valido, devolver nil (NO escribir basura).
             if isUnityFS(data) {
                 result = data
-            } else if let plain = decrypt(data), isUnityFS(plain) {
+            } else if let plain = decrypt(data, session: session), isUnityFS(plain) {
                 result = plain
             } else {
                 result = nil

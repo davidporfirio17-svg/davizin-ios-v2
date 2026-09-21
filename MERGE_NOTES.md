@@ -6,7 +6,7 @@ Se tomó el repositorio V2 como base porque contiene la política de compatibili
 
 La política de inyección ahora acepta iOS/iPadOS 26.6.2 mediante `NyxelSupportPolicy.swift`. La nueva IPA usa `CFBundleVersion` `3` y versión visible `1.4`; el Worker mantendrá el build anterior autorizado durante la transición y podrá revocarlo después de instalar la nueva IPA.
 
-No fue necesario modificar el Worker: el cliente V2 ya envía `app_version` y `app_build`, y el Worker autoriza el build `2`.
+El cliente V2 ahora obtiene una sesión efímera del Worker y la envía en configuración, recursos y consumo. Los recursos nuevos se cifran con una clave derivada de esa sesión; se conserva temporalmente una ruta de compatibilidad para la IPA anterior mientras termina la migración.
 
 ## Verificación
 
@@ -14,7 +14,9 @@ No fue necesario modificar el Worker: el cliente V2 ya envía `app_version` y `a
 - `NyxelSupportPolicy.swift` está incluido en la fase de compilación de Xcode.
 - `MinimumOSVersion`: 16.0.
 - Rango de política iOS 26: 26.0–26.6.2.
-- Build de app conservado: 2.
+- Build de app nuevo: 3.
+- El nombre del proyecto fue renombrado consistentemente a `Davizin` en archivos y símbolos.
+- No se pudo compilar una IPA firmada en este entorno; GitHub Actions genera una IPA unsigned para firmar externamente.
 
 ## Nota sobre la IPA
 

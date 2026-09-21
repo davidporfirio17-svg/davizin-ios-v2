@@ -1,6 +1,5 @@
 import Foundation
 import UIKit
-import CryptoKit
 
 struct KeyResponse: Codable {
     let success: Bool
@@ -28,9 +27,6 @@ class KeyValidator {
     /// No se persiste en UserDefaults: debe desaparecer al cerrar la app.
     private(set) static var currentSessionToken: String?
 
-    // Debe coincidir EXACTO con el secreto del Worker.
-    private static let signSecret = "78ae85be57c27ab1525e0af061fa4ce012e2f2b1484209bf64dc8834be7e0fc4"
-
     static func getDeviceHWID() -> String {
         if let hwid = UIDevice.current.identifierForVendor?.uuidString {
             return hwid
@@ -47,24 +43,6 @@ class KeyValidator {
 
     static func getIOSVersion() -> String {
         return UIDevice.current.systemVersion
-    }
-
-    /// Recalcula HMAC-SHA256 hex igual que el Worker: HMAC(secreto, mensaje).
-    private static func hmacHex(_ message: String) -> String {
-        let key = SymmetricKey(data: Data(signSecret.utf8))
-        let mac = HMAC<SHA256>.authenticationCode(for: Data(message.utf8), using: key)
-        return mac.map { String(format: "%02x", $0) }.joined()
-    }
-
-    /// Verifica que la firma de la respuesta sea legitima (viene de nuestro Worker).
-    /// El Worker firma: key + "|" + remaining + "|" + expire
-    private static func verifySignature(key: String, remaining: Int, expire: Int64, signature: String?) -> Bool {
-        guard let signature = signature, !signature.isEmpty else { return false }
-        let message = "\(key)|\(remaining)|\(expire)"
-        let expected = hmacHex(message)
-        // Comparacion en tiempo constante
-        guard expected.count == signature.count else { return false }
-        return expected == signature
     }
 
     static func validate(key: String, completion: @escaping (Bool, String, Int, String?) -> Void) {
@@ -120,16 +98,9 @@ class KeyValidator {
                     let resp = try JSONDecoder().decode(KeyResponse.self, from: data)
                     let rem = resp.data?.remaining_seconds ?? resp.remaining_seconds ?? 0
 
-                    // Si el login es exitoso, EXIGIMOS firma valida.
-                    // Esto bloquea servidores falsos que respondan success:true sin poder firmar.
+                    // Si el login es exitoso, EXIGIMOS una sesión efímera emitida por el Worker.
                     if resp.success {
-                        let expire = resp.data?.expire ?? 0
-                        let ok = verifySignature(key: upperKey, remaining: rem, expire: expire, signature: resp.signature)
-                        if !ok {
-                            completion(false, "Respuesta no válida. Servidor no autorizado.", 0, nil)
-                            return
-                        }
-						if let modes = resp.data?.modes {
+							if let modes = resp.data?.modes {
 							guard modes.count <= 64 else {
 								NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Demasiados modos")
 								completion(false, "Configuración inválida. Inténtalo más tarde.", 0, nil)
