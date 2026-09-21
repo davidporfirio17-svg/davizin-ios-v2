@@ -1,12 +1,12 @@
 import UIKit
 
-// MARK: - ARIFIToast — puerto nativo de Sonner (sonner-main/src/index.tsx + styles.css)
+// MARK: - DavizinToast — puerto nativo de Sonner (sonner-main/src/index.tsx + styles.css)
 // Constantes copiadas literal del código fuente de Sonner, no inventadas:
 //   VISIBLE_TOASTS_AMOUNT = 3, TOAST_LIFETIME = 4000, GAP = 14,
 //   SWIPE_THRESHOLD = 45, TIME_BEFORE_UNMOUNT = 200
 // Animación de entrada: scale(0.8)->scale(1), 300ms ease (@keyframes sonner-fade-in)
 
-enum ARIFIToastKind {
+enum DavizinToastKind {
     case success, warning, danger
 
     var color: UIColor {
@@ -18,8 +18,8 @@ enum ARIFIToastKind {
     }
 }
 
-final class ARIFIToastCenter {
-    static let shared = ARIFIToastCenter()
+final class DavizinToastCenter {
+    static let shared = DavizinToastCenter()
     private init() {}
 
     // Constantes literales de Sonner
@@ -30,9 +30,9 @@ final class ARIFIToastCenter {
     private let timeBeforeUnmount: TimeInterval = 0.2
 
     private var window: UIWindow?
-    private var activeToasts: [ARIFIToastView] = []
+    private var activeToasts: [DavizinToastView] = []
 
-    func show(title: String, subtitle: String? = nil, kind: ARIFIToastKind = .success) {
+    func show(title: String, subtitle: String? = nil, kind: DavizinToastKind = .success) {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
 
         if window == nil {
@@ -48,7 +48,7 @@ final class ARIFIToastCenter {
         }
         guard let container = window?.rootViewController?.view else { return }
 
-        let toast = ARIFIToastView(title: title, subtitle: subtitle, kind: kind)
+        let toast = DavizinToastView(title: title, subtitle: subtitle, kind: kind)
         toast.onDismiss = { [weak self] in self?.remove(toast) }
         toast.swipeThreshold = swipeThreshold
         container.addSubview(toast)
@@ -83,7 +83,7 @@ final class ARIFIToastCenter {
         toast.scheduleAutoDismiss(after: toastLifetime)
     }
 
-    private func remove(_ toast: ARIFIToastView) {
+    private func remove(_ toast: DavizinToastView) {
         guard let idx = activeToasts.firstIndex(where: { $0 === toast }) else { return }
         activeToasts.remove(at: idx)
 
@@ -114,7 +114,7 @@ final class ARIFIToastCenter {
     }
 }
 
-final class ARIFIToastView: UIView {
+final class DavizinToastView: UIView {
     var onDismiss: (() -> Void)?
     var swipeThreshold: CGFloat = 45.0
     var bottomConstraintConstant: CGFloat = -20 {
@@ -130,7 +130,7 @@ final class ARIFIToastView: UIView {
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
 
-    init(title: String, subtitle: String?, kind: ARIFIToastKind) {
+    init(title: String, subtitle: String?, kind: DavizinToastKind) {
         super.init(frame: .zero)
         backgroundColor = UIColor(red: 0.11, green: 0.11, blue: 0.13, alpha: 1.0)
         layer.cornerRadius = 12

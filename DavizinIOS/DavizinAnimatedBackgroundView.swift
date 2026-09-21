@@ -1,6 +1,6 @@
 import UIKit
 
-final class ARIFIAnimatedBackgroundView: UIView {
+final class DavizinAnimatedBackgroundView: UIView {
 
     // ── Nodo flotante ─────────────────────────────────────────────
     private struct Node {

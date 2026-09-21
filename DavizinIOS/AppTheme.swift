@@ -19,13 +19,13 @@ enum AppTheme {
     static let success         = UIColor(red: 0.498, green: 0.839, blue: 0.541, alpha: 1.0)   // #7FD68A
     static let failure         = UIColor(red: 1.000, green: 0.361, blue: 0.361, alpha: 1.0)   // #FF5C5C
     static let warm            = UIColor(red: 1.000, green: 0.690, blue: 0.125, alpha: 1.0)   // #FFB020
-    static let accentWarm      = warm  // alias: nombre usado en LoginView/DavizinBridge/ARIFICardView existentes
+    static let accentWarm      = warm  // alias: nombre usado en LoginView/DavizinBridge/DavizinCardView existentes
 
     static var accent: UIColor { NyxelAppearanceStore.accent }
     static var accentHot: UIColor { NyxelAppearanceStore.accentHot }
     static var accentDim: UIColor { NyxelAppearanceStore.accentDim }
 
-    // Alias de compatibilidad con codigo existente (ARIFIButton, LoginView) que
+    // Alias de compatibilidad con codigo existente (DavizinButton, LoginView) que
     // referencia nombres de la paleta anterior. Apuntan a los tokens nuevos.
     static let control         = card
     static let separator       = hairline
@@ -65,7 +65,7 @@ enum AppTheme {
 }
 
 extension UIView {
-    func arifiPinEdges(to view: UIView, insets: UIEdgeInsets = .zero) {
+    func davizinPinEdges(to view: UIView, insets: UIEdgeInsets = .zero) {
         translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: insets.left),

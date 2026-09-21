@@ -1,21 +1,21 @@
 import UIKit
 
 protocol GameSelectionViewDelegate: AnyObject {
-    func gameSelectionView(_ view: GameSelectionView, didSelect game: ARIFIGame)
+    func gameSelectionView(_ view: GameSelectionView, didSelect game: DavizinGame)
 }
 
 final class GameSelectionView: UIView {
     weak var delegate: GameSelectionViewDelegate?
 
-    private let cardView = ARIFICardView()
+    private let cardView = DavizinCardView()
     private let categoryLabel = UILabel()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
-    private let freeFireButton = ARIFIButton(title: "FREE FIRE", style: .secondary)
-    private let freeFireMaxButton = ARIFIButton(title: "FREE FIRE MAX", style: .secondary)
+    private let freeFireButton = DavizinButton(title: "FREE FIRE", style: .secondary)
+    private let freeFireMaxButton = DavizinButton(title: "FREE FIRE MAX", style: .secondary)
     private let stackView = UIStackView()
 
-    private(set) var selectedGame: ARIFIGame?
+    private(set) var selectedGame: DavizinGame?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -27,7 +27,7 @@ final class GameSelectionView: UIView {
         configure()
     }
 
-    func setSelectedGame(_ game: ARIFIGame?) {
+    func setSelectedGame(_ game: DavizinGame?) {
         selectedGame = game
         freeFireButton.selectedVisual = game == .freeFire
         freeFireMaxButton.selectedVisual = game == .freeFireMax

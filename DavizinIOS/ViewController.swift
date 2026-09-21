@@ -6,20 +6,20 @@ final class ViewController: UIViewController {
 
     /// Callbacks vacíos por defecto para conectar la lógica real desde fuera del UI.
     var onLoginContinue: ((String) -> Void)?
-    var onGameSelected: ((ARIFIGame) -> Void)?
-    var onModeSelected: ((ARIFIMode) -> Void)?
-    var onOperation: ((ARIFIOperationKind) -> Void)?
+    var onGameSelected: ((DavizinGame) -> Void)?
+    var onModeSelected: ((DavizinMode) -> Void)?
+    var onOperation: ((DavizinOperationKind) -> Void)?
     var onClose: (() -> Void)?
 
-    private let animatedBackgroundView = ARIFIAnimatedBackgroundView()
-    private let headerView = ARIFIHeaderView()
+    private let animatedBackgroundView = DavizinAnimatedBackgroundView()
+    private let headerView = DavizinHeaderView()
     private let contentContainerView = UIView()
-    private let bottomNavView = ARIFIBottomNavView()
+    private let bottomNavView = DavizinBottomNavView()
     private var bottomNavHeightConstraint: NSLayoutConstraint?
 
-    private var currentStage: ARIFIScreenStage = .login
-    private var selectedGame: ARIFIGame = .freeFireMax
-    private var selectedMode: ARIFIMode = .drag
+    private var currentStage: DavizinScreenStage = .login
+    private var selectedGame: DavizinGame = .freeFireMax
+    private var selectedMode: DavizinMode = .drag
     private var activeKey: String?
     private var activeRemainingSeconds: Int = 0
     private var backgroundedAt: Date?
@@ -29,7 +29,7 @@ final class ViewController: UIViewController {
     private var gameSelectionView: GameSelectionView?
     private var missionMapView: MissionMapView?
     private var profileView: ProfileView?
-    private var stageBeforeProfile: ARIFIScreenStage = .modeSelection
+    private var stageBeforeProfile: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -67,15 +67,15 @@ final class ViewController: UIViewController {
         loginView?.setStatus(text, success: success)
     }
 
-    func setOperationState(_ state: ARIFIOperationState) {
+    func setOperationState(_ state: DavizinOperationState) {
         operationView?.setState(state)
         switch state {
         case .succeeded(let message):
             NyxelActivityLog.record("Operación completada")
-            ARIFIToastCenter.shared.show(title: "Operación completada", subtitle: message, kind: .success)
+            DavizinToastCenter.shared.show(title: "Operación completada", subtitle: message, kind: .success)
         case .failed(let message):
             NyxelActivityLog.record("Operación fallida")
-            ARIFIToastCenter.shared.show(title: "Operación fallida", subtitle: message, kind: .danger)
+            DavizinToastCenter.shared.show(title: "Operación fallida", subtitle: message, kind: .danger)
         default:
             break
         }
@@ -289,7 +289,7 @@ final class ViewController: UIViewController {
         bottomNavView.isHidden = true
     }
 
-    private func setBottomNavigation(visible: Bool, selected: ARIFIBottomNavView.Item = .modes) {
+    private func setBottomNavigation(visible: Bool, selected: DavizinBottomNavView.Item = .modes) {
         bottomNavView.isHidden = !visible
         bottomNavView.setSelected(selected)
         bottomNavHeightConstraint?.constant = visible ? 68.0 : 0.0
@@ -386,7 +386,7 @@ final class ViewController: UIViewController {
     private func showModeSelection(animated: Bool) {
         currentStage = .modeSelection
         setBottomNavigation(visible: true, selected: .modes)
-        if let firstActive = ARIFIModeCatalog.enabledModes(for: selectedGame).first, !ARIFIModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) {
+        if let firstActive = DavizinModeCatalog.enabledModes(for: selectedGame).first, !DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) {
             selectedMode = firstActive
         }
 		headerView.title = "Configurar / \(selectedGame.rawValue)"
@@ -395,14 +395,14 @@ final class ViewController: UIViewController {
 
         let screen = MissionMapView()
         screen.delegate = self
-        screen.setModes(ARIFIModeCatalog.enabledModes(for: selectedGame), selected: selectedMode)
+        screen.setModes(DavizinModeCatalog.enabledModes(for: selectedGame), selected: selectedMode)
         missionMapView = screen
         display(screen, animated: animated)
     }
 
     private func showOperation(animated: Bool) {
         setBottomNavigation(visible: true, selected: .modes)
-        guard ARIFIModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) else {
+        guard DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) else {
             showModeSelection(animated: animated)
             return
         }
@@ -446,9 +446,9 @@ final class ViewController: UIViewController {
                     NyxelActivityLog.record("Datos del Worker actualizados")
                     self.setAccountSession(key: key, remainingSeconds: remaining)
                     screen?.setAccount(key: key, remainingSeconds: remaining)
-                    ARIFIToastCenter.shared.show(title: "Datos actualizados", subtitle: "La key y el Worker están sincronizados.", kind: .success)
+                    DavizinToastCenter.shared.show(title: "Datos actualizados", subtitle: "La key y el Worker están sincronizados.", kind: .success)
                 } else {
-                    ARIFIToastCenter.shared.show(title: "No se pudo actualizar", subtitle: message, kind: .danger)
+                    DavizinToastCenter.shared.show(title: "No se pudo actualizar", subtitle: message, kind: .danger)
                 }
             }
         }
@@ -458,7 +458,7 @@ final class ViewController: UIViewController {
     }
 
 	/// Abre Free Fire (MAX o normal) usando su esquema de URL.
-	private func openGame(_ game: ARIFIGame) {
+	private func openGame(_ game: DavizinGame) {
 		operationView?.setOpeningGame(true)
 		let urls: [URL]
 		switch game {
@@ -509,7 +509,7 @@ final class ViewController: UIViewController {
         contentContainerView.subviews.forEach { $0.removeFromSuperview() }
         screen.translatesAutoresizingMaskIntoConstraints = false
         contentContainerView.addSubview(screen)
-        screen.arifiPinEdges(to: contentContainerView)
+        screen.davizinPinEdges(to: contentContainerView)
 
         guard animated else {
             screen.alpha = 1.0
@@ -544,9 +544,9 @@ final class ViewController: UIViewController {
         }
     }
 
-    private func simulateOperation(_ operation: ARIFIOperationKind) {
+    private func simulateOperation(_ operation: DavizinOperationKind) {
         guard let screen = operationView else { return }
-        let state: ARIFIOperationState
+        let state: DavizinOperationState
         switch operation {
         case .runExploit:
             state = .running
@@ -593,22 +593,22 @@ final class ViewController: UIViewController {
     }
 }
 
-extension ViewController: ARIFIHeaderViewDelegate {
-    func headerViewDidTapBack(_ headerView: ARIFIHeaderView) {
+extension ViewController: DavizinHeaderViewDelegate {
+    func headerViewDidTapBack(_ headerView: DavizinHeaderView) {
         goBack()
     }
 
-    func headerViewDidTapClose(_ headerView: ARIFIHeaderView) {
+    func headerViewDidTapClose(_ headerView: DavizinHeaderView) {
         // La X regresa directo a la pantalla de la key (login)
         showLogin(animated: true)
     }
 
-    func headerViewDidTapAvatar(_ headerView: ARIFIHeaderView) {
+    func headerViewDidTapAvatar(_ headerView: DavizinHeaderView) {
         guard currentStage != .login, currentStage != .profile else { return }
         showProfile(animated: true)
     }
 
-    func headerViewDidLongPressAvatar(_ headerView: ARIFIHeaderView) {
+    func headerViewDidLongPressAvatar(_ headerView: DavizinHeaderView) {
         guard currentStage != .login else { return }
         let alert = UIAlertController(
             title: "¿Cerrar sesión?",
@@ -639,7 +639,7 @@ extension ViewController: LoginViewDelegate {
 }
 
 extension ViewController: GameSelectionViewDelegate {
-    func gameSelectionView(_ view: GameSelectionView, didSelect game: ARIFIGame) {
+    func gameSelectionView(_ view: GameSelectionView, didSelect game: DavizinGame) {
         selectedGame = game
         NyxelActivityLog.record("Juego seleccionado: \(game.rawValue)")
         onGameSelected?(game)
@@ -648,7 +648,7 @@ extension ViewController: GameSelectionViewDelegate {
 }
 
 extension ViewController: MissionMapViewDelegate {
-    func missionMapView(_ view: MissionMapView, didSelect mode: ARIFIMode) {
+    func missionMapView(_ view: MissionMapView, didSelect mode: DavizinMode) {
         selectedMode = mode
         NyxelActivityLog.record("Modo seleccionado: \(mode.displayName)")
         onModeSelected?(mode)
@@ -657,7 +657,7 @@ extension ViewController: MissionMapViewDelegate {
 }
 
 extension ViewController: OperationViewDelegate {
-    func operationView(_ view: OperationView, didTap operation: ARIFIOperationKind) {
+    func operationView(_ view: OperationView, didTap operation: DavizinOperationKind) {
         onOperation?(operation)
         guard simulateUIStates else { return }
         simulateOperation(operation)

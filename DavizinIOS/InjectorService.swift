@@ -11,7 +11,7 @@ private let kBaseFolder = "Documents/contentcache/Compulsory/ios/gameassetbundle
 private let kConfigURL = "https://dz.davidporfirio17.workers.dev/app-config"
 
 // Valores originales: se conservan como respaldo si el Worker no responde.
-private func defaultDestFileName(for game: ARIFIGame) -> String {
+private func defaultDestFileName(for game: DavizinGame) -> String {
     switch game {
     case .freeFireMax:
         return "assetindexer.PENojQAQf9a1l6Dzjs0n1Z3rtVU~3D"
@@ -26,7 +26,7 @@ private func isSafeAssetFileName(_ value: String) -> Bool {
     return !value.isEmpty && value.unicodeScalars.allSatisfy { allowed.contains($0) }
 }
 
-private func savedDestFileName(for game: ARIFIGame) -> String {
+private func savedDestFileName(for game: DavizinGame) -> String {
     let key = game == .freeFireMax ? "dz_active_dest_max" : "dz_active_dest_normal"
     if let saved = UserDefaults.standard.string(forKey: key), isSafeAssetFileName(saved) { return saved }
     return defaultDestFileName(for: game)
@@ -38,21 +38,21 @@ private func isSafeRelativePath(_ value: String) -> Bool {
     return value.unicodeScalars.allSatisfy { allowed.contains($0) }
 }
 
-private func destPathRel(for game: ARIFIGame, mode: ARIFIMode) -> String {
+private func destPathRel(for game: DavizinGame, mode: DavizinMode) -> String {
     let configured = game == .freeFireMax ? mode.pathMax : mode.pathNormal
     if let configured, isSafeRelativePath(configured) { return configured }
     return kBaseFolder + "/" + savedDestFileName(for: game)
 }
 
-private func activePathKey(for game: ARIFIGame) -> String {
+private func activePathKey(for game: DavizinGame) -> String {
     return game == .freeFireMax ? "dz_active_path_max" : "dz_active_path_normal"
 }
 
-private func legacyDestPathRel(for game: ARIFIGame) -> String {
+private func legacyDestPathRel(for game: DavizinGame) -> String {
     return kBaseFolder + "/" + savedDestFileName(for: game)
 }
 
-private func backPathRel(for game: ARIFIGame, mode: ARIFIMode) -> String {
+private func backPathRel(for game: DavizinGame, mode: DavizinMode) -> String {
     return disguisedBackupPath(for: destPathRel(for: game, mode: mode))
 }
 
@@ -78,7 +78,7 @@ private let kSignSecret = "78ae85be57c27ab1525e0af061fa4ce012e2f2b1484209bf64dc8
 class InjectorService {
 
     /// Bundle ID del contenedor segun el juego.
-    private static func bundleID(for game: ARIFIGame) -> String {
+    private static func bundleID(for game: DavizinGame) -> String {
         switch game {
         case .freeFireMax: return "com.dts.freefiremax"
         case .freeFire:    return "com.dts.freefireth"
@@ -87,7 +87,7 @@ class InjectorService {
 
     /// Ruta del Worker para cada modo y juego (descarga desde KV).
     /// Free Fire MAX usa slots base; Free Fire normal usa el sufijo _ff.
-    private static func remoteSlot(for mode: ARIFIMode, game: ARIFIGame) -> String {
+    private static func remoteSlot(for mode: DavizinMode, game: DavizinGame) -> String {
         return game == .freeFire ? mode.id + "_ff" : mode.id
     }
 
@@ -129,7 +129,7 @@ class InjectorService {
     }
 
     /// Actualiza opcionalmente el nombre de destino. Si falla, conserva el respaldo local.
-    private static func refreshDestinationFileName(for game: ARIFIGame, key: String, hwid: String) {
+    private static func refreshDestinationFileName(for game: DavizinGame, key: String, hwid: String) {
         guard let url = URL(string: kConfigURL) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -155,7 +155,7 @@ class InjectorService {
     }
 
     /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
-    private static func downloadResource(for mode: ARIFIMode, game: ARIFIGame, key: String, hwid: String) -> Data? {
+    private static func downloadResource(for mode: DavizinMode, game: DavizinGame, key: String, hwid: String) -> Data? {
         guard !key.isEmpty else { return nil }
         guard let url = URL(string: "\(kCacheBaseURL)/avatar/\(remoteSlot(for: mode, game: game))") else { return nil }
 
@@ -200,7 +200,7 @@ class InjectorService {
         return FileManager.default.fileExists(atPath: container + "/" + kBaseFolder)
     }
 
-	static func inject(game: ARIFIGame, mode: ARIFIMode, key: String, hwid: String) -> InjectorResult {
+	static func inject(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) -> InjectorResult {
 		guard NyxelSupportPolicy.isCurrentSystemSupported else {
 			return InjectorResult(
 				success: false,
@@ -258,7 +258,7 @@ class InjectorService {
             message: "¡\(mode.displayName) inyectado! Cierra y abre Free Fire.")
     }
 
-    static func uninject(game: ARIFIGame) -> InjectorResult {
+    static func uninject(game: DavizinGame) -> InjectorResult {
         let fm = FileManager.default
         let bundleID = bundleID(for: game)
 

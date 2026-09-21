@@ -1,13 +1,13 @@
 import UIKit
 
 protocol OperationViewDelegate: AnyObject {
-    func operationView(_ view: OperationView, didTap operation: ARIFIOperationKind)
+    func operationView(_ view: OperationView, didTap operation: DavizinOperationKind)
 }
 
 final class OperationView: UIView {
     weak var delegate: OperationViewDelegate?
 
-    private let cardView = ARIFICardView()
+    private let cardView = DavizinCardView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let noticeCard = UIView()
@@ -16,12 +16,12 @@ final class OperationView: UIView {
     private let noticeStack = UIStackView()
 
     // Estado 1 (antes de inyectar): solo estos dos son visibles.
-    private let runButton = ARIFIButton(title: "EJECUTAR PROCESO", style: .secondary)
-    private let injectButton = ARIFIButton(title: "MANTÉN PARA INYECTAR", style: .primary)
+    private let runButton = DavizinButton(title: "EJECUTAR PROCESO", style: .secondary)
+    private let injectButton = DavizinButton(title: "MANTÉN PARA INYECTAR", style: .primary)
 
     // Estado 2 (despues de inyectar con exito): solo estos dos son visibles.
-    private let cleanButton = ARIFIButton(title: "LIMPIAR SESIÓN", style: .destructive)
-    private let openGameButton = ARIFIButton(title: "ABRIR JUEGO")
+    private let cleanButton = DavizinButton(title: "LIMPIAR SESIÓN", style: .destructive)
+    private let openGameButton = DavizinButton(title: "ABRIR JUEGO")
     var onOpenGame: (() -> Void)?
 
     private let statusLabel = UILabel()
@@ -36,13 +36,13 @@ final class OperationView: UIView {
 	private let holdDuration: TimeInterval = 0.32
 	private var isHoldingInject = false
 
-    private(set) var operationState: ARIFIOperationState = .idle
+    private(set) var operationState: DavizinOperationState = .idle
 
-    var selectedGame: ARIFIGame = .freeFireMax {
+    var selectedGame: DavizinGame = .freeFireMax {
         didSet { updateSubtitle() }
     }
 
-    var selectedMode: ARIFIMode = .drag {
+    var selectedMode: DavizinMode = .drag {
         didSet {
             updateSubtitle()
             updateNotice()
@@ -60,7 +60,7 @@ final class OperationView: UIView {
         configure()
     }
 
-    func setState(_ state: ARIFIOperationState) {
+    func setState(_ state: DavizinOperationState) {
         operationState = state
         statusLabel.textColor = AppTheme.secondaryText
         runButton.setLoading(false)

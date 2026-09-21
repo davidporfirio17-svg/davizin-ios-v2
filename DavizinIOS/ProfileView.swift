@@ -52,7 +52,7 @@ final class ProfileView: UIView {
     private let appearanceControl = UISegmentedControl(items: ["Cian", "Fuego", "Violeta"])
     private let biometricSwitch = UISwitch()
     private let refreshButton = UIButton(type: .system)
-    private let logoutButton = ARIFIButton(title: "CERRAR SESIÓN", style: .destructive)
+    private let logoutButton = DavizinButton(title: "CERRAR SESIÓN", style: .destructive)
     private let scrollView = UIScrollView()
     private let progressTrack = CAShapeLayer()
     private let progressRing = CAShapeLayer()
@@ -187,7 +187,7 @@ final class ProfileView: UIView {
         refreshButton.layer.borderColor = AppTheme.accent.withAlphaComponent(0.35).cgColor
         refreshButton.heightAnchor.constraint(equalToConstant: 38).isActive = true
 
-        let card = ARIFICardView()
+        let card = DavizinCardView()
         let biometricRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Face ID / Touch ID antes de Inject"), biometricSwitch])
         biometricRow.axis = .horizontal
         biometricRow.alignment = .center

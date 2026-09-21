@@ -1,7 +1,7 @@
 import UIKit
 import LocalAuthentication
 
-/// Conecta el UI de ARIFIxIOS con la logica real de Davizin
+/// Conecta el UI de DavizinxIOS con la logica real de Davizin
 final class DavizinBridge {
 
     private weak var vc: ViewController?
@@ -9,10 +9,10 @@ final class DavizinBridge {
     private var remainingSeconds: Int = 0
 
     /// Modo elegido por el usuario. Define que cache_res se inyecta.
-    private var selectedMode: ARIFIMode = .drag
+    private var selectedMode: DavizinMode = .drag
 
     /// Juego elegido. Define bundle ID y de que slots se descarga.
-    private var selectedGame: ARIFIGame = .freeFireMax
+    private var selectedGame: DavizinGame = .freeFireMax
 
     /// Credenciales de la sesion actual. Se usan para descargar el cache_res del Worker.
     private var sessionKey: String = ""
@@ -22,10 +22,10 @@ final class DavizinBridge {
     func connect(to viewController: ViewController) {
         self.vc = viewController
         // Restaurar el ultimo juego y modo elegidos
-        if let g = UserDefaults.standard.string(forKey: "dz_last_game"), let game = ARIFIGame(rawValue: g) {
+        if let g = UserDefaults.standard.string(forKey: "dz_last_game"), let game = DavizinGame(rawValue: g) {
             selectedGame = game
         }
-        if let m = UserDefaults.standard.string(forKey: "dz_last_mode"), let mode = ARIFIModeCatalog.mode(id: m) {
+        if let m = UserDefaults.standard.string(forKey: "dz_last_mode"), let mode = DavizinModeCatalog.mode(id: m) {
             selectedMode = mode
         }
         viewController.simulateUIStates = false
@@ -81,7 +81,7 @@ final class DavizinBridge {
 
                 self?.startCountdown()
 
-                // Los modos ya se guardaron en ARIFIModeCatalog dentro de
+                // Los modos ya se guardaron en DavizinModeCatalog dentro de
                 // KeyValidator.validate() (lee resp.data.modes del /check real),
                 // asi que aqui solo falta mostrar el aviso si hay uno.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -101,7 +101,7 @@ final class DavizinBridge {
 
     // MARK: - Operaciones
 
-    private func performInjection(game: ARIFIGame, mode: ARIFIMode, key: String, hwid: String) {
+    private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
         vc?.setOperationState(.injecting)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
@@ -118,7 +118,7 @@ final class DavizinBridge {
         }
     }
 
-    private func consumeOneTimeMode(mode: ARIFIMode, key: String, hwid: String, result: InjectorResult) {
+    private func consumeOneTimeMode(mode: DavizinMode, key: String, hwid: String, result: InjectorResult) {
         guard let url = URL(string: "https://dz.davidporfirio17.workers.dev/consume-mode") else {
             operationInFlight = false
             vc?.setOperationState(.failed("NYX-002 — No se pudo confirmar la operación con el Worker."))
@@ -136,14 +136,14 @@ final class DavizinBridge {
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.hapticFeedback(success: ok)
-                if ok { ARIFIModeCatalog.markConsumed(mode.id) }
+                if ok { DavizinModeCatalog.markConsumed(mode.id) }
                 self.operationInFlight = false
                 self.vc?.setOperationState(ok ? .succeeded(result.message) : .failed("La inyección se realizó, pero no se pudo confirmar el consumo de Holograma. No vuelvas a intentarlo hasta revisar la conexión."))
             }
         }.resume()
     }
 
-    private func handleOperation(_ operation: ARIFIOperationKind) {
+    private func handleOperation(_ operation: DavizinOperationKind) {
         guard !operationInFlight else {
             vc?.setOperationState(.failed("NYX-006 — Ya hay una operación en curso."))
             return
@@ -170,7 +170,7 @@ final class DavizinBridge {
         }
     }
 
-    private func executeAuthorizedOperation(_ operation: ARIFIOperationKind) {
+    private func executeAuthorizedOperation(_ operation: DavizinOperationKind) {
         switch operation {
 
         case .runExploit:

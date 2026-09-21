@@ -1,6 +1,6 @@
 import UIKit
 
-final class ARIFICardView: UIView {
+final class DavizinCardView: UIView {
     private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let contentView = UIView()
     private var contentConstraints: [NSLayoutConstraint] = []
@@ -31,7 +31,7 @@ final class ARIFICardView: UIView {
 
     func addContent(_ view: UIView) {
         contentView.addSubview(view)
-        view.arifiPinEdges(to: contentView)
+        view.davizinPinEdges(to: contentView)
         updateContentConstraints()
     }
 
@@ -53,7 +53,7 @@ final class ARIFICardView: UIView {
         blurView.clipsToBounds = true
         blurView.alpha = 0.72
         addSubview(blurView)
-        blurView.arifiPinEdges(to: self)
+        blurView.davizinPinEdges(to: self)
 
         contentView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(contentView)

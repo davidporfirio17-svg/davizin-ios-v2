@@ -4,7 +4,7 @@
 
 Se tomó el repositorio V2 como base porque contiene la política de compatibilidad usada por la IPA y el flujo de validación de build que espera el Worker `dz`.
 
-La política de inyección ahora acepta iOS/iPadOS 26.6.2 mediante `NyxelSupportPolicy.swift`. Se conserva el `CFBundleVersion` en `2`, porque el Worker desplegado utiliza el build `2` como build autorizado. La versión visible (`CFBundleShortVersionString`) se actualizó a `1.3`.
+La política de inyección ahora acepta iOS/iPadOS 26.6.2 mediante `NyxelSupportPolicy.swift`. La nueva IPA usa `CFBundleVersion` `3` y versión visible `1.4`; el Worker mantendrá el build anterior autorizado durante la transición y podrá revocarlo después de instalar la nueva IPA.
 
 No fue necesario modificar el Worker: el cliente V2 ya envía `app_version` y `app_build`, y el Worker autoriza el build `2`.
 

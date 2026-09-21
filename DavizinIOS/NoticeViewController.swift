@@ -69,7 +69,7 @@ final class NoticeViewController: UIViewController {
         messageLabel.textColor = AppTheme.secondaryText
         messageLabel.numberOfLines = 0
 
-        let continueButton = ARIFIButton(title: "Entendido", style: .primary)
+        let continueButton = DavizinButton(title: "Entendido", style: .primary)
         continueButton.addTarget(self, action: #selector(continueTapped), for: .touchUpInside)
 
         [eyebrow, card, continueButton].forEach {

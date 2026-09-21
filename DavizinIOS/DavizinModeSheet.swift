@@ -1,22 +1,22 @@
 import UIKit
 
-// MARK: - ARIFIModeSheet — equivalente nativo de Vaul (vaul-main/src/index.tsx + constants.ts)
+// MARK: - DavizinModeSheet — equivalente nativo de Vaul (vaul-main/src/index.tsx + constants.ts)
 // UISheetPresentationController ya implementa nativamente lo que Vaul hace a mano en web:
 // drag con damping, snap points, velocity threshold para cerrar. Se configuran los mismos
 // parámetros de vaul/constants.ts donde el sistema nativo lo permite:
 //   BORDER_RADIUS = 8 -> preferredCornerRadius
 //   detents (Vaul snapPoints) -> [.medium(), .large()]
 //
-// Usa el ARIFIMode real de UIState.swift (id, label, oneTime, consumed, etc.)
+// Usa el DavizinMode real de UIState.swift (id, label, oneTime, consumed, etc.)
 // — no redefine el modelo.
 
-protocol ARIFIModeSheetDelegate: AnyObject {
-    func modeSheet(_ sheet: ARIFIModeSheetViewController, didSelect mode: ARIFIMode)
+protocol DavizinModeSheetDelegate: AnyObject {
+    func modeSheet(_ sheet: DavizinModeSheetViewController, didSelect mode: DavizinMode)
 }
 
 /// Icono y descripción visual por id de modo. Si llega un modo nuevo desde el
 /// Worker que no está en esta tabla, cae a un ícono/descr. genéricos.
-private extension ARIFIMode {
+private extension DavizinMode {
     var symbol: String {
         switch id {
         case "holograma": return "◈"
@@ -39,14 +39,14 @@ private extension ARIFIMode {
     }
 }
 
-final class ARIFIModeSheetViewController: UIViewController {
-    weak var delegate: ARIFIModeSheetDelegate?
+final class DavizinModeSheetViewController: UIViewController {
+    weak var delegate: DavizinModeSheetDelegate?
 
-    private let modes: [ARIFIMode]
+    private let modes: [DavizinMode]
     private var selectedIndex: Int?
     private let stack = UIStackView()
 
-    init(modes: [ARIFIMode]) {
+    init(modes: [DavizinMode]) {
         self.modes = modes
         super.init(nibName: nil, bundle: nil)
 
@@ -95,7 +95,7 @@ final class ARIFIModeSheetViewController: UIViewController {
         }
 
         for (index, mode) in modes.enumerated() {
-            let row = ARIFIModeRow(mode: mode)
+            let row = DavizinModeRow(mode: mode)
             row.tag = index
             row.onTap = { [weak self] in self?.select(index) }
             stack.addArrangedSubview(row)
@@ -139,7 +139,7 @@ final class ARIFIModeSheetViewController: UIViewController {
     private func select(_ index: Int) {
         guard index >= 0, index < modes.count else { return }
         selectedIndex = index
-        for case let row as ARIFIModeRow in stack.arrangedSubviews {
+        for case let row as DavizinModeRow in stack.arrangedSubviews {
             row.setSelected(row.tag == index, animated: true)
         }
         // Delay corto para que se vea el check antes de cerrar — mismo patrón que
@@ -156,7 +156,7 @@ final class ARIFIModeSheetViewController: UIViewController {
 
 // MARK: - Fila de modo individual
 
-final class ARIFIModeRow: UIView {
+final class DavizinModeRow: UIView {
     var onTap: (() -> Void)?
     private let iconContainer = UIView()
     private let iconLabel = UILabel()
@@ -165,7 +165,7 @@ final class ARIFIModeRow: UIView {
     private let checkView = UIView()
     private let checkmark = UIImageView()
 
-    init(mode: ARIFIMode) {
+    init(mode: DavizinMode) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         layer.cornerRadius = 12

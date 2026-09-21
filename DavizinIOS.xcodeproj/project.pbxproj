@@ -45,10 +45,10 @@
 		F07 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=GameSelectionView.swift;sourceTree="<group>";};
 		F08 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ModeSelectionView.swift;sourceTree="<group>";};
 		F09 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=OperationView.swift;sourceTree="<group>";};
-		F10 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ARIFIAnimatedBackgroundView.swift;sourceTree="<group>";};
-		F11 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ARIFIButton.swift;sourceTree="<group>";};
-		F12 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ARIFICardView.swift;sourceTree="<group>";};
-		F13 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ARIFIHeaderView.swift;sourceTree="<group>";};
+		F10 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=DavizinAnimatedBackgroundView.swift;sourceTree="<group>";};
+		F11 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=DavizinButton.swift;sourceTree="<group>";};
+		F12 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=DavizinCardView.swift;sourceTree="<group>";};
+		F13 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=DavizinHeaderView.swift;sourceTree="<group>";};
 		F14 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=DavizinBridge.swift;sourceTree="<group>";};
 		F15 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=InjectorService.swift;sourceTree="<group>";};
 		F16 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=KeyValidator.swift;sourceTree="<group>";};
@@ -57,7 +57,7 @@
 		F19 = {isa=PBXFileReference;lastKnownFileType=sourcecode.c.h;path="DavizinIOS-Bridging-Header.h";sourceTree="<group>";};
 		F20 = {isa=PBXFileReference;lastKnownFileType=text.plist.xml;path=Info.plist;sourceTree="<group>";};
 		F21 = {isa=PBXFileReference;lastKnownFileType=text.plist.entitlements;path=DavizinIOS.entitlements;sourceTree="<group>";};
-		F22 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ARIFIToast.swift;sourceTree="<group>";};
+		F22 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=DavizinToast.swift;sourceTree="<group>";};
 		F23 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=SoundService.swift;sourceTree="<group>";};
 		F24 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=SplashViewController.swift;sourceTree="<group>";};
 			F25 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NoticeViewController.swift;sourceTree="<group>";};
@@ -65,7 +65,7 @@
 			F27 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ProfileView.swift;sourceTree="<group>";};
 			F28 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NyxelSupportPolicy.swift;sourceTree="<group>";};
 			F29 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NyxelDiagnostics.swift;sourceTree="<group>";};
-			F30 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=ARIFIBottomNavView.swift;sourceTree="<group>";};
+			F30 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=DavizinBottomNavView.swift;sourceTree="<group>";};
 			F31 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NyxelAppearance.swift;sourceTree="<group>";};
 			FR1 = {isa=PBXFileReference;lastKnownFileType=folder.assetcatalog;path=Assets.xcassets;sourceTree="<group>";};
 		FR3 = {isa=PBXFileReference;lastKnownFileType=file.storyboard;path=LaunchScreen.storyboard;sourceTree="<group>";};

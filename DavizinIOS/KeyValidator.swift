@@ -18,7 +18,7 @@ struct KeyData: Codable {
     let token: String?
     let resource_key: String?
     let tier: String?
-    let modes: [ARIFIMode]?
+    let modes: [DavizinMode]?
     let client_session: String?
 }
 
@@ -135,7 +135,7 @@ class KeyValidator {
 								completion(false, "Configuración inválida. Inténtalo más tarde.", 0, nil)
 								return
 							}
-							ARIFIModeCatalog.save(modes)
+							DavizinModeCatalog.save(modes)
 							}
 							guard let session = resp.data?.client_session, !session.isEmpty else {
 								NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Sesión ausente")

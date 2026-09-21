@@ -1,7 +1,7 @@
 import UIKit
 
 protocol ModeSelectionViewDelegate: AnyObject {
-    func modeSelectionView(_ view: ModeSelectionView, didSelect mode: ARIFIMode)
+    func modeSelectionView(_ view: ModeSelectionView, didSelect mode: DavizinMode)
     /// El VC decide cómo presentar el sheet nativo (necesita un UIViewController real).
     func modeSelectionViewDidRequestSheet(_ view: ModeSelectionView)
 }
@@ -9,18 +9,18 @@ protocol ModeSelectionViewDelegate: AnyObject {
 final class ModeSelectionView: UIView {
     weak var delegate: ModeSelectionViewDelegate?
 
-    private let cardView = ARIFICardView()
+    private let cardView = DavizinCardView()
     private let categoryLabel = UILabel()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let footerLabel = UILabel()
-    private let sheetTriggerButton = ARIFIButton(title: "◈ Elegir desde lista", style: .primary)
+    private let sheetTriggerButton = DavizinButton(title: "◈ Elegir desde lista", style: .primary)
     private let stackView = UIStackView()
 
-    /// Un botón por cada caso de ARIFIMode, en el mismo orden del enum.
-    private var modeButtons: [(mode: ARIFIMode, button: ARIFIButton)] = []
+    /// Un botón por cada caso de DavizinMode, en el mismo orden del enum.
+    private var modeButtons: [(mode: DavizinMode, button: DavizinButton)] = []
 
-    private(set) var selectedMode: ARIFIMode?
+    private(set) var selectedMode: DavizinMode?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -32,7 +32,7 @@ final class ModeSelectionView: UIView {
         configure()
     }
 
-    func setSelectedMode(_ mode: ARIFIMode?) {
+    func setSelectedMode(_ mode: DavizinMode?) {
         selectedMode = mode
         for entry in modeButtons {
             entry.button.selectedVisual = (entry.mode == mode)
@@ -86,12 +86,12 @@ final class ModeSelectionView: UIView {
             sheetTriggerButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
         ]
 
-        let activeModes = ARIFIModeCatalog.enabledModes()
+        let activeModes = DavizinModeCatalog.enabledModes()
         if activeModes.isEmpty {
             footerLabel.text = "No hay modos activos. Activa al menos uno desde el panel."
         }
         for (index, mode) in activeModes.enumerated() {
-            let button = ARIFIButton(title: mode.displayName, style: .secondary)
+            let button = DavizinButton(title: mode.displayName, style: .secondary)
             button.accessibilityIdentifier = accessibilityIdentifier(for: mode)
             button.tag = index
             button.addTarget(self, action: #selector(modeTapped(_:)), for: .touchUpInside)
@@ -120,7 +120,7 @@ final class ModeSelectionView: UIView {
         ] + buttonConstraints)
     }
 
-    private func accessibilityIdentifier(for mode: ARIFIMode) -> String {
+    private func accessibilityIdentifier(for mode: DavizinMode) -> String {
         return "mode." + mode.id
     }
 
@@ -128,8 +128,8 @@ final class ModeSelectionView: UIView {
         delegate?.modeSelectionViewDidRequestSheet(self)
     }
 
-    @objc private func modeTapped(_ sender: ARIFIButton) {
-        let cases = ARIFIModeCatalog.enabledModes()
+    @objc private func modeTapped(_ sender: DavizinButton) {
+        let cases = DavizinModeCatalog.enabledModes()
         guard sender.tag >= 0, sender.tag < cases.count else { return }
         let mode = cases[sender.tag]
         setSelectedMode(mode)

@@ -1,20 +1,20 @@
 import UIKit
 
-// MARK: - ARIFIButton v2
+// MARK: - DavizinButton v2
 // Press feedback: scale(0.97), 150ms — recipe "Button press" de animate/RECIPES.md,
 // portado a UIKit con spring en vez de cubic-bezier (nativo UIKit no anima bien
 // cubic-bezier + transform combinados en highlighted state, spring da mejor feel físico).
 
-enum ARIFIButtonStyle {
+enum DavizinButtonStyle {
     case primary
     case secondary
     case destructive
 }
 
-final class ARIFIButton: UIButton {
+final class DavizinButton: UIButton {
     private let spinner = UIActivityIndicatorView(style: .medium)
     private var titleBeforeLoading: String?
-    private var style: ARIFIButtonStyle = .secondary
+    private var style: DavizinButtonStyle = .secondary
 
     var selectedVisual: Bool = false {
         didSet { updateAppearance() }
@@ -40,7 +40,7 @@ final class ARIFIButton: UIButton {
         didSet { updateAppearance() }
     }
 
-    convenience init(title: String, style: ARIFIButtonStyle = .secondary) {
+    convenience init(title: String, style: DavizinButtonStyle = .secondary) {
         self.init(type: .system)
         self.style = style
         setTitle(title, for: .normal)
@@ -57,7 +57,7 @@ final class ARIFIButton: UIButton {
         configure()
     }
 
-    func setButtonStyle(_ style: ARIFIButtonStyle) {
+    func setButtonStyle(_ style: DavizinButtonStyle) {
         self.style = style
         updateAppearance()
     }

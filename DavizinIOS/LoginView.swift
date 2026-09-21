@@ -42,11 +42,11 @@ protocol LoginViewDelegate: AnyObject {
 final class LoginView: UIView {
     weak var delegate: LoginViewDelegate?
 
-    private let cardView = ARIFICardView()
+    private let cardView = DavizinCardView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let keyField = UITextField()
-    private let continueButton = ARIFIButton(title: "ENTRAR AL PANEL", style: .primary)
+    private let continueButton = DavizinButton(title: "ENTRAR AL PANEL", style: .primary)
     private let statusLabel = UILabel()
     private let compatLabel = UILabel()
     private let stackView = UIStackView()

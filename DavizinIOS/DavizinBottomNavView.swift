@@ -1,6 +1,6 @@
 import UIKit
 
-final class ARIFIBottomNavView: UIView {
+final class DavizinBottomNavView: UIView {
     var onModes: (() -> Void)?
     var onProfile: (() -> Void)?
 

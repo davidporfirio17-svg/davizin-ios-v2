@@ -8,12 +8,12 @@ import UIKit
 // particula que viaja por cada linea.
 
 protocol MissionMapViewDelegate: AnyObject {
-    func missionMapView(_ view: MissionMapView, didSelect mode: ARIFIMode)
+    func missionMapView(_ view: MissionMapView, didSelect mode: DavizinMode)
 }
 
 final class MissionMapView: UIView {
     weak var delegate: MissionMapViewDelegate?
-    private var modes: [ARIFIMode] = []
+    private var modes: [DavizinMode] = []
     private var nodeViews: [MissionNodeView] = []
     private let scrollView = UIScrollView()
     private let canvas = UIView()
@@ -48,7 +48,7 @@ final class MissionMapView: UIView {
         configure()
     }
 
-    func setModes(_ modes: [ARIFIMode], selected: ARIFIMode?) {
+    func setModes(_ modes: [DavizinMode], selected: DavizinMode?) {
         self.modes = modes
         nodeViews.forEach { $0.removeFromSuperview() }
         nodeViews.removeAll()
@@ -149,7 +149,7 @@ final class MissionMapView: UIView {
         }
     }
 
-    private func buildNodes(selected: ARIFIMode?) {
+    private func buildNodes(selected: DavizinMode?) {
         for (index, mode) in modes.enumerated() {
             let node = MissionNodeView(mode: mode, index: index)
             node.onTap = { [weak self] in self?.selectNode(at: index) }
@@ -260,11 +260,11 @@ final class MissionMapView: UIView {
 
 final class MissionNodeView: UIView {
     var onTap: (() -> Void)?
-    private let mode: ARIFIMode
+    private let mode: DavizinMode
     private let glyphLabel = UILabel()
     private let nameLabel = UILabel()
 
-    init(mode: ARIFIMode, index: Int) {
+    init(mode: DavizinMode, index: Int) {
         self.mode = mode
         super.init(frame: .zero)
         backgroundColor = AppTheme.card
@@ -339,7 +339,7 @@ final class MissionNodeView: UIView {
     }
 }
 
-private extension ARIFIMode {
+private extension DavizinMode {
     var symbol: String {
         switch id {
         case "drag": return "◆"

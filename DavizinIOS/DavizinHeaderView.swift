@@ -1,14 +1,14 @@
 import UIKit
 
-protocol ARIFIHeaderViewDelegate: AnyObject {
-    func headerViewDidTapBack(_ headerView: ARIFIHeaderView)
-    func headerViewDidTapClose(_ headerView: ARIFIHeaderView)
-    func headerViewDidTapAvatar(_ headerView: ARIFIHeaderView)
-    func headerViewDidLongPressAvatar(_ headerView: ARIFIHeaderView)
+protocol DavizinHeaderViewDelegate: AnyObject {
+    func headerViewDidTapBack(_ headerView: DavizinHeaderView)
+    func headerViewDidTapClose(_ headerView: DavizinHeaderView)
+    func headerViewDidTapAvatar(_ headerView: DavizinHeaderView)
+    func headerViewDidLongPressAvatar(_ headerView: DavizinHeaderView)
 }
 
-final class ARIFIHeaderView: UIView {
-    weak var delegate: ARIFIHeaderViewDelegate?
+final class DavizinHeaderView: UIView {
+    weak var delegate: DavizinHeaderViewDelegate?
 
     var title: String = "" {
         didSet { titleLabel.text = title.uppercased() }
