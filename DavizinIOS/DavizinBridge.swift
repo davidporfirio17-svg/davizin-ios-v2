@@ -127,6 +127,9 @@ final class DavizinBridge {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let session = KeyValidator.currentSessionToken, !session.isEmpty {
+            request.setValue(session, forHTTPHeaderField: "X-DZ-Session")
+        }
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["key": key, "hwid": hwid, "mode": mode.id])
         URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
             let ok = (response as? HTTPURLResponse)?.statusCode == 200 && ((try? JSONSerialization.jsonObject(with: data ?? Data()) as? [String: Any])?["success"] as? Bool == true)

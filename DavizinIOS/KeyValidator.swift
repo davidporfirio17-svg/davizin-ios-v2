@@ -19,9 +19,14 @@ struct KeyData: Codable {
     let resource_key: String?
     let tier: String?
     let modes: [ARIFIMode]?
+    let client_session: String?
 }
 
 class KeyValidator {
+
+    /// Token efímero emitido por el Worker para las operaciones posteriores.
+    /// No se persiste en UserDefaults: debe desaparecer al cerrar la app.
+    private(set) static var currentSessionToken: String?
 
     // Debe coincidir EXACTO con el secreto del Worker.
     private static let signSecret = "78ae85be57c27ab1525e0af061fa4ce012e2f2b1484209bf64dc8834be7e0fc4"
@@ -131,8 +136,17 @@ class KeyValidator {
 								return
 							}
 							ARIFIModeCatalog.save(modes)
+							}
+							guard let session = resp.data?.client_session, !session.isEmpty else {
+								NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Sesión ausente")
+								completion(false, "Respuesta incompleta. Servidor no autorizado.", 0, nil)
+								return
+							}
+							currentSessionToken = session
+							NyxelRemoteConfigStore.recordAccepted()
 						}
-						NyxelRemoteConfigStore.recordAccepted()
+					else {
+						currentSessionToken = nil
 					}
 
                     completion(resp.success, resp.message ?? "ok", rem, resp.notice)

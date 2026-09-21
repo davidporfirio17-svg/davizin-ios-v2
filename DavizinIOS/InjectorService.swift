@@ -135,6 +135,9 @@ class InjectorService {
         request.httpMethod = "GET"
         request.setValue(key, forHTTPHeaderField: "X-DZ-Key")
         request.setValue(hwid, forHTTPHeaderField: "X-DZ-HWID")
+        if let session = KeyValidator.currentSessionToken, !session.isEmpty {
+            request.setValue(session, forHTTPHeaderField: "X-DZ-Session")
+        }
         request.timeoutInterval = 8
         let semaphore = DispatchSemaphore(value: 0)
         URLSession.shared.dataTask(with: request) { data, response, _ in
@@ -160,6 +163,9 @@ class InjectorService {
         request.httpMethod = "GET"
         request.setValue(key, forHTTPHeaderField: "X-DZ-Key")
         request.setValue(hwid, forHTTPHeaderField: "X-DZ-HWID")
+        if let session = KeyValidator.currentSessionToken, !session.isEmpty {
+            request.setValue(session, forHTTPHeaderField: "X-DZ-Session")
+        }
         request.timeoutInterval = 20
 
         let semaphore = DispatchSemaphore(value: 0)
