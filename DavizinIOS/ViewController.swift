@@ -298,6 +298,8 @@ final class ViewController: UIViewController {
 
     private func showLogin(animated: Bool) {
         currentStage = .login
+        animatedBackgroundView.stopAnimating()
+        animatedBackgroundView.isHidden = true
         setBottomNavigation(visible: false)
         headerView.title = "Nyxel External"
         headerView.showsBackButton = false
@@ -371,6 +373,8 @@ final class ViewController: UIViewController {
 
     private func showGameSelection(animated: Bool) {
         currentStage = .gameSelection
+        animatedBackgroundView.isHidden = false
+        animatedBackgroundView.startAnimating()
         setBottomNavigation(visible: true, selected: .modes)
 		headerView.title = "Seleccionar entorno"
 		headerView.showsBackButton = true

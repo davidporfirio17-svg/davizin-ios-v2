@@ -165,8 +165,8 @@ final class LoginView: UIView {
         NSLayoutConstraint.activate([
             videoBackground.leadingAnchor.constraint(equalTo: leadingAnchor),
             videoBackground.trailingAnchor.constraint(equalTo: trailingAnchor),
-            videoBackground.topAnchor.constraint(equalTo: topAnchor),
-            videoBackground.bottomAnchor.constraint(equalTo: bottomAnchor),
+            videoBackground.topAnchor.constraint(equalTo: topAnchor, constant: -90.0),
+            videoBackground.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -90.0),
             videoOverlay.leadingAnchor.constraint(equalTo: leadingAnchor),
             videoOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
             videoOverlay.topAnchor.constraint(equalTo: topAnchor),
