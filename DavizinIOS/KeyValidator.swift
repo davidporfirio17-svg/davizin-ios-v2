@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Security
 
 struct KeyResponse: Codable {
     let success: Bool
@@ -26,6 +27,50 @@ class KeyValidator {
     /// Token efímero emitido por el Worker para las operaciones posteriores.
     /// No se persiste en UserDefaults: debe desaparecer al cerrar la app.
     private(set) static var currentSessionToken: String?
+
+    private static let installationService = "com.davizin.client-installation"
+
+    /// Identificador aleatorio por instalación, protegido por Keychain y no incluido en backups.
+    static func getInstallationID() -> String {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: installationService,
+            kSecAttrAccount as String: "installation-id",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        if SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+           let data = result as? Data,
+           let value = String(data: data, encoding: .utf8),
+           !value.isEmpty {
+            return value
+        }
+
+        let value = UUID().uuidString.lowercased()
+        let add: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: installationService,
+            kSecAttrAccount as String: "installation-id",
+            kSecValueData as String: Data(value.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        SecItemAdd(add as CFDictionary, nil)
+        return value
+    }
+
+    static func getAppBuild() -> String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+    }
+
+    /// Añade identidad de instalación, build y sesión a cada solicitud sensible.
+    static func applySecurityHeaders(to request: inout URLRequest) {
+        request.setValue(getInstallationID(), forHTTPHeaderField: "X-DZ-Installation")
+        request.setValue(getAppBuild(), forHTTPHeaderField: "X-DZ-Build")
+        if let session = currentSessionToken, !session.isEmpty {
+            request.setValue(session, forHTTPHeaderField: "X-DZ-Session")
+        }
+    }
 
     static func getDeviceHWID() -> String {
         if let hwid = UIDevice.current.identifierForVendor?.uuidString {
@@ -60,13 +105,14 @@ class KeyValidator {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 15
+        applySecurityHeaders(to: &request)
 
         let hwid = getDeviceHWID()
         let model = getDeviceModel()
         let ios = getIOSVersion()
         let upperKey = key.uppercased()
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
-        let appBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        let appBuild = getAppBuild()
 
         let body: [String: Any] = [
             "key": upperKey,
@@ -75,7 +121,8 @@ class KeyValidator {
             "model": model,
             "ios": ios,
             "app_version": appVersion,
-            "app_build": appBuild
+            "app_build": appBuild,
+            "installation_id": getInstallationID()
         ]
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
