@@ -24,9 +24,6 @@ struct KeyGateView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            DavizinLoginVideoBackground()
-                .ignoresSafeArea()
-                .overlay(Color.black.opacity(0.48).ignoresSafeArea())
             BackgroundParticles()
             VStack(spacing: 0) {
                 Spacer()

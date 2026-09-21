@@ -42,6 +42,8 @@ protocol LoginViewDelegate: AnyObject {
 final class LoginView: UIView {
     weak var delegate: LoginViewDelegate?
 
+    private let videoBackground = DavizinLoginVideoView()
+    private let videoOverlay = UIView()
     private let cardView = DavizinCardView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
@@ -89,6 +91,13 @@ final class LoginView: UIView {
     private func configure() {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
+
+        videoBackground.translatesAutoresizingMaskIntoConstraints = false
+        videoOverlay.translatesAutoresizingMaskIntoConstraints = false
+        videoOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.48)
+        addSubview(videoBackground)
+        addSubview(videoOverlay)
+        sendSubviewToBack(videoBackground)
 
 		titleLabel.text = "NYXEL"
         titleLabel.textColor = AppTheme.primaryText
@@ -154,6 +163,14 @@ final class LoginView: UIView {
         addSubview(cardView)
 
         NSLayoutConstraint.activate([
+            videoBackground.leadingAnchor.constraint(equalTo: leadingAnchor),
+            videoBackground.trailingAnchor.constraint(equalTo: trailingAnchor),
+            videoBackground.topAnchor.constraint(equalTo: topAnchor),
+            videoBackground.bottomAnchor.constraint(equalTo: bottomAnchor),
+            videoOverlay.leadingAnchor.constraint(equalTo: leadingAnchor),
+            videoOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
+            videoOverlay.topAnchor.constraint(equalTo: topAnchor),
+            videoOverlay.bottomAnchor.constraint(equalTo: bottomAnchor),
             cardView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 22.0),
             cardView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -22.0),
             cardView.centerXAnchor.constraint(equalTo: centerXAnchor),
