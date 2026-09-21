@@ -5,6 +5,7 @@ import Security
 struct KeyResponse: Codable {
     let success: Bool
     let message: String?
+    let error_code: String?
     let remaining_seconds: Int?
     let data: KeyData?
     let signature: String?
@@ -27,6 +28,7 @@ class KeyValidator {
     /// Token efímero emitido por el Worker para las operaciones posteriores.
     /// No se persiste en UserDefaults: debe desaparecer al cerrar la app.
     private(set) static var currentSessionToken: String?
+    private(set) static var lastValidationWasVersionUnavailable = false
 
     private static let installationService = "com.davizin.client-installation"
 
@@ -143,6 +145,7 @@ class KeyValidator {
 
                 do {
                     let resp = try JSONDecoder().decode(KeyResponse.self, from: data)
+                    lastValidationWasVersionUnavailable = resp.error_code == "VERSION_UNAVAILABLE"
                     let rem = resp.data?.remaining_seconds ?? resp.remaining_seconds ?? 0
 
                     // Si el login es exitoso, EXIGIMOS una sesión efímera emitida por el Worker.
@@ -168,8 +171,9 @@ class KeyValidator {
 					}
 
                     completion(resp.success, resp.message ?? "ok", rem, resp.notice)
-			} catch {
-					NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Respuesta no válida")
+                } catch {
+                        lastValidationWasVersionUnavailable = false
+						NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Respuesta no válida")
 					completion(false, "Error parsing response", 0, nil)
                 }
             }

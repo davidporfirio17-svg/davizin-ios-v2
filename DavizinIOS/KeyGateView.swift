@@ -8,6 +8,7 @@ struct KeyGateView: View {
     @State private var isValidating: Bool = false
     @State private var errorMessage: String = ""
     @State private var showError: Bool = false
+    @State private var versionUnavailable: Bool = false
     @State private var logoScale: CGFloat = 0.8
     @State private var logoOpacity: Double = 0
     
@@ -50,6 +51,32 @@ struct KeyGateView: View {
                     }
                 }
                 Spacer().frame(height: 50)
+                if versionUnavailable {
+                    VStack(spacing: 18) {
+                        Image(systemName: "nosign")
+                            .font(.system(size: 42, weight: .semibold))
+                            .foregroundColor(.orange)
+                        Text("VERSIÓN NO DISPONIBLE")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .tracking(1)
+                        Text("Esta versión ya no puede iniciar sesión.")
+                            .font(.system(size: 14))
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.white.opacity(0.6))
+                        Button("REINTENTAR") {
+                            versionUnavailable = false
+                            showError = false
+                        }
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(Capsule().fill(Color.cyan))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(28)
+                } else {
                 VStack(spacing: 16) {
                     HStack(spacing: 8) {
                         Circle().fill(Color.green).frame(width: 8, height: 8)
@@ -103,6 +130,7 @@ struct KeyGateView: View {
                 .padding(24)
                 .background(RoundedRectangle(cornerRadius: 24).fill(Color.white.opacity(0.04)).overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Color.white.opacity(0.08), lineWidth: 1)))
                 .padding(.horizontal, 20)
+                }
                 Spacer()
                 Text("Nyxel").font(.system(size: 12, weight: .semibold)).foregroundColor(.white.opacity(0.2)).padding(.bottom, 30)
             }
@@ -123,8 +151,15 @@ struct KeyGateView: View {
                 appState.saveKey(keyInput, expirationMs: expirationTimeMs)
                 onSuccess()
             } else {
-                errorMessage = message
-                withAnimation { showError = true }
+                if KeyValidator.lastValidationWasVersionUnavailable {
+                    withAnimation {
+                        versionUnavailable = true
+                        showError = false
+                    }
+                } else {
+                    errorMessage = message
+                    withAnimation { showError = true }
+                }
             }
         }
     }
