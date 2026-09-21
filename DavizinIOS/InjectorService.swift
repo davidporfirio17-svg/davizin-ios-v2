@@ -171,14 +171,9 @@ class InjectorService {
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
             guard let data = data, data.count > 28 else { return }
 
-            // El archivo puede venir cifrado o en claro. Resolvemos a un cache_res VALIDO.
-            // Un cache_res valido SIEMPRE empieza con la firma "UnityFS".
-            // 1) Si ya viene en claro (empieza con UnityFS), usarlo.
-            // 2) Si no, intentar descifrar y validar que el resultado sea UnityFS.
-            // 3) Si nada da un UnityFS valido, devolver nil (NO escribir basura).
-            if isUnityFS(data) {
-                result = data
-            } else if let plain = decrypt(data, session: session), isUnityFS(plain) {
+            // Desde la eliminación del legacy, todos los recursos deben venir cifrados.
+            // Nunca aceptar contenido en claro aunque empiece por "UnityFS".
+            if let plain = decrypt(data, session: session), isUnityFS(plain) {
                 result = plain
             } else {
                 result = nil
