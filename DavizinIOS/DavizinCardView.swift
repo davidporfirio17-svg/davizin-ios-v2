@@ -35,6 +35,13 @@ final class DavizinCardView: UIView {
         updateContentConstraints()
     }
 
+    func useTransparentAppearance() {
+        backgroundColor = .clear
+        blurView.alpha = 0.16
+        layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
+        layer.shadowOpacity = 0.12
+    }
+
     private func configure() {
         backgroundColor = AppTheme.card
         layer.cornerRadius = AppTheme.cardCornerRadius

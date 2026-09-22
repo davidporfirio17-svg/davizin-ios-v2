@@ -159,6 +159,7 @@ final class LoginView: UIView {
         stackView.addArrangedSubview(statusLabel)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
+        cardView.useTransparentAppearance()
         cardView.addContent(stackView)
         addSubview(cardView)
 
