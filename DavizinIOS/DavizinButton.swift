@@ -22,6 +22,7 @@ final class DavizinButton: UIButton {
     private var backgroundVideoLooper: AVPlayerLooper?
     private let backgroundVideoLayer = AVPlayerLayer()
     private let backgroundVideoOverlay = CALayer()
+    private let backgroundGlassView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
 
     var selectedVisual: Bool = false {
         didSet { updateAppearance() }
@@ -72,6 +73,8 @@ final class DavizinButton: UIButton {
         backgroundVideoLayer.cornerRadius = layer.cornerRadius
         backgroundVideoOverlay.frame = bounds
         backgroundVideoOverlay.cornerRadius = layer.cornerRadius
+        backgroundGlassView.frame = bounds
+        backgroundGlassView.layer.cornerRadius = layer.cornerRadius
     }
 
     func setButtonStyle(_ style: DavizinButtonStyle) {
@@ -97,10 +100,16 @@ final class DavizinButton: UIButton {
         backgroundVideoPlayer = player
         backgroundVideoLayer.player = player
         backgroundVideoLayer.videoGravity = .resizeAspectFill
-        backgroundVideoOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.34).cgColor
+        backgroundVideoOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.10).cgColor
         if backgroundVideoLayer.superlayer == nil {
             layer.insertSublayer(backgroundVideoLayer, at: 0)
             layer.insertSublayer(backgroundVideoOverlay, above: backgroundVideoLayer)
+        }
+        if backgroundGlassView.superview == nil {
+            backgroundGlassView.isUserInteractionEnabled = false
+            backgroundGlassView.alpha = 0.42
+            backgroundGlassView.clipsToBounds = true
+            insertSubview(backgroundGlassView, at: 0)
         }
         layer.masksToBounds = true
         player.isMuted = true
@@ -180,7 +189,9 @@ final class DavizinButton: UIButton {
             backgroundColor = UIColor.clear
         } else {
             loginGradient.isHidden = true
-            let alpha: CGFloat = backgroundVideoPlayer == nil ? visualAlpha : 0.58 * visualAlpha
+            let alpha: CGFloat = backgroundVideoPlayer == nil
+                ? visualAlpha
+                : (selectedVisual ? 0.30 : 0.18) * visualAlpha
             backgroundColor = baseColor.withAlphaComponent(alpha)
         }
         setTitleColor(titleColor.withAlphaComponent(visualAlpha), for: .normal)
