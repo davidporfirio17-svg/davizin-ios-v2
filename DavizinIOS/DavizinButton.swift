@@ -16,6 +16,7 @@ final class DavizinButton: UIButton {
     private var titleBeforeLoading: String?
     private var style: DavizinButtonStyle = .secondary
     private var usesLoginEmphasis = false
+    private let loginGradient = CAGradientLayer()
 
     var selectedVisual: Bool = false {
         didSet { updateAppearance() }
@@ -58,6 +59,12 @@ final class DavizinButton: UIButton {
         configure()
     }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        loginGradient.frame = bounds
+        loginGradient.cornerRadius = layer.cornerRadius
+    }
+
     func setButtonStyle(_ style: DavizinButtonStyle) {
         self.style = style
         updateAppearance()
@@ -65,6 +72,11 @@ final class DavizinButton: UIButton {
 
     func useLoginEmphasis() {
         usesLoginEmphasis = true
+        if loginGradient.superlayer == nil {
+            loginGradient.startPoint = CGPoint(x: 0.0, y: 0.0)
+            loginGradient.endPoint = CGPoint(x: 1.0, y: 1.0)
+            layer.insertSublayer(loginGradient, at: 0)
+        }
         updateAppearance()
     }
 
@@ -130,7 +142,18 @@ final class DavizinButton: UIButton {
         let enabledAlpha: CGFloat = isEnabled ? 1.0 : 0.45
         let highlightAlpha: CGFloat = isHighlighted ? 0.80 : 1.0
         let visualAlpha = enabledAlpha * highlightAlpha
-        backgroundColor = baseColor.withAlphaComponent(visualAlpha)
+        if usesLoginEmphasis && style == .primary {
+            loginGradient.isHidden = false
+            loginGradient.colors = [
+                AppTheme.accentDim.withAlphaComponent(visualAlpha).cgColor,
+                AppTheme.accent.withAlphaComponent(visualAlpha).cgColor,
+                AppTheme.accentHot.withAlphaComponent(visualAlpha).cgColor
+            ]
+            backgroundColor = UIColor.clear
+        } else {
+            loginGradient.isHidden = true
+            backgroundColor = baseColor.withAlphaComponent(visualAlpha)
+        }
         setTitleColor(titleColor.withAlphaComponent(visualAlpha), for: .normal)
         layer.borderWidth = selectedVisual || style != .secondary ? 1.0 : 0.0
         layer.borderColor = borderColor.withAlphaComponent(visualAlpha).cgColor
