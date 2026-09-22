@@ -1,5 +1,4 @@
 import UIKit
-import AVFoundation
 
 // MARK: - DavizinButton v2
 // Press feedback: scale(0.97), 150ms — recipe "Button press" de animate/RECIPES.md,
@@ -18,11 +17,6 @@ final class DavizinButton: UIButton {
     private var style: DavizinButtonStyle = .secondary
     private var usesLoginEmphasis = false
     private let loginGradient = CAGradientLayer()
-    private var backgroundVideoPlayer: AVQueuePlayer?
-    private var backgroundVideoLooper: AVPlayerLooper?
-    private let backgroundVideoLayer = AVPlayerLayer()
-    private let backgroundVideoOverlay = CALayer()
-    private let backgroundGlassView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
 
     var selectedVisual: Bool = false {
         didSet { updateAppearance() }
@@ -69,12 +63,6 @@ final class DavizinButton: UIButton {
         super.layoutSubviews()
         loginGradient.frame = bounds
         loginGradient.cornerRadius = layer.cornerRadius
-        backgroundVideoLayer.frame = bounds
-        backgroundVideoLayer.cornerRadius = layer.cornerRadius
-        backgroundVideoOverlay.frame = bounds
-        backgroundVideoOverlay.cornerRadius = layer.cornerRadius
-        backgroundGlassView.frame = bounds
-        backgroundGlassView.layer.cornerRadius = layer.cornerRadius
     }
 
     func setButtonStyle(_ style: DavizinButtonStyle) {
@@ -89,31 +77,6 @@ final class DavizinButton: UIButton {
             loginGradient.endPoint = CGPoint(x: 1.0, y: 1.0)
             layer.insertSublayer(loginGradient, at: 0)
         }
-        updateAppearance()
-    }
-
-    /// Añade un video silencioso en loop detrás del título del botón.
-    func setBackgroundVideo(resourceName: String) {
-        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") else { return }
-        let player = AVQueuePlayer()
-        backgroundVideoLooper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
-        backgroundVideoPlayer = player
-        backgroundVideoLayer.player = player
-        backgroundVideoLayer.videoGravity = .resizeAspectFill
-        backgroundVideoOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.10).cgColor
-        if backgroundVideoLayer.superlayer == nil {
-            layer.insertSublayer(backgroundVideoLayer, at: 0)
-            layer.insertSublayer(backgroundVideoOverlay, above: backgroundVideoLayer)
-        }
-        if backgroundGlassView.superview == nil {
-            backgroundGlassView.isUserInteractionEnabled = false
-            backgroundGlassView.alpha = 0.42
-            backgroundGlassView.clipsToBounds = true
-            insertSubview(backgroundGlassView, at: 0)
-        }
-        layer.masksToBounds = true
-        player.isMuted = true
-        player.play()
         updateAppearance()
     }
 
@@ -189,10 +152,7 @@ final class DavizinButton: UIButton {
             backgroundColor = UIColor.clear
         } else {
             loginGradient.isHidden = true
-            let alpha: CGFloat = backgroundVideoPlayer == nil
-                ? visualAlpha
-                : (selectedVisual ? 0.30 : 0.18) * visualAlpha
-            backgroundColor = baseColor.withAlphaComponent(alpha)
+            backgroundColor = baseColor.withAlphaComponent(visualAlpha)
         }
         setTitleColor(titleColor.withAlphaComponent(visualAlpha), for: .normal)
         layer.borderWidth = selectedVisual || style != .secondary ? 1.0 : 0.0
