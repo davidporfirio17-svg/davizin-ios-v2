@@ -14,6 +14,7 @@ final class SoundService {
 
     private let engine = AVAudioEngine()
     private let mixer: AVAudioMixerNode
+    private var activationPlayer: AVAudioPlayer?
     private var holdPlayer: AVAudioSourceNode?
     private var holdFrequency: Double = 220
     private var holdPhase: Double = 0
@@ -76,6 +77,21 @@ final class SoundService {
         playTone(frequency: 660, duration: 0.32, volume: 0.22, waveform: .triangle)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) { [weak self] in
             self?.playTone(frequency: 990, duration: 0.32, volume: 0.22, waveform: .triangle)
+        }
+    }
+
+    /// Voz de confirmación que se reproduce cuando la inyección termina correctamente.
+    func playActivationVoice() {
+        guard isEnabled,
+              let url = Bundle.main.url(forResource: "opcion_activada", withExtension: "mp3") else { return }
+        do {
+            activationPlayer?.stop()
+            activationPlayer = try AVAudioPlayer(contentsOf: url)
+            activationPlayer?.volume = 1.0
+            activationPlayer?.prepareToPlay()
+            activationPlayer?.play()
+        } catch {
+            activationPlayer = nil
         }
     }
 
