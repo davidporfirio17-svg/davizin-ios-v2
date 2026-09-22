@@ -304,13 +304,22 @@ final class LoginView: UIView {
             videoOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
             videoOverlay.topAnchor.constraint(equalTo: topAnchor),
             videoOverlay.bottomAnchor.constraint(equalTo: bottomAnchor),
-            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 22.0),
-            cardView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -22.0),
-            cardView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            cardView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor, constant: 22.0),
+            cardView.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -22.0),
+            cardView.centerXAnchor.constraint(equalTo: safeAreaLayoutGuide.centerXAnchor),
+            cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
             cardView.widthAnchor.constraint(lessThanOrEqualToConstant: AppTheme.contentMaximumWidth),
             stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: 220.0),
             continueButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
+        ])
+
+        let topSafeArea = cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 16.0)
+        let bottomSafeArea = cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -16.0)
+        topSafeArea.priority = .defaultHigh
+        bottomSafeArea.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            topSafeArea,
+            bottomSafeArea
         ])
     }
 
