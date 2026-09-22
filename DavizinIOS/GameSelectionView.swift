@@ -58,6 +58,8 @@ final class GameSelectionView: UIView {
 
         freeFireButton.accessibilityIdentifier = "game.freeFire"
         freeFireMaxButton.accessibilityIdentifier = "game.freeFireMax"
+        freeFireButton.setBackgroundVideo(resourceName: "game_selection_preview")
+        freeFireMaxButton.setBackgroundVideo(resourceName: "game_selection_preview")
         freeFireButton.addTarget(self, action: #selector(freeFireTapped), for: .touchUpInside)
         freeFireMaxButton.addTarget(self, action: #selector(freeFireMaxTapped), for: .touchUpInside)
 
