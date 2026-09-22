@@ -59,6 +59,9 @@ final class LoginView: UIView {
     private var hasPlayedEntrance = false
     private var keyboardObserverTokens: [NSObjectProtocol] = []
     private var showingValidationError = false
+    private var portraitLayoutConstraints: [NSLayoutConstraint] = []
+    private var landscapeLayoutConstraints: [NSLayoutConstraint] = []
+    private var usesLandscapeLayout = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -78,6 +81,19 @@ final class LoginView: UIView {
         super.layoutSubviews()
         videoGradient.frame = videoOverlay.bounds
         vignetteGradient.frame = videoOverlay.bounds
+        updateResponsiveLayoutIfNeeded()
+    }
+
+    private func updateResponsiveLayoutIfNeeded() {
+        guard !portraitLayoutConstraints.isEmpty else { return }
+        let landscape = bounds.width > bounds.height && bounds.width > 600.0
+        guard landscape != usesLandscapeLayout else { return }
+        usesLandscapeLayout = landscape
+        NSLayoutConstraint.deactivate(landscape ? portraitLayoutConstraints : landscapeLayoutConstraints)
+        NSLayoutConstraint.activate(landscape ? landscapeLayoutConstraints : portraitLayoutConstraints)
+        UIView.animate(withDuration: 0.28, delay: 0.0, options: [.curveEaseInOut, .beginFromCurrentState, .allowUserInteraction]) {
+            self.layoutIfNeeded()
+        }
     }
 
     override func didMoveToWindow() {
@@ -279,7 +295,7 @@ final class LoginView: UIView {
 	        titleLabel.adjustsFontForContentSizeCategory = true
 	        applyTitleTracking(titleLabel, value: -0.25)
 
-        subtitleLabel.text = "Activa tu sesión para continuar."
+		subtitleLabel.text = "SECURE EXTERNAL ACCESS"
         subtitleLabel.textColor = AppTheme.secondaryText
         subtitleLabel.font = AppTheme.bodyFont()
         subtitleLabel.textAlignment = .center
@@ -360,7 +376,7 @@ final class LoginView: UIView {
         addGestureRecognizer(dismissKeyboardTap)
         observeKeyboard()
 
-        NSLayoutConstraint.activate([
+        let commonConstraints = [
             videoBackground.leadingAnchor.constraint(equalTo: leadingAnchor),
             videoBackground.trailingAnchor.constraint(equalTo: trailingAnchor),
             videoBackground.topAnchor.constraint(equalTo: topAnchor, constant: -90.0),
@@ -369,23 +385,30 @@ final class LoginView: UIView {
             videoOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
             videoOverlay.topAnchor.constraint(equalTo: topAnchor),
             videoOverlay.bottomAnchor.constraint(equalTo: bottomAnchor),
-            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor, constant: 22.0),
-            cardView.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -22.0),
-            cardView.centerXAnchor.constraint(equalTo: safeAreaLayoutGuide.centerXAnchor),
-            cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
-            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: AppTheme.contentMaximumWidth),
             stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: 220.0),
             continueButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
-        ])
+        ]
+        NSLayoutConstraint.activate(commonConstraints)
 
-        let topSafeArea = cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 16.0)
-        let bottomSafeArea = cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -16.0)
-        topSafeArea.priority = .defaultHigh
-        bottomSafeArea.priority = .defaultHigh
-        NSLayoutConstraint.activate([
-            topSafeArea,
-            bottomSafeArea
-        ])
+        portraitLayoutConstraints = [
+            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor, constant: 18.0),
+            cardView.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -18.0),
+            cardView.centerXAnchor.constraint(equalTo: safeAreaLayoutGuide.centerXAnchor),
+            cardView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
+            cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 18.0),
+            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 380.0)
+        ]
+
+        landscapeLayoutConstraints = [
+            cardView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -28.0),
+            cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
+            cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 18.0),
+            cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
+            cardView.widthAnchor.constraint(equalTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.42),
+            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 380.0)
+        ]
+
+        NSLayoutConstraint.activate(portraitLayoutConstraints)
     }
 
 	@objc private func keyFieldChanged() {
