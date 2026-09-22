@@ -15,6 +15,7 @@ final class DavizinButton: UIButton {
     private let spinner = UIActivityIndicatorView(style: .medium)
     private var titleBeforeLoading: String?
     private var style: DavizinButtonStyle = .secondary
+    private var usesLoginEmphasis = false
 
     var selectedVisual: Bool = false {
         didSet { updateAppearance() }
@@ -59,6 +60,11 @@ final class DavizinButton: UIButton {
 
     func setButtonStyle(_ style: DavizinButtonStyle) {
         self.style = style
+        updateAppearance()
+    }
+
+    func useLoginEmphasis() {
+        usesLoginEmphasis = true
         updateAppearance()
     }
 
@@ -130,8 +136,8 @@ final class DavizinButton: UIButton {
         layer.borderColor = borderColor.withAlphaComponent(visualAlpha).cgColor
         layer.shadowColor = selectedVisual || style == .primary ? AppTheme.accent.cgColor : UIColor.clear.cgColor
         layer.shadowOpacity = selectedVisual || style == .primary ? 0.28 : 0.0
-        layer.shadowRadius = 14.0
-        layer.shadowOffset = CGSize(width: 0, height: 6)
+        layer.shadowRadius = usesLoginEmphasis ? 18.0 : 14.0
+        layer.shadowOffset = CGSize(width: 0, height: usesLoginEmphasis ? 7.0 : 6.0)
         spinner.color = titleColor
     }
 }

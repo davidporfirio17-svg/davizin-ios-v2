@@ -113,15 +113,22 @@ final class LoginView: UIView {
         subtitleLabel.adjustsFontForContentSizeCategory = true
 
         keyField.translatesAutoresizingMaskIntoConstraints = false
-        keyField.backgroundColor = AppTheme.background
+        keyField.backgroundColor = UIColor.black.withAlphaComponent(0.28)
         keyField.textColor = AppTheme.primaryText
         keyField.tintColor = AppTheme.primaryText
         keyField.font = AppTheme.bodyFont()
         keyField.layer.cornerRadius = AppTheme.controlCornerRadius
         keyField.layer.cornerCurve = .continuous
         keyField.layer.borderWidth = 1.0
-        keyField.layer.borderColor = AppTheme.separator.cgColor
-        keyField.placeholder = "PEGA TU KEY DE ACCESO"
+        keyField.layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
+        keyField.layer.shadowColor = AppTheme.accent.cgColor
+        keyField.layer.shadowOffset = .zero
+        keyField.layer.shadowRadius = 12.0
+        keyField.layer.shadowOpacity = 0.0
+        keyField.attributedPlaceholder = NSAttributedString(
+            string: "PEGA TU KEY DE ACCESO",
+            attributes: [.foregroundColor: UIColor.white.withAlphaComponent(0.42)]
+        )
         keyField.autocorrectionType = .no
         keyField.autocapitalizationType = .allCharacters
         keyField.returnKeyType = .continue
@@ -134,6 +141,7 @@ final class LoginView: UIView {
         keyField.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight).isActive = true
 
         continueButton.addTarget(self, action: #selector(continueTapped), for: .touchUpInside)
+        continueButton.useLoginEmphasis()
         continueButton.accessibilityIdentifier = "login.continue"
 
         statusLabel.textColor = AppTheme.secondaryText
@@ -183,9 +191,27 @@ final class LoginView: UIView {
     }
 
 	@objc private func keyFieldChanged() {
-		let value = (keyField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-		keyField.text = value
-		if value.isEmpty { NyxelKeychain.remove() } else { NyxelKeychain.save(value) }
+			let value = (keyField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+			keyField.text = value
+			if value.isEmpty { NyxelKeychain.remove() } else { NyxelKeychain.save(value) }
+	}
+
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        guard textField === keyField else { return }
+        UIView.animate(withDuration: 0.18) {
+            self.keyField.backgroundColor = UIColor.black.withAlphaComponent(0.18)
+            self.keyField.layer.borderColor = AppTheme.accent.cgColor
+            self.keyField.layer.shadowOpacity = 0.28
+        }
+    }
+
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        guard textField === keyField else { return }
+        UIView.animate(withDuration: 0.18) {
+            self.keyField.backgroundColor = UIColor.black.withAlphaComponent(0.28)
+            self.keyField.layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
+            self.keyField.layer.shadowOpacity = 0.0
+        }
     }
 
     @objc private func continueTapped() {
