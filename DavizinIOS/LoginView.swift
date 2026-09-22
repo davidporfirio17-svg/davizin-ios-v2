@@ -277,7 +277,7 @@ final class LoginView: UIView {
         titleLabel.font = AppTheme.titleFont()
 		titleLabel.textAlignment = .center
 	        titleLabel.adjustsFontForContentSizeCategory = true
-	        titleLabel.applyTitleTracking(value: -0.25)
+	        applyTitleTracking(titleLabel, value: -0.25)
 
         subtitleLabel.text = "Activa tu sesión para continuar."
         subtitleLabel.textColor = AppTheme.secondaryText
