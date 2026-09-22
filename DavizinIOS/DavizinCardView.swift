@@ -51,6 +51,7 @@ final class DavizinCardView: UIView {
         glassHighlight.startPoint = CGPoint(x: 0.5, y: 0.0)
         glassHighlight.endPoint = CGPoint(x: 0.5, y: 1.0)
         glassHighlight.cornerRadius = AppTheme.cardCornerRadius
+        glassHighlight.masksToBounds = true
         layer.insertSublayer(glassHighlight, at: 0)
     }
 

@@ -53,6 +53,7 @@ final class LoginView: UIView {
     private let statusLabel = UILabel()
     private let compatLabel = UILabel()
     private let stackView = UIStackView()
+    private var hasPlayedEntrance = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -71,7 +72,8 @@ final class LoginView: UIView {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        guard window != nil else { return }
+        guard window != nil, !hasPlayedEntrance else { return }
+        hasPlayedEntrance = true
 
         videoBackground.alpha = 0.0
         cardView.alpha = 0.0
@@ -123,7 +125,9 @@ final class LoginView: UIView {
         translatesAutoresizingMaskIntoConstraints = false
 
         videoBackground.translatesAutoresizingMaskIntoConstraints = false
+        videoBackground.isUserInteractionEnabled = false
         videoOverlay.translatesAutoresizingMaskIntoConstraints = false
+        videoOverlay.isUserInteractionEnabled = false
         videoOverlay.backgroundColor = .clear
         videoGradient.colors = [
             UIColor.black.withAlphaComponent(0.12).cgColor,
