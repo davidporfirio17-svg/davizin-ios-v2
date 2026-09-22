@@ -291,6 +291,8 @@ final class LoginView: UIView {
         keyField.autocapitalizationType = .allCharacters
         keyField.returnKeyType = .continue
         keyField.clearButtonMode = .whileEditing
+        keyField.accessibilityLabel = "Key de acceso"
+        keyField.accessibilityHint = "Pega tu key; los espacios y saltos de línea se eliminan automáticamente"
         keyField.delegate = self
         keyField.addTarget(self, action: #selector(keyFieldChanged), for: .editingChanged)
 		keyField.text = NyxelKeychain.key
@@ -371,10 +373,14 @@ final class LoginView: UIView {
 
 	@objc private func keyFieldChanged() {
 			if showingValidationError { clearValidationFeedback() }
-				let value = (keyField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-			keyField.text = value
-			if value.isEmpty { NyxelKeychain.remove() } else { NyxelKeychain.save(value) }
+				let value = normalizedKey(keyField.text ?? "")
+				keyField.text = value
+				if value.isEmpty { NyxelKeychain.remove() } else { NyxelKeychain.save(value) }
 	}
+
+    private func normalizedKey(_ value: String) -> String {
+        value.components(separatedBy: .whitespacesAndNewlines).joined().uppercased()
+    }
 
     @objc private func toggleKeyVisibility() {
         let wasFirstResponder = keyField.isFirstResponder
@@ -429,6 +435,22 @@ final class LoginView: UIView {
 }
 
 extension LoginView: UITextFieldDelegate {
+    func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        guard textField === keyField,
+              let current = textField.text,
+              let textRange = Range(range, in: current) else { return true }
+
+        let proposed = current.replacingCharacters(in: textRange, with: string)
+        let normalized = normalizedKey(proposed)
+        guard normalized != proposed || string.rangeOfCharacter(from: .whitespacesAndNewlines) != nil else {
+            return true
+        }
+
+        textField.text = normalized
+        keyFieldChanged()
+        return false
+    }
+
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         continueTapped()
         return true
