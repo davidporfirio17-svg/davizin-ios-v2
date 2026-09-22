@@ -86,6 +86,15 @@ final class LoginView: UIView {
         }
 
         UIView.animate(
+            withDuration: 1.35,
+            delay: 0.72,
+            options: [.autoreverse, .repeat, .allowUserInteraction, .beginFromCurrentState]
+        ) {
+            self.logoMark.alpha = 0.72
+            self.logoMark.transform = CGAffineTransform(scaleX: 0.94, y: 0.94)
+        }
+
+        UIView.animate(
             withDuration: 0.62,
             delay: 0.18,
             usingSpringWithDamping: 0.86,
@@ -132,6 +141,7 @@ final class LoginView: UIView {
             self.cardView.alpha = 0.0
             self.cardView.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
             self.videoBackground.alpha = 0.0
+            self.videoBackground.transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
         } completion: { _ in
             completion()
         }
@@ -165,7 +175,7 @@ final class LoginView: UIView {
 		logoMark.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 24.0, weight: .bold)
 		logoMark.heightAnchor.constraint(equalToConstant: 30.0).isActive = true
 
-		titleLabel.text = "DAVIZIN"
+		titleLabel.text = "NYXEL EXTERNAL"
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = AppTheme.titleFont()
         titleLabel.textAlignment = .center
@@ -285,6 +295,13 @@ final class LoginView: UIView {
 
     func textFieldDidBeginEditing(_ textField: UITextField) {
         guard textField === keyField else { return }
+        let borderPulse = CABasicAnimation(keyPath: "borderColor")
+        borderPulse.fromValue = UIColor.white.withAlphaComponent(0.22).cgColor
+        borderPulse.toValue = AppTheme.accent.cgColor
+        borderPulse.duration = 0.85
+        borderPulse.autoreverses = true
+        borderPulse.repeatCount = .greatestFiniteMagnitude
+        keyField.layer.add(borderPulse, forKey: "nyxel.key.borderPulse")
         UIView.animate(withDuration: 0.18) {
             self.keyField.backgroundColor = UIColor.black.withAlphaComponent(0.18)
             self.keyField.layer.borderColor = AppTheme.accent.cgColor
@@ -294,6 +311,7 @@ final class LoginView: UIView {
 
     func textFieldDidEndEditing(_ textField: UITextField) {
         guard textField === keyField else { return }
+        keyField.layer.removeAnimation(forKey: "nyxel.key.borderPulse")
         UIView.animate(withDuration: 0.18) {
             self.keyField.backgroundColor = UIColor.black.withAlphaComponent(0.28)
             self.keyField.layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
