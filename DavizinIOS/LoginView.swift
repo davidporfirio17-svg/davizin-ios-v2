@@ -45,6 +45,7 @@ final class LoginView: UIView {
     private let videoBackground = DavizinLoginVideoView()
     private let videoOverlay = UIView()
     private let videoGradient = CAGradientLayer()
+    private let vignetteGradient = CAGradientLayer()
     private let cardView = DavizinCardView()
     private let logoMark = UIImageView()
     private let titleLabel = UILabel()
@@ -76,6 +77,7 @@ final class LoginView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         videoGradient.frame = videoOverlay.bounds
+        vignetteGradient.frame = videoOverlay.bounds
     }
 
     override func didMoveToWindow() {
@@ -246,21 +248,36 @@ final class LoginView: UIView {
         videoGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
         videoGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
         videoOverlay.layer.addSublayer(videoGradient)
+        vignetteGradient.colors = [
+            UIColor.black.withAlphaComponent(0.30).cgColor,
+            UIColor.clear.cgColor,
+            UIColor.clear.cgColor,
+            UIColor.black.withAlphaComponent(0.22).cgColor
+        ]
+        vignetteGradient.locations = [0.0, 0.18, 0.72, 1.0]
+        vignetteGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
+        vignetteGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
+        videoOverlay.layer.addSublayer(vignetteGradient)
         addSubview(videoBackground)
         addSubview(videoOverlay)
         sendSubviewToBack(videoBackground)
 
 		logoMark.image = UIImage(systemName: "bolt.shield.fill")
 		logoMark.tintColor = AppTheme.accent
-		logoMark.contentMode = .scaleAspectFit
-		logoMark.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 24.0, weight: .bold)
-		logoMark.heightAnchor.constraint(equalToConstant: 30.0).isActive = true
+			logoMark.contentMode = .scaleAspectFit
+			logoMark.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 24.0, weight: .bold)
+			logoMark.layer.shadowColor = AppTheme.accent.cgColor
+			logoMark.layer.shadowRadius = 14.0
+			logoMark.layer.shadowOpacity = 0.72
+			logoMark.layer.shadowOffset = .zero
+			logoMark.heightAnchor.constraint(equalToConstant: 30.0).isActive = true
 
 		titleLabel.text = "NYXEL EXTERNAL"
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = AppTheme.titleFont()
-        titleLabel.textAlignment = .center
-        titleLabel.adjustsFontForContentSizeCategory = true
+		titleLabel.textAlignment = .center
+	        titleLabel.adjustsFontForContentSizeCategory = true
+	        titleLabel.applyTitleTracking(value: -0.25)
 
         subtitleLabel.text = "Activa tu sesión para continuar."
         subtitleLabel.textColor = AppTheme.secondaryText
