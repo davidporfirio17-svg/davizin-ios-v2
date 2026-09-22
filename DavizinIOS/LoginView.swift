@@ -108,6 +108,7 @@ final class LoginView: UIView {
 
     func setChecking(_ checking: Bool) {
         keyField.isEnabled = !checking
+        keyVisibilityButton.isEnabled = !checking
         continueButton.setLoading(checking, title: "VERIFICANDO...")
         statusLabel.text = checking ? "Validando credenciales..." : nil
         statusLabel.isHidden = !checking
@@ -181,7 +182,7 @@ final class LoginView: UIView {
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
 
-        subtitleLabel.text = "Activa tu sesión para desbloquear el panel de operaciones."
+        subtitleLabel.text = "Activa tu sesión para continuar."
         subtitleLabel.textColor = AppTheme.secondaryText
         subtitleLabel.font = AppTheme.bodyFont()
         subtitleLabel.textAlignment = .center
@@ -255,6 +256,10 @@ final class LoginView: UIView {
         cardView.addContent(stackView)
         addSubview(cardView)
 
+        let dismissKeyboardTap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        dismissKeyboardTap.cancelsTouchesInView = false
+        addGestureRecognizer(dismissKeyboardTap)
+
         NSLayoutConstraint.activate([
             videoBackground.leadingAnchor.constraint(equalTo: leadingAnchor),
             videoBackground.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -293,6 +298,10 @@ final class LoginView: UIView {
         }
     }
 
+    @objc private func dismissKeyboard() {
+        endEditing(true)
+    }
+
     func textFieldDidBeginEditing(_ textField: UITextField) {
         guard textField === keyField else { return }
         let borderPulse = CABasicAnimation(keyPath: "borderColor")
@@ -320,7 +329,10 @@ final class LoginView: UIView {
     }
 
     @objc private func continueTapped() {
+        guard continueButton.isEnabled else { return }
         keyFieldChanged()
+        keyField.resignFirstResponder()
+        continueButton.isEnabled = false
         delegate?.loginView(self, didTapContinueWithKey: keyField.text ?? "")
     }
 }
