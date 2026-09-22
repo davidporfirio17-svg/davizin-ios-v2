@@ -51,6 +51,7 @@ final class ProfileView: UIView {
     private let rankProgressLabel = UILabel()
     private let appearanceControl = UISegmentedControl(items: ["Cian", "Fuego", "Violeta"])
     private let biometricSwitch = UISwitch()
+    private let activationVoiceSwitch = UISwitch()
     private let refreshButton = UIButton(type: .system)
     private let logoutButton = DavizinButton(title: "CERRAR SESIÓN", style: .destructive)
     private let scrollView = UIScrollView()
@@ -89,6 +90,7 @@ final class ProfileView: UIView {
         deviceLabel.text = "DISPOSITIVO\n\(KeyValidator.getDeviceModel()) • \(NyxelSupportPolicy.currentSystemDescription)"
         appearanceControl.selectedSegmentIndex = NyxelAppearanceStore.theme.rawValue
         biometricSwitch.isOn = UserDefaults.standard.bool(forKey: "nyxel.biometric.enabled")
+        activationVoiceSwitch.isOn = SoundService.shared.activationVoiceEnabled
         serviceStatusLabel.text = "●  \(NyxelRemoteConfigStore.status)"
         serviceStatusLabel.textColor = NyxelRemoteConfigStore.status == "Configuración válida" ? AppTheme.success : AppTheme.warm
         diagnosticsLabel.text = diagnosticText()
@@ -177,6 +179,8 @@ final class ProfileView: UIView {
         appearanceControl.addTarget(self, action: #selector(appearanceChanged), for: .valueChanged)
         biometricSwitch.onTintColor = AppTheme.accent
         biometricSwitch.addTarget(self, action: #selector(biometricChanged), for: .valueChanged)
+        activationVoiceSwitch.onTintColor = AppTheme.accent
+        activationVoiceSwitch.addTarget(self, action: #selector(activationVoiceChanged), for: .valueChanged)
 
         refreshButton.setTitle("↻  ACTUALIZAR DATOS", for: .normal)
         refreshButton.setTitleColor(AppTheme.accent, for: .normal)
@@ -192,7 +196,11 @@ final class ProfileView: UIView {
         biometricRow.axis = .horizontal
         biometricRow.alignment = .center
         biometricRow.distribution = .equalSpacing
-        let stack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, keyRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel, serviceStatusLabel, diagnosticsLabel, gamesLabel, historyLabel, appearanceControl, biometricRow, refreshButton, activityLabel, logoutButton])
+        let activationVoiceRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Audio \"Opción activada\" después de Inject"), activationVoiceSwitch])
+        activationVoiceRow.axis = .horizontal
+        activationVoiceRow.alignment = .center
+        activationVoiceRow.distribution = .equalSpacing
+        let stack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, keyRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel, serviceStatusLabel, diagnosticsLabel, gamesLabel, historyLabel, appearanceControl, biometricRow, activationVoiceRow, refreshButton, activityLabel, logoutButton])
         stack.axis = .vertical; stack.spacing = 13
         stack.setCustomSpacing(22, after: heroStack)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -254,6 +262,11 @@ final class ProfileView: UIView {
     @objc private func biometricChanged() {
         UserDefaults.standard.set(biometricSwitch.isOn, forKey: "nyxel.biometric.enabled")
         NyxelActivityLog.record(biometricSwitch.isOn ? "Biometría activada" : "Biometría desactivada")
+    }
+
+    @objc private func activationVoiceChanged() {
+        SoundService.shared.activationVoiceEnabled = activationVoiceSwitch.isOn
+        NyxelActivityLog.record(activationVoiceSwitch.isOn ? "Audio de confirmación activado" : "Audio de confirmación desactivado")
     }
 
     private func makeCaptionLabel(_ text: String) -> UILabel {

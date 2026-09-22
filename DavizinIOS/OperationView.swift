@@ -90,9 +90,9 @@ final class OperationView: UIView {
             statusLabel.isHidden = false
             if message.lowercased().contains("inyectado") {
                 HapticsService.success()
-                SoundService.shared.playChime()
+                SoundService.shared.playActivationVoice()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) {
-                    SoundService.shared.playActivationVoice()
+                    SoundService.shared.playChime()
                 }
                 SessionStats.recordInjection()
                 showPostInjectButtons(animated: true)

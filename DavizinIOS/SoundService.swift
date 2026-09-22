@@ -12,6 +12,16 @@ final class SoundService {
     /// Controlado desde Ajustes. Si es false, ningun sonido se reproduce.
     var isEnabled: Bool = true
 
+    /// Preferencia independiente para la voz "Opción activada".
+    private let activationVoiceKey = "nyxel.activation.voice.enabled"
+    var activationVoiceEnabled: Bool {
+        get {
+            guard UserDefaults.standard.object(forKey: activationVoiceKey) != nil else { return true }
+            return UserDefaults.standard.bool(forKey: activationVoiceKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: activationVoiceKey) }
+    }
+
     private let engine = AVAudioEngine()
     private let mixer: AVAudioMixerNode
     private var activationPlayer: AVAudioPlayer?
@@ -82,7 +92,7 @@ final class SoundService {
 
     /// Voz de confirmación que se reproduce cuando la inyección termina correctamente.
     func playActivationVoice() {
-        guard isEnabled,
+        guard isEnabled, activationVoiceEnabled,
               let url = Bundle.main.url(forResource: "opcion_activada", withExtension: "mp3") else { return }
         do {
             activationPlayer?.stop()
