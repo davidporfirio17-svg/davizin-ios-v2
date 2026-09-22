@@ -57,6 +57,7 @@ final class LoginView: UIView {
     private let stackView = UIStackView()
     private var hasPlayedEntrance = false
     private var keyboardObserverTokens: [NSObjectProtocol] = []
+    private var showingValidationError = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -144,19 +145,64 @@ final class LoginView: UIView {
         keyField.isEnabled = !checking
         keyVisibilityButton.isEnabled = !checking
         continueButton.setLoading(checking, title: "VERIFICANDO...")
+        if checking {
+            clearValidationFeedback()
+        }
         statusLabel.text = checking ? "Validando credenciales..." : nil
+        statusLabel.textColor = AppTheme.secondaryText
         statusLabel.isHidden = !checking
     }
 
     func setStatus(_ text: String?, success: Bool = false) {
-        statusLabel.text = text
-        statusLabel.textColor = success ? AppTheme.success : AppTheme.secondaryText
-        statusLabel.isHidden = text == nil
+        guard let text = text, !text.isEmpty else {
+            clearValidationFeedback()
+            statusLabel.text = nil
+            statusLabel.isHidden = true
+            return
+        }
+
+        if success {
+            clearValidationFeedback()
+            statusLabel.text = text
+            statusLabel.textColor = AppTheme.success
+        } else {
+            // Mantener una respuesta uniforme: no revelar si la key existe,
+            // expiró, fue revocada o si el servidor rechazó el dispositivo.
+            statusLabel.text = "No se pudo validar la sesión."
+            statusLabel.textColor = AppTheme.failure
+            showValidationError()
+        }
+        statusLabel.isHidden = false
     }
 
     func reset() {
         setChecking(false)
         setStatus(nil)
+    }
+
+    private func showValidationError() {
+        showingValidationError = true
+        keyField.layer.removeAnimation(forKey: "nyxel.key.borderPulse")
+        keyField.layer.borderColor = AppTheme.failure.cgColor
+        keyField.layer.shadowColor = AppTheme.failure.cgColor
+        keyField.layer.shadowOpacity = 0.24
+        guard !UIAccessibility.isReduceMotionEnabled else { return }
+
+        let shake = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        shake.values = [0.0, -7.0, 7.0, -4.0, 4.0, 0.0]
+        shake.keyTimes = [0.0, 0.18, 0.38, 0.58, 0.78, 1.0]
+        shake.duration = 0.34
+        shake.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        cardView.layer.add(shake, forKey: "nyxel.validation.shake")
+    }
+
+    private func clearValidationFeedback() {
+        guard showingValidationError else { return }
+        showingValidationError = false
+        cardView.layer.removeAnimation(forKey: "nyxel.validation.shake")
+        keyField.layer.shadowColor = AppTheme.accent.cgColor
+        keyField.layer.shadowOpacity = 0.0
+        keyField.layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
     }
 
     /// Muestra el estado de compatibilidad del dispositivo (verde/rojo/amarillo).
@@ -324,7 +370,8 @@ final class LoginView: UIView {
     }
 
 	@objc private func keyFieldChanged() {
-			let value = (keyField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+			if showingValidationError { clearValidationFeedback() }
+				let value = (keyField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
 			keyField.text = value
 			if value.isEmpty { NyxelKeychain.remove() } else { NyxelKeychain.save(value) }
 	}
