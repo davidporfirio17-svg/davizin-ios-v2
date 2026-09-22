@@ -56,6 +56,7 @@ final class LoginView: UIView {
     private let compatLabel = UILabel()
     private let stackView = UIStackView()
     private var hasPlayedEntrance = false
+    private var keyboardObserverTokens: [NSObjectProtocol] = []
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -65,6 +66,10 @@ final class LoginView: UIView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         configure()
+    }
+
+    deinit {
+        keyboardObserverTokens.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     override func layoutSubviews() {
@@ -103,6 +108,35 @@ final class LoginView: UIView {
         ) {
             self.cardView.alpha = 1.0
             self.cardView.transform = .identity
+        }
+    }
+
+    private func observeKeyboard() {
+        let center = NotificationCenter.default
+        let names: [Notification.Name] = [
+            UIResponder.keyboardWillChangeFrameNotification,
+            UIResponder.keyboardWillHideNotification
+        ]
+        keyboardObserverTokens = names.map { name in
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] notification in
+                self?.adjustForKeyboard(notification)
+            }
+        }
+    }
+
+    private func adjustForKeyboard(_ notification: Notification) {
+        guard window != nil else { return }
+        let keyboardFrame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)
+            .map { convert($0.cgRectValue, from: nil) } ?? .zero
+        let isHidden = notification.name == UIResponder.keyboardWillHideNotification || keyboardFrame.minY >= bounds.maxY
+        let bottomPadding: CGFloat = 18.0
+        let overlap = isHidden ? 0.0 : max(0.0, cardView.frame.maxY - (keyboardFrame.minY - bottomPadding))
+        let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue ?? 0.25
+        let curveRaw = (notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? NSNumber)?.uintValue ?? 7
+        let options = UIView.AnimationOptions(rawValue: curveRaw << 16).union([.beginFromCurrentState, .allowUserInteraction])
+
+        UIView.animate(withDuration: duration, delay: 0.0, options: options) {
+            self.cardView.transform = CGAffineTransform(translationX: 0.0, y: -overlap)
         }
     }
 
@@ -259,6 +293,7 @@ final class LoginView: UIView {
         let dismissKeyboardTap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         dismissKeyboardTap.cancelsTouchesInView = false
         addGestureRecognizer(dismissKeyboardTap)
+        observeKeyboard()
 
         NSLayoutConstraint.activate([
             videoBackground.leadingAnchor.constraint(equalTo: leadingAnchor),
