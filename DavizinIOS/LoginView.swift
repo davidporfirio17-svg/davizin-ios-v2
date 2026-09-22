@@ -55,6 +55,9 @@ final class LoginView: UIView {
     private let continueButton = DavizinButton(title: "ENTRAR AL PANEL", style: .primary)
     private let statusLabel = UILabel()
     private let compatLabel = UILabel()
+    private let readinessRow = UIStackView()
+    private let readinessDot = UIView()
+    private let readinessLabel = UILabel()
     private let stackView = UIStackView()
     private var hasPlayedEntrance = false
     private var keyboardObserverTokens: [NSObjectProtocol] = []
@@ -107,6 +110,14 @@ final class LoginView: UIView {
 
         UIView.animate(withDuration: 0.70, delay: 0.04, options: [.curveEaseOut, .beginFromCurrentState]) {
             self.videoBackground.alpha = 1.0
+        }
+
+        guard !UIAccessibility.isReduceMotionEnabled else {
+            logoMark.alpha = 1.0
+            logoMark.transform = .identity
+            cardView.alpha = 1.0
+            cardView.transform = .identity
+            return
         }
 
         UIView.animate(
@@ -169,6 +180,7 @@ final class LoginView: UIView {
         statusLabel.text = checking ? "Validando credenciales..." : nil
         statusLabel.textColor = AppTheme.secondaryText
         statusLabel.isHidden = !checking
+        setReadiness(checking ? "VERIFICANDO" : "SISTEMA LISTO", color: checking ? AppTheme.warm : AppTheme.accent)
     }
 
     func setStatus(_ text: String?, success: Bool = false) {
@@ -183,12 +195,14 @@ final class LoginView: UIView {
             clearValidationFeedback()
             statusLabel.text = text
             statusLabel.textColor = AppTheme.success
+            setReadiness("SESIÓN ACTIVA", color: AppTheme.success)
         } else {
             // Mantener una respuesta uniforme: no revelar si la key existe,
             // expiró, fue revocada o si el servidor rechazó el dispositivo.
             statusLabel.text = "No se pudo validar la sesión."
             statusLabel.textColor = AppTheme.failure
             showValidationError()
+            setReadiness("SESIÓN NO VALIDADA", color: AppTheme.failure)
         }
         statusLabel.isHidden = false
     }
@@ -196,6 +210,14 @@ final class LoginView: UIView {
     func reset() {
         setChecking(false)
         setStatus(nil)
+    }
+
+    private func setReadiness(_ text: String, color: UIColor) {
+        readinessLabel.text = text
+        readinessLabel.textColor = color
+        readinessDot.backgroundColor = color
+        readinessDot.layer.shadowColor = color.cgColor
+        readinessDot.layer.shadowOpacity = UIAccessibility.isReduceMotionEnabled ? 0.0 : 0.75
     }
 
     private func showValidationError() {
@@ -349,6 +371,24 @@ final class LoginView: UIView {
         statusLabel.numberOfLines = 0
         statusLabel.isHidden = true
 
+        readinessDot.translatesAutoresizingMaskIntoConstraints = false
+        readinessDot.layer.cornerRadius = 4.0
+        readinessDot.layer.shadowRadius = 6.0
+        readinessDot.layer.shadowOffset = .zero
+        readinessDot.backgroundColor = AppTheme.accent
+        readinessLabel.text = "SISTEMA LISTO"
+        readinessLabel.textColor = AppTheme.accent
+        readinessLabel.font = AppTheme.captionFont()
+        readinessLabel.adjustsFontForContentSizeCategory = true
+        readinessRow.axis = .horizontal
+        readinessRow.alignment = .center
+        readinessRow.spacing = 7.0
+        readinessRow.translatesAutoresizingMaskIntoConstraints = false
+        readinessRow.addArrangedSubview(readinessDot)
+        readinessRow.addArrangedSubview(readinessLabel)
+        readinessDot.widthAnchor.constraint(equalToConstant: 8.0).isActive = true
+        readinessDot.heightAnchor.constraint(equalToConstant: 8.0).isActive = true
+
         compatLabel.font = UIFont.systemFont(ofSize: 13.0, weight: .bold)
         compatLabel.textAlignment = .center
         compatLabel.numberOfLines = 0
@@ -365,6 +405,7 @@ final class LoginView: UIView {
         stackView.addArrangedSubview(keyField)
         stackView.addArrangedSubview(continueButton)
         stackView.addArrangedSubview(statusLabel)
+        stackView.addArrangedSubview(readinessRow)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
         cardView.useTransparentAppearance()
