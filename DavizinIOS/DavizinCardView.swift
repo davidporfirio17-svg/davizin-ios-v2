@@ -3,6 +3,7 @@ import UIKit
 final class DavizinCardView: UIView {
     private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let contentView = UIView()
+    private let glassHighlight = CAGradientLayer()
     private var contentConstraints: [NSLayoutConstraint] = []
 
     var contentInsets: UIEdgeInsets = UIEdgeInsets(
@@ -27,6 +28,7 @@ final class DavizinCardView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: AppTheme.cardCornerRadius).cgPath
+        glassHighlight.frame = bounds
     }
 
     func addContent(_ view: UIView) {
@@ -37,9 +39,19 @@ final class DavizinCardView: UIView {
 
     func useTransparentAppearance() {
         backgroundColor = .clear
-        blurView.alpha = 0.16
-        layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
+        blurView.alpha = 0.24
+        layer.borderColor = UIColor.white.withAlphaComponent(0.26).cgColor
         layer.shadowOpacity = 0.12
+        glassHighlight.colors = [
+            UIColor.white.withAlphaComponent(0.14).cgColor,
+            UIColor.white.withAlphaComponent(0.025).cgColor,
+            UIColor.clear.cgColor
+        ]
+        glassHighlight.locations = [0.0, 0.16, 0.48]
+        glassHighlight.startPoint = CGPoint(x: 0.5, y: 0.0)
+        glassHighlight.endPoint = CGPoint(x: 0.5, y: 1.0)
+        glassHighlight.cornerRadius = AppTheme.cardCornerRadius
+        layer.insertSublayer(glassHighlight, at: 0)
     }
 
     private func configure() {

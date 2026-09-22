@@ -44,6 +44,7 @@ final class LoginView: UIView {
 
     private let videoBackground = DavizinLoginVideoView()
     private let videoOverlay = UIView()
+    private let videoGradient = CAGradientLayer()
     private let cardView = DavizinCardView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
@@ -61,6 +62,11 @@ final class LoginView: UIView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         configure()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        videoGradient.frame = videoOverlay.bounds
     }
 
     func setChecking(_ checking: Bool) {
@@ -94,7 +100,16 @@ final class LoginView: UIView {
 
         videoBackground.translatesAutoresizingMaskIntoConstraints = false
         videoOverlay.translatesAutoresizingMaskIntoConstraints = false
-        videoOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.48)
+        videoOverlay.backgroundColor = .clear
+        videoGradient.colors = [
+            UIColor.black.withAlphaComponent(0.12).cgColor,
+            UIColor.black.withAlphaComponent(0.24).cgColor,
+            UIColor.black.withAlphaComponent(0.72).cgColor
+        ]
+        videoGradient.locations = [0.0, 0.48, 1.0]
+        videoGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
+        videoGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
+        videoOverlay.layer.addSublayer(videoGradient)
         addSubview(videoBackground)
         addSubview(videoOverlay)
         sendSubviewToBack(videoBackground)
