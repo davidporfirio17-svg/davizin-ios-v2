@@ -46,9 +46,11 @@ final class LoginView: UIView {
     private let videoOverlay = UIView()
     private let videoGradient = CAGradientLayer()
     private let cardView = DavizinCardView()
+    private let logoMark = UIImageView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let keyField = UITextField()
+    private let keyVisibilityButton = UIButton(type: .system)
     private let continueButton = DavizinButton(title: "ENTRAR AL PANEL", style: .primary)
     private let statusLabel = UILabel()
     private let compatLabel = UILabel()
@@ -120,6 +122,21 @@ final class LoginView: UIView {
         compatLabel.isHidden = text.isEmpty
     }
 
+    func playExitAnimation(completion: @escaping () -> Void) {
+        keyField.resignFirstResponder()
+        UIView.animate(
+            withDuration: 0.30,
+            delay: 0.0,
+            options: [.curveEaseIn, .beginFromCurrentState]
+        ) {
+            self.cardView.alpha = 0.0
+            self.cardView.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+            self.videoBackground.alpha = 0.0
+        } completion: { _ in
+            completion()
+        }
+    }
+
     private func configure() {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
@@ -142,7 +159,13 @@ final class LoginView: UIView {
         addSubview(videoOverlay)
         sendSubviewToBack(videoBackground)
 
-		titleLabel.text = "NYXEL"
+		logoMark.image = UIImage(systemName: "bolt.shield.fill")
+		logoMark.tintColor = AppTheme.accent
+		logoMark.contentMode = .scaleAspectFit
+		logoMark.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 24.0, weight: .bold)
+		logoMark.heightAnchor.constraint(equalToConstant: 30.0).isActive = true
+
+		titleLabel.text = "DAVIZIN"
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = AppTheme.titleFont()
         titleLabel.textAlignment = .center
@@ -172,6 +195,7 @@ final class LoginView: UIView {
             string: "PEGA TU KEY DE ACCESO",
             attributes: [.foregroundColor: UIColor.white.withAlphaComponent(0.42)]
         )
+        keyField.isSecureTextEntry = true
         keyField.autocorrectionType = .no
         keyField.autocapitalizationType = .allCharacters
         keyField.returnKeyType = .continue
@@ -180,7 +204,13 @@ final class LoginView: UIView {
         keyField.addTarget(self, action: #selector(keyFieldChanged), for: .editingChanged)
 		keyField.text = NyxelKeychain.key
         keyField.setLeftPadding(14.0)
-        keyField.setRightPadding(14.0)
+        keyVisibilityButton.setImage(UIImage(systemName: "eye.slash.fill"), for: .normal)
+        keyVisibilityButton.tintColor = UIColor.white.withAlphaComponent(0.58)
+        keyVisibilityButton.frame = CGRect(x: 0.0, y: 0.0, width: 42.0, height: AppTheme.controlHeight)
+        keyVisibilityButton.accessibilityLabel = "Mostrar key"
+        keyVisibilityButton.addTarget(self, action: #selector(toggleKeyVisibility), for: .touchUpInside)
+        keyField.rightView = keyVisibilityButton
+        keyField.rightViewMode = .always
         keyField.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight).isActive = true
 
         continueButton.addTarget(self, action: #selector(continueTapped), for: .touchUpInside)
@@ -202,6 +232,7 @@ final class LoginView: UIView {
         stackView.alignment = .fill
         stackView.spacing = 12.0
         stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.addArrangedSubview(logoMark)
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
         stackView.addArrangedSubview(compatLabel)
@@ -238,6 +269,19 @@ final class LoginView: UIView {
 			keyField.text = value
 			if value.isEmpty { NyxelKeychain.remove() } else { NyxelKeychain.save(value) }
 	}
+
+    @objc private func toggleKeyVisibility() {
+        let wasFirstResponder = keyField.isFirstResponder
+        let selectedRange = keyField.selectedTextRange
+        keyField.isSecureTextEntry.toggle()
+        let visible = !keyField.isSecureTextEntry
+        keyVisibilityButton.setImage(UIImage(systemName: visible ? "eye.fill" : "eye.slash.fill"), for: .normal)
+        keyVisibilityButton.accessibilityLabel = visible ? "Ocultar key" : "Mostrar key"
+        if wasFirstResponder {
+            keyField.becomeFirstResponder()
+            keyField.selectedTextRange = selectedRange
+        }
+    }
 
     func textFieldDidBeginEditing(_ textField: UITextField) {
         guard textField === keyField else { return }

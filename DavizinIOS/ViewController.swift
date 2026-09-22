@@ -543,7 +543,10 @@ final class ViewController: UIViewController {
             screen.setStatus("Access granted", success: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
                 guard let self = self, self.currentStage == .login else { return }
-                self.showGameSelection(animated: true)
+                screen.playExitAnimation {
+                    guard self.currentStage == .login else { return }
+                    self.showGameSelection(animated: true)
+                }
             }
         }
     }
