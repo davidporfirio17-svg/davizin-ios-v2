@@ -31,13 +31,13 @@
 			A24 = {isa=PBXBuildFile;fileRef=F27;};
 			A25 = {isa=PBXBuildFile;fileRef=F28;};
 			A26 = {isa=PBXBuildFile;fileRef=F29;};
-			A27 = {isa=PBXBuildFile;fileRef=F30;};
-			A28 = {isa=PBXBuildFile;fileRef=F31;};
-			A29 = {isa=PBXBuildFile;fileRef=F32;};
-			AR4 = {isa=PBXBuildFile;fileRef=FR4;};
-			A28 = {isa=PBXBuildFile;fileRef=F28;};
-			A29 = {isa=PBXBuildFile;fileRef=F29;};
-			AR5 = {isa=PBXBuildFile;fileRef=FR5;};
+				A27 = {isa=PBXBuildFile;fileRef=F30;};
+				A28 = {isa=PBXBuildFile;fileRef=F31;};
+				A29 = {isa=PBXBuildFile;fileRef=F32;};
+				AR1 = {isa=PBXBuildFile;fileRef=FR1;};
+				AR3 = {isa=PBXBuildFile;fileRef=FR3;};
+				AR4 = {isa=PBXBuildFile;fileRef=FR4;};
+				AR5 = {isa=PBXBuildFile;fileRef=FR5;};
 /* PBXFileReference */
 		F01 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=AppDelegate.swift;sourceTree="<group>";};
 		F02 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=SceneDelegate.swift;sourceTree="<group>";};
