@@ -69,6 +69,30 @@ final class LoginView: UIView {
         videoGradient.frame = videoOverlay.bounds
     }
 
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else { return }
+
+        videoBackground.alpha = 0.0
+        cardView.alpha = 0.0
+        cardView.transform = CGAffineTransform(translationX: 0.0, y: 16.0)
+
+        UIView.animate(withDuration: 0.70, delay: 0.04, options: [.curveEaseOut, .beginFromCurrentState]) {
+            self.videoBackground.alpha = 1.0
+        }
+
+        UIView.animate(
+            withDuration: 0.62,
+            delay: 0.18,
+            usingSpringWithDamping: 0.86,
+            initialSpringVelocity: 0.25,
+            options: [.curveEaseOut, .beginFromCurrentState]
+        ) {
+            self.cardView.alpha = 1.0
+            self.cardView.transform = .identity
+        }
+    }
+
     func setChecking(_ checking: Bool) {
         keyField.isEnabled = !checking
         continueButton.setLoading(checking, title: "VERIFICANDO...")
