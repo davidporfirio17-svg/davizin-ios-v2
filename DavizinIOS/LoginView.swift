@@ -435,8 +435,9 @@ final class LoginView: UIView {
             cardView.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor, constant: 18.0),
             cardView.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -18.0),
             cardView.centerXAnchor.constraint(equalTo: safeAreaLayoutGuide.centerXAnchor),
-            cardView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
+            cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
             cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 18.0),
+            cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
             cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 380.0)
         ]
 
