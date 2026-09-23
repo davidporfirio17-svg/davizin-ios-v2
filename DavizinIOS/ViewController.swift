@@ -21,6 +21,7 @@ final class ViewController: UIViewController {
     private var selectedGame: DavizinGame = .freeFireMax
     private var selectedMode: DavizinMode = .drag
     private var activeKey: String?
+    private var activeCountryCode: String?
     private var activeRemainingSeconds: Int = 0
     private var backgroundedAt: Date?
     private let inactivityLockInterval: TimeInterval = 10 * 60
@@ -90,10 +91,12 @@ final class ViewController: UIViewController {
         headerView.setCountdownColor(color)
     }
 
-    func setAccountSession(key: String?, remainingSeconds: Int) {
+    func setAccountSession(key: String?, remainingSeconds: Int, countryCode: String? = nil) {
         activeKey = key
+        if countryCode != nil { activeCountryCode = countryCode }
+        if key == nil { activeCountryCode = nil }
         activeRemainingSeconds = max(0, remainingSeconds)
-        profileView?.setAccount(key: key, remainingSeconds: activeRemainingSeconds)
+        profileView?.setAccount(key: key, remainingSeconds: activeRemainingSeconds, countryCode: activeCountryCode)
     }
 
     /// Muestra un mensaje personalizado del panel al cliente (popup con estilo Davizin).
@@ -439,7 +442,7 @@ final class ViewController: UIViewController {
 
         let screen = ProfileView()
         screen.delegate = self
-        screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds)
+        screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds, countryCode: activeCountryCode)
         screen.onAppearanceChanged = { [weak self] in
             self?.showProfile(animated: true)
         }
@@ -449,8 +452,8 @@ final class ViewController: UIViewController {
                 guard let self else { return }
                 if success && remaining > 0 {
                     NyxelActivityLog.record("Datos del Worker actualizados")
-                    self.setAccountSession(key: key, remainingSeconds: remaining)
-                    screen?.setAccount(key: key, remainingSeconds: remaining)
+                    self.setAccountSession(key: key, remainingSeconds: remaining, countryCode: KeyValidator.lastCountryCode)
+                    screen?.setAccount(key: key, remainingSeconds: remaining, countryCode: KeyValidator.lastCountryCode)
                     DavizinToastCenter.shared.show(title: "Datos actualizados", subtitle: "La key y el Worker están sincronizados.", kind: .success)
                 } else {
                     DavizinToastCenter.shared.show(title: "No se pudo actualizar", subtitle: message, kind: .danger)

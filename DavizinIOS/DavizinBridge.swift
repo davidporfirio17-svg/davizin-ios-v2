@@ -73,7 +73,7 @@ final class DavizinBridge {
                 NyxelActivityLog.record("Key validada")
                 self?.vc?.setLoginStatus("Acceso concedido ✓", success: true)
                 self?.remainingSeconds = remaining
-                self?.vc?.setAccountSession(key: upperKey, remainingSeconds: remaining)
+                self?.vc?.setAccountSession(key: upperKey, remainingSeconds: remaining, countryCode: KeyValidator.lastCountryCode)
 
                 // Guardar credenciales para las descargas de cache_res
                 self?.sessionKey = upperKey

@@ -21,6 +21,7 @@ struct KeyData: Codable {
     let tier: String?
     let modes: [DavizinMode]?
     let client_session: String?
+    let country: String?
 }
 
 class KeyValidator {
@@ -28,6 +29,7 @@ class KeyValidator {
     /// Token efímero emitido por el Worker para las operaciones posteriores.
     /// No se persiste en UserDefaults: debe desaparecer al cerrar la app.
     private(set) static var currentSessionToken: String?
+    private(set) static var lastCountryCode: String?
     private(set) static var lastValidationWasVersionUnavailable = false
 
     private static let installationService = "com.davizin.client-installation"
@@ -145,6 +147,7 @@ class KeyValidator {
 
                 do {
                     let resp = try JSONDecoder().decode(KeyResponse.self, from: data)
+                    lastCountryCode = resp.data?.country?.uppercased()
                     lastValidationWasVersionUnavailable = resp.error_code == "VERSION_UNAVAILABLE"
                     let rem = resp.data?.remaining_seconds ?? resp.remaining_seconds ?? 0
 

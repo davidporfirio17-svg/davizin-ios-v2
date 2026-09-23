@@ -105,6 +105,7 @@ final class ProfileView: UIView {
     private let rankBadge = UIView()
     private let rankLabel = UILabel()
     private let keyValueLabel = UILabel()
+    private let countryValueLabel = UILabel()
     private let expirationValueLabel = UILabel()
     private let accountStatusLabel = UILabel()
     private let countValueLabel = UILabel()
@@ -130,7 +131,7 @@ final class ProfileView: UIView {
     override init(frame: CGRect) { super.init(frame: frame); configure() }
     required init?(coder: NSCoder) { super.init(coder: coder); configure() }
 
-    func setAccount(key: String?, remainingSeconds: Int) {
+    func setAccount(key: String?, remainingSeconds: Int, countryCode: String? = nil) {
         let previousKey = activeKey
         activeKey = key
         activeRemainingSeconds = max(0, remainingSeconds)
@@ -147,6 +148,7 @@ final class ProfileView: UIView {
         rankBadge.layer.borderColor = tier.color.withAlphaComponent(0.5).cgColor
         rankBadge.backgroundColor = tier.color.withAlphaComponent(0.12)
         keyValueLabel.text = maskedKey(activeKey)
+        countryValueLabel.text = countryName(for: countryCode)
         accountStatusLabel.text = activeKey == nil ? "Sin validar" : (activeRemainingSeconds > 0 ? "Activa" : "Expirada")
         accountStatusLabel.textColor = activeRemainingSeconds > 0 ? AppTheme.success : AppTheme.failure
         expirationValueLabel.text = formattedRemaining(activeRemainingSeconds)
@@ -214,6 +216,7 @@ final class ProfileView: UIView {
         heroStack.translatesAutoresizingMaskIntoConstraints = false
 
         let keyRow = makeRow(label: "Key", valueLabel: keyValueLabel)
+        let countryRow = makeRow(label: "País", valueLabel: countryValueLabel)
         let statusRow = makeRow(label: "Estado", valueLabel: accountStatusLabel)
         let expirationRow = makeRow(label: "Expira en", valueLabel: expirationValueLabel)
         let countRow = makeRow(label: "Inyecciones totales", valueLabel: countValueLabel)
@@ -263,7 +266,7 @@ final class ProfileView: UIView {
         activationVoiceRow.alignment = .center
         activationVoiceRow.distribution = .equalSpacing
 
-        let accountSection = ProfileDisclosureSection(title: "CUENTA", views: [keyRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel])
+        let accountSection = ProfileDisclosureSection(title: "CUENTA", views: [keyRow, countryRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel])
         let appearanceSection = ProfileDisclosureSection(title: "APARIENCIA", views: [appearanceControl])
         let securitySection = ProfileDisclosureSection(title: "SEGURIDAD", views: [biometricRow])
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
@@ -358,6 +361,13 @@ final class ProfileView: UIView {
         let d = seconds / 86400; let h = (seconds % 86400) / 3600; let m = (seconds % 3600) / 60; let s = seconds % 60
         if d > 0 { return String(format: "%dd %02dh %02dm", d, h, m) }
         return String(format: "%02dh %02dm %02ds", h, m, s)
+    }
+
+    private func countryName(for code: String?) -> String {
+        guard let code, !code.isEmpty else { return "País no disponible" }
+        let names = ["MX": "México", "GT": "Guatemala", "US": "Estados Unidos", "CA": "Canadá", "ES": "España", "CO": "Colombia", "AR": "Argentina", "CL": "Chile", "PE": "Perú", "BR": "Brasil", "DO": "República Dominicana", "HN": "Honduras", "SV": "El Salvador", "CR": "Costa Rica", "PA": "Panamá", "NI": "Nicaragua", "VE": "Venezuela", "EC": "Ecuador", "BO": "Bolivia", "UY": "Uruguay", "PY": "Paraguay", "PR": "Puerto Rico", "EU": "Europa"]
+        let normalized = code.uppercased()
+        return names[normalized].map { "\(normalized) · \($0)" } ?? normalized
     }
 
     private func diagnosticText() -> String {
