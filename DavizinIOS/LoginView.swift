@@ -420,8 +420,8 @@ final class LoginView: UIView {
         let commonConstraints = [
             videoBackground.leadingAnchor.constraint(equalTo: leadingAnchor),
             videoBackground.trailingAnchor.constraint(equalTo: trailingAnchor),
-            videoBackground.topAnchor.constraint(equalTo: topAnchor, constant: -90.0),
-            videoBackground.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -90.0),
+            videoBackground.topAnchor.constraint(equalTo: topAnchor),
+            videoBackground.bottomAnchor.constraint(equalTo: bottomAnchor),
             videoOverlay.leadingAnchor.constraint(equalTo: leadingAnchor),
             videoOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
             videoOverlay.topAnchor.constraint(equalTo: topAnchor),
@@ -441,14 +441,26 @@ final class LoginView: UIView {
             cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 380.0)
         ]
 
-        landscapeLayoutConstraints = [
-            cardView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -28.0),
-            cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
-            cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 18.0),
-            cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
-            cardView.widthAnchor.constraint(equalTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.42),
-            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 380.0)
-        ]
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            landscapeLayoutConstraints = [
+                cardView.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor, constant: 28.0),
+                cardView.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -28.0),
+                cardView.centerXAnchor.constraint(equalTo: safeAreaLayoutGuide.centerXAnchor),
+                cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
+                cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 18.0),
+                cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
+                cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 440.0)
+            ]
+        } else {
+            landscapeLayoutConstraints = [
+                cardView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -28.0),
+                cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
+                cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 18.0),
+                cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
+                cardView.widthAnchor.constraint(equalTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.42),
+                cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 380.0)
+            ]
+        }
 
         NSLayoutConstraint.activate(portraitLayoutConstraints)
     }
