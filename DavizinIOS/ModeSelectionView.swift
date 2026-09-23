@@ -122,8 +122,8 @@ final class ModeSelectionView: UIView {
             cardView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -22.0),
             cardView.centerXAnchor.constraint(equalTo: centerXAnchor),
             cardView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: AppTheme.contentMaximumWidth),
-            stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: 240.0)
+            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 560.0 : AppTheme.contentMaximumWidth),
+            stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 360.0 : 240.0)
         ] + buttonConstraints)
     }
 

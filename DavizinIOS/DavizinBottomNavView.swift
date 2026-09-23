@@ -45,12 +45,13 @@ final class DavizinBottomNavView: UIView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
         NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: 68),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 28),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -28),
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: 6),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6)
+            heightAnchor.constraint(equalToConstant: isPad ? 78 : 68),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: isPad ? 120 : 28),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: isPad ? -120 : -28),
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: isPad ? 8 : 6),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: isPad ? -8 : -6)
         ])
         setSelected(.modes)
     }
@@ -61,7 +62,7 @@ final class DavizinBottomNavView: UIView {
         button.accessibilityLabel = text.capitalized
         button.addTarget(self, action: action, for: .touchUpInside)
         label.text = text
-        label.font = .systemFont(ofSize: 10, weight: .heavy)
+        label.font = .systemFont(ofSize: UIDevice.current.userInterfaceIdiom == .pad ? 11 : 10, weight: .heavy)
         label.textAlignment = .center
         label.textColor = AppTheme.secondaryText
         label.isUserInteractionEnabled = false
