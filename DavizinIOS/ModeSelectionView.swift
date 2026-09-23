@@ -48,6 +48,7 @@ final class ModeSelectionView: UIView {
         categoryLabel.font = AppTheme.captionFont()
         categoryLabel.textAlignment = .center
         categoryLabel.adjustsFontForContentSizeCategory = true
+        applyTitleTracking(categoryLabel, value: 1.2)
 
         titleLabel.text = "Configura tu perfil"
         titleLabel.textColor = AppTheme.primaryText
@@ -93,6 +94,11 @@ final class ModeSelectionView: UIView {
         for (index, mode) in activeModes.enumerated() {
             let button = DavizinButton(title: mode.displayName, style: .secondary)
             button.accessibilityIdentifier = accessibilityIdentifier(for: mode)
+            button.accessibilityHint = mode.noticeBody.isEmpty ? "Selecciona este modo para continuar." : mode.noticeBody
+            button.contentHorizontalAlignment = .left
+            button.setImage(UIImage(systemName: iconName(for: mode)), for: .normal)
+            button.tintColor = AppTheme.accent
+            button.imageEdgeInsets = UIEdgeInsets(top: 0, left: 2, bottom: 0, right: 10)
             button.tag = index
             button.addTarget(self, action: #selector(modeTapped(_:)), for: .touchUpInside)
 
@@ -107,6 +113,7 @@ final class ModeSelectionView: UIView {
         stackView.addArrangedSubview(footerLabel)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
+        cardView.useTransparentAppearance()
         cardView.addContent(stackView)
         addSubview(cardView)
 
@@ -122,6 +129,15 @@ final class ModeSelectionView: UIView {
 
     private func accessibilityIdentifier(for mode: DavizinMode) -> String {
         return "mode." + mode.id
+    }
+
+    private func iconName(for mode: DavizinMode) -> String {
+        switch mode.id.lowercased() {
+        case "drag": return "hand.draw.fill"
+        case "pecho": return "scope"
+        case "body100": return "bolt.fill"
+        default: return "slider.horizontal.3"
+        }
     }
 
     @objc private func sheetTriggerTapped() {
