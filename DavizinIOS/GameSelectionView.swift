@@ -72,7 +72,7 @@ final class GameSelectionView: UIView {
         stackView.addArrangedSubview(freeFireMaxButton)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
-        cardView.setBackgroundVideo(resourceName: "game_selection_preview")
+        cardView.useTransparentAppearance()
         cardView.addContent(stackView)
         addSubview(cardView)
 

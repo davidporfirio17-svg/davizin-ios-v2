@@ -1,14 +1,9 @@
 import UIKit
-import AVFoundation
 
 final class DavizinCardView: UIView {
     private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let contentView = UIView()
     private let glassHighlight = CAGradientLayer()
-    private var backgroundVideoPlayer: AVQueuePlayer?
-    private var backgroundVideoLooper: AVPlayerLooper?
-    private let backgroundVideoLayer = AVPlayerLayer()
-    private let backgroundVideoOverlay = CALayer()
     private var contentConstraints: [NSLayoutConstraint] = []
 
     var contentInsets: UIEdgeInsets = UIEdgeInsets(
@@ -34,35 +29,12 @@ final class DavizinCardView: UIView {
         super.layoutSubviews()
         layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: AppTheme.cardCornerRadius).cgPath
         glassHighlight.frame = bounds
-        backgroundVideoLayer.frame = bounds
-        backgroundVideoLayer.cornerRadius = AppTheme.cardCornerRadius
-        backgroundVideoOverlay.frame = bounds
-        backgroundVideoOverlay.cornerRadius = AppTheme.cardCornerRadius
     }
 
     func addContent(_ view: UIView) {
         contentView.addSubview(view)
         view.davizinPinEdges(to: contentView)
         updateContentConstraints()
-    }
-
-    /// Coloca un video silencioso en loop detrás de todo el contenido de la tarjeta.
-    func setBackgroundVideo(resourceName: String) {
-        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") else { return }
-        let player = AVQueuePlayer()
-        backgroundVideoLooper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
-        backgroundVideoPlayer = player
-        backgroundVideoLayer.player = player
-        backgroundVideoLayer.videoGravity = .resizeAspectFill
-        backgroundVideoLayer.masksToBounds = true
-        backgroundVideoOverlay.backgroundColor = UIColor.black.withAlphaComponent(0.08).cgColor
-        if backgroundVideoLayer.superlayer == nil {
-            layer.insertSublayer(backgroundVideoLayer, at: 0)
-            layer.insertSublayer(backgroundVideoOverlay, above: backgroundVideoLayer)
-        }
-        blurView.alpha = 0.34
-        player.isMuted = true
-        player.play()
     }
 
     func useTransparentAppearance() {
