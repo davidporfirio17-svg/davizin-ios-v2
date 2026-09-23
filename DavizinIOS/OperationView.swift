@@ -14,6 +14,8 @@ final class OperationView: UIView {
     private let noticeTitleLabel = UILabel()
     private let noticeBodyLabel = UILabel()
     private let noticeStack = UIStackView()
+    private let successCard = UIView()
+    private let successLabel = UILabel()
 
     // Estado 1 (antes de inyectar): solo estos dos son visibles.
     private let runButton = DavizinButton(title: "EJECUTAR PROCESO", style: .secondary)
@@ -92,6 +94,7 @@ final class OperationView: UIView {
 
     func setState(_ state: DavizinOperationState) {
         operationState = state
+        successCard.isHidden = true
         statusLabel.textColor = AppTheme.secondaryText
         runButton.setLoading(false)
         cleanButton.setLoading(false)
@@ -131,6 +134,7 @@ final class OperationView: UIView {
             statusLabel.isHidden = false
             statusRow.isHidden = false
             if message.lowercased().contains("inyectado") {
+                successCard.isHidden = false
                 showSuccessPulse()
                 HapticsService.success()
                 SoundService.shared.playActivationVoice()
@@ -222,6 +226,26 @@ final class OperationView: UIView {
         ])
         updateNotice()
 
+        successLabel.text = "✓  OPCIÓN ACTIVADA"
+        successLabel.textColor = AppTheme.success
+        successLabel.font = .systemFont(ofSize: 14, weight: .black)
+        successLabel.textAlignment = .center
+        successLabel.translatesAutoresizingMaskIntoConstraints = false
+        successCard.backgroundColor = AppTheme.success.withAlphaComponent(0.12)
+        successCard.layer.cornerRadius = 12.0
+        successCard.layer.borderWidth = 1.0
+        successCard.layer.borderColor = AppTheme.success.withAlphaComponent(0.48).cgColor
+        successCard.addSubview(successLabel)
+        successCard.accessibilityLabel = "Opción activada correctamente"
+        successCard.isAccessibilityElement = true
+        successCard.isHidden = true
+        NSLayoutConstraint.activate([
+            successCard.heightAnchor.constraint(equalToConstant: 48.0),
+            successLabel.leadingAnchor.constraint(equalTo: successCard.leadingAnchor, constant: 12.0),
+            successLabel.trailingAnchor.constraint(equalTo: successCard.trailingAnchor, constant: -12.0),
+            successLabel.centerYAnchor.constraint(equalTo: successCard.centerYAnchor)
+        ])
+
         runButton.accessibilityIdentifier = "operation.runExploit"
         injectButton.accessibilityIdentifier = "operation.inject"
         cleanButton.accessibilityIdentifier = "operation.clean"
@@ -266,6 +290,7 @@ final class OperationView: UIView {
         stackView.addArrangedSubview(noticeCard)
         stackView.addArrangedSubview(runButton)
         stackView.addArrangedSubview(injectButton)
+        stackView.addArrangedSubview(successCard)
         stackView.addArrangedSubview(cleanButton)
         stackView.addArrangedSubview(openGameButton)
         stackView.addArrangedSubview(statusRow)
