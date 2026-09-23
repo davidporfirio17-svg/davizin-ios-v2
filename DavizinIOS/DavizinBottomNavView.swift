@@ -52,12 +52,15 @@ final class DavizinBottomNavView: UIView {
         addSubview(stack)
 
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        let stackTop = stack.topAnchor.constraint(equalTo: topAnchor, constant: isPad ? 8 : 6)
+        let stackBottom = stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: isPad ? -8 : -6)
+        stackTop.priority = .defaultHigh
+        stackBottom.priority = .defaultHigh
         NSLayoutConstraint.activate([
-            heightAnchor.constraint(equalToConstant: isPad ? 78 : 68),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: isPad ? 120 : 28),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: isPad ? -120 : -28),
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: isPad ? 8 : 6),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: isPad ? -8 : -6)
+            stackTop,
+            stackBottom
         ])
         setSelected(.modes)
     }

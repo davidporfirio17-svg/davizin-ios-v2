@@ -292,7 +292,8 @@ final class ViewController: UIViewController {
     private func setBottomNavigation(visible: Bool, selected: DavizinBottomNavView.Item = .modes) {
         bottomNavView.isHidden = !visible
         bottomNavView.setSelected(selected)
-        bottomNavHeightConstraint?.constant = visible ? 68.0 : 0.0
+        let navigationHeight: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 78.0 : 68.0
+        bottomNavHeightConstraint?.constant = visible ? navigationHeight : 0.0
         UIView.animate(withDuration: 0.2) { self.view.layoutIfNeeded() }
     }
 
