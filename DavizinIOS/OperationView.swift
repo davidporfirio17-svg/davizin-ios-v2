@@ -24,7 +24,9 @@ final class OperationView: UIView {
     private let openGameButton = DavizinButton(title: "ABRIR JUEGO")
     var onOpenGame: (() -> Void)?
 
+    private let statusDot = UIView()
     private let statusLabel = UILabel()
+    private let statusRow = UIStackView()
     private let stackView = UIStackView()
 
     // Hold-to-confirm: anillo de progreso sobre injectButton
@@ -37,6 +39,34 @@ final class OperationView: UIView {
 	private var isHoldingInject = false
 
     private(set) var operationState: DavizinOperationState = .idle
+
+    private func setStatusIndicator(color: UIColor, pulse: Bool) {
+        statusDot.backgroundColor = color
+        statusDot.layer.shadowColor = color.cgColor
+        statusDot.layer.shadowRadius = pulse ? 7.0 : 4.0
+        statusDot.layer.shadowOpacity = pulse ? 0.85 : 0.45
+        statusDot.layer.removeAllAnimations()
+        guard pulse else { return }
+        let animation = CABasicAnimation(keyPath: "opacity")
+        animation.fromValue = 0.38
+        animation.toValue = 1.0
+        animation.duration = 0.8
+        animation.autoreverses = true
+        animation.repeatCount = .infinity
+        statusDot.layer.add(animation, forKey: "nyxel.statusPulse")
+    }
+
+    private func showSuccessPulse() {
+        let originalTransform = cardView.transform
+        cardView.transform = CGAffineTransform(scaleX: 0.985, y: 0.985)
+        UIView.animate(withDuration: 0.22, delay: 0.0, options: [.curveEaseOut, .allowUserInteraction]) {
+            self.cardView.transform = CGAffineTransform(scaleX: 1.012, y: 1.012)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.24, delay: 0.0, options: [.curveEaseInOut, .allowUserInteraction]) {
+                self.cardView.transform = originalTransform
+            }
+        }
+    }
 
     var selectedGame: DavizinGame = .freeFireMax {
         didSet { updateSubtitle() }
@@ -68,27 +98,40 @@ final class OperationView: UIView {
 
         switch state {
         case .idle:
+            setStatusIndicator(color: AppTheme.accent, pulse: false)
             statusLabel.text = nil
             statusLabel.isHidden = true
+            statusRow.isHidden = true
         case .checking:
+            setStatusIndicator(color: AppTheme.accent, pulse: true)
             statusLabel.text = "Comprobando entorno..."
             statusLabel.isHidden = false
+            statusRow.isHidden = false
         case .running:
+            setStatusIndicator(color: AppTheme.warm, pulse: true)
             runButton.setLoading(true, title: "EJECUTANDO...")
             statusLabel.text = "Ejecutando proceso..."
             statusLabel.isHidden = false
+            statusRow.isHidden = false
         case .injecting:
+            setStatusIndicator(color: AppTheme.accentHot, pulse: true)
             statusLabel.text = "Aplicando configuración..."
             statusLabel.isHidden = false
+            statusRow.isHidden = false
         case .cleaning:
+            setStatusIndicator(color: AppTheme.warm, pulse: true)
             cleanButton.setLoading(true, title: "LIMPIANDO...")
             statusLabel.text = "Limpiando sesión..."
             statusLabel.isHidden = false
+            statusRow.isHidden = false
         case .succeeded(let message):
+            setStatusIndicator(color: AppTheme.success, pulse: false)
             statusLabel.text = message
             statusLabel.textColor = AppTheme.success
             statusLabel.isHidden = false
+            statusRow.isHidden = false
             if message.lowercased().contains("inyectado") {
+                showSuccessPulse()
                 HapticsService.success()
                 SoundService.shared.playActivationVoice()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) {
@@ -101,9 +144,11 @@ final class OperationView: UIView {
                 showPreInjectButtons(animated: true)
             }
         case .failed(let message):
+            setStatusIndicator(color: AppTheme.failure, pulse: false)
             statusLabel.text = message
             statusLabel.textColor = AppTheme.failure
             statusLabel.isHidden = false
+            statusRow.isHidden = false
             HapticsService.warning()
         }
 
@@ -118,20 +163,24 @@ final class OperationView: UIView {
         openGameButton.setLoading(opening, title: "ABRIENDO JUEGO...")
         openGameButton.isEnabled = !opening
         if opening {
+            setStatusIndicator(color: AppTheme.accent, pulse: true)
             statusLabel.text = "Intentando abrir \(selectedGame.rawValue)..."
             statusLabel.textColor = AppTheme.accent
             statusLabel.isHidden = false
+            statusRow.isHidden = false
         }
     }
 
     func showGameOpenResult(success: Bool) {
         openGameButton.setLoading(false)
         openGameButton.isEnabled = true
+        setStatusIndicator(color: success ? AppTheme.success : AppTheme.failure, pulse: false)
         statusLabel.text = success
             ? "Juego abierto correctamente ✓"
             : "NYX-004 — No se pudo abrir el juego"
         statusLabel.textColor = success ? AppTheme.success : AppTheme.failure
         statusLabel.isHidden = false
+        statusRow.isHidden = false
     }
 
     private func configure() {
@@ -195,6 +244,19 @@ final class OperationView: UIView {
         statusLabel.numberOfLines = 0
         statusLabel.isHidden = true
 
+        statusDot.translatesAutoresizingMaskIntoConstraints = false
+        statusDot.layer.cornerRadius = 4.0
+        statusDot.layer.shadowOffset = .zero
+        statusDot.widthAnchor.constraint(equalToConstant: 8.0).isActive = true
+        statusDot.heightAnchor.constraint(equalToConstant: 8.0).isActive = true
+        statusRow.axis = .horizontal
+        statusRow.alignment = .center
+        statusRow.spacing = 7.0
+        statusRow.translatesAutoresizingMaskIntoConstraints = false
+        statusRow.addArrangedSubview(statusDot)
+        statusRow.addArrangedSubview(statusLabel)
+        statusRow.isHidden = true
+
         stackView.axis = .vertical
         stackView.alignment = .fill
         stackView.spacing = 12.0
@@ -206,7 +268,7 @@ final class OperationView: UIView {
         stackView.addArrangedSubview(injectButton)
         stackView.addArrangedSubview(cleanButton)
         stackView.addArrangedSubview(openGameButton)
-        stackView.addArrangedSubview(statusLabel)
+        stackView.addArrangedSubview(statusRow)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
         cardView.useTransparentAppearance()
