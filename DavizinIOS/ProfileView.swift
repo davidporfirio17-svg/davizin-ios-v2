@@ -125,6 +125,7 @@ final class ProfileView: UIView {
     private let progressTrack = CAShapeLayer()
     private let progressRing = CAShapeLayer()
     private var activeKey: String?
+    private var activeCountryCode: String?
     private var activeRemainingSeconds = 0
     private var initialRemainingSeconds = 0
 
@@ -134,6 +135,8 @@ final class ProfileView: UIView {
     func setAccount(key: String?, remainingSeconds: Int, countryCode: String? = nil) {
         let previousKey = activeKey
         activeKey = key
+        if countryCode != nil { activeCountryCode = countryCode }
+        if key == nil { activeCountryCode = nil }
         activeRemainingSeconds = max(0, remainingSeconds)
         if key != previousKey { initialRemainingSeconds = max(remainingSeconds, 1) }
         if initialRemainingSeconds == 0 { initialRemainingSeconds = max(remainingSeconds, 1) }
@@ -148,7 +151,7 @@ final class ProfileView: UIView {
         rankBadge.layer.borderColor = tier.color.withAlphaComponent(0.5).cgColor
         rankBadge.backgroundColor = tier.color.withAlphaComponent(0.12)
         keyValueLabel.text = maskedKey(activeKey)
-        countryValueLabel.text = countryName(for: countryCode)
+        countryValueLabel.text = countryName(for: activeCountryCode)
         accountStatusLabel.text = activeKey == nil ? "Sin validar" : (activeRemainingSeconds > 0 ? "Activa" : "Expirada")
         accountStatusLabel.textColor = activeRemainingSeconds > 0 ? AppTheme.success : AppTheme.failure
         expirationValueLabel.text = formattedRemaining(activeRemainingSeconds)
