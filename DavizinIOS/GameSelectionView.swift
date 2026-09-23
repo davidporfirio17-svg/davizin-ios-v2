@@ -13,6 +13,8 @@ final class GameSelectionView: UIView {
     private let subtitleLabel = UILabel()
     private let freeFireButton = DavizinButton(title: "FREE FIRE", style: .secondary)
     private let freeFireMaxButton = DavizinButton(title: "FREE FIRE MAX", style: .secondary)
+    private let freeFireSubtitle = UILabel()
+    private let freeFireMaxSubtitle = UILabel()
     private let stackView = UIStackView()
 
     private(set) var selectedGame: DavizinGame?
@@ -31,6 +33,10 @@ final class GameSelectionView: UIView {
         selectedGame = game
         freeFireButton.selectedVisual = game == .freeFire
         freeFireMaxButton.selectedVisual = game == .freeFireMax
+        freeFireSubtitle.text = game == .freeFire ? "✓ SELECCIONADO · ESTÁNDAR" : "Entorno estándar"
+        freeFireMaxSubtitle.text = game == .freeFireMax ? "✓ SELECCIONADO · OPTIMIZADO" : "Entorno optimizado"
+        freeFireSubtitle.textColor = game == .freeFire ? AppTheme.accent : AppTheme.tertiaryText
+        freeFireMaxSubtitle.textColor = game == .freeFireMax ? AppTheme.accent : AppTheme.tertiaryText
     }
 
     private func configure() {
@@ -60,6 +66,23 @@ final class GameSelectionView: UIView {
 
         freeFireButton.accessibilityIdentifier = "game.freeFire"
         freeFireMaxButton.accessibilityIdentifier = "game.freeFireMax"
+        freeFireButton.accessibilityValue = "Entorno estándar"
+        freeFireButton.accessibilityHint = "Selecciona Free Fire como entorno."
+        freeFireMaxButton.accessibilityValue = "Entorno optimizado"
+        freeFireMaxButton.accessibilityHint = "Selecciona Free Fire MAX como entorno."
+        freeFireButton.setImage(UIImage(systemName: "flame.fill"), for: .normal)
+        freeFireMaxButton.setImage(UIImage(systemName: "flame.circle.fill"), for: .normal)
+        freeFireButton.tintColor = AppTheme.accent
+        freeFireMaxButton.tintColor = AppTheme.accent
+        freeFireButton.contentHorizontalAlignment = .left
+        freeFireMaxButton.contentHorizontalAlignment = .left
+        freeFireSubtitle.text = "Entorno estándar"
+        freeFireMaxSubtitle.text = "Entorno optimizado"
+        [freeFireSubtitle, freeFireMaxSubtitle].forEach {
+            $0.font = AppTheme.captionFont()
+            $0.textAlignment = .left
+            $0.translatesAutoresizingMaskIntoConstraints = false
+        }
         freeFireButton.addTarget(self, action: #selector(freeFireTapped), for: .touchUpInside)
         freeFireMaxButton.addTarget(self, action: #selector(freeFireMaxTapped), for: .touchUpInside)
 
@@ -70,8 +93,15 @@ final class GameSelectionView: UIView {
         stackView.addArrangedSubview(categoryLabel)
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
-        stackView.addArrangedSubview(freeFireButton)
-        stackView.addArrangedSubview(freeFireMaxButton)
+        let freeFireChoice = UIStackView(arrangedSubviews: [freeFireButton, freeFireSubtitle])
+        let freeFireMaxChoice = UIStackView(arrangedSubviews: [freeFireMaxButton, freeFireMaxSubtitle])
+        [freeFireChoice, freeFireMaxChoice].forEach {
+            $0.axis = .vertical
+            $0.alignment = .fill
+            $0.spacing = 3.0
+        }
+        stackView.addArrangedSubview(freeFireChoice)
+        stackView.addArrangedSubview(freeFireMaxChoice)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
         cardView.useTransparentAppearance()
@@ -86,7 +116,9 @@ final class GameSelectionView: UIView {
             cardView.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 560.0 : AppTheme.contentMaximumWidth),
             stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 360.0 : 240.0),
             freeFireButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
-            freeFireMaxButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
+            freeFireMaxButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
+            freeFireSubtitle.heightAnchor.constraint(equalToConstant: 14.0),
+            freeFireMaxSubtitle.heightAnchor.constraint(equalToConstant: 14.0)
         ])
     }
 
