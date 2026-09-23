@@ -14,6 +14,7 @@ struct HomeView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         headerSection
+                        readinessSummary
                         expirationBannerLarge
                         continueButton
                         Spacer().frame(height: 20)
@@ -28,6 +29,70 @@ struct HomeView: View {
     }
     
     // MARK: - Anuncio Grande
+    var readinessSummary: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: appState.isExpired ? "exclamationmark.triangle.fill" : "checkmark.seal.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(appState.isExpired ? .red : .cyan)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(appState.isExpired ? "KEY EXPIRADA" : "KEY ACTIVA")
+                        .font(.system(size: 13, weight: .black))
+                        .tracking(0.7)
+                        .foregroundColor(appState.isExpired ? .red : .cyan)
+                    Text(appState.isExpired ? "Actualiza tu acceso para continuar." : "Tu sesión está lista para preparar un entorno.")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.48))
+                }
+                Spacer()
+                Circle()
+                    .fill((appState.isExpired ? Color.red : Color.green).opacity(0.9))
+                    .frame(width: 8, height: 8)
+                    .shadow(color: appState.isExpired ? .red : .green, radius: 5)
+            }
+
+            HStack(spacing: 10) {
+                summaryItem(icon: "key.fill", title: "KEY", value: maskedKey)
+                summaryItem(icon: "ipad.and.iphone", title: "DISPOSITIVO", value: deviceName)
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.035))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.cyan.opacity(0.18), lineWidth: 1)))
+    }
+
+    func summaryItem(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.cyan.opacity(0.8))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(0.6)
+                    .foregroundColor(.white.opacity(0.34))
+                Text(value)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.72))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.04)))
+    }
+
+    private var maskedKey: String {
+        let cleanKey = appState.currentKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleanKey.count > 7 else { return cleanKey.isEmpty ? "NO DISPONIBLE" : "••••••" }
+        return "••••" + cleanKey.suffix(4)
+    }
+
+    private var deviceName: String {
+        UIDevice.current.localizedModel.uppercased()
+    }
+
     var expirationBannerLarge: some View {
         VStack(spacing: 14) {
             HStack(spacing: 8) {
