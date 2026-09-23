@@ -192,6 +192,7 @@ final class ProfileView: UIView {
         refreshButton.heightAnchor.constraint(equalToConstant: 38).isActive = true
 
         let card = DavizinCardView()
+        card.useTransparentAppearance()
         let biometricRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Face ID / Touch ID antes de Inject"), biometricSwitch])
         biometricRow.axis = .horizontal
         biometricRow.alignment = .center

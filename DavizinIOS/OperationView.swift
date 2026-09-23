@@ -163,6 +163,7 @@ final class OperationView: UIView {
         noticeStack.addArrangedSubview(noticeBodyLabel)
         noticeCard.layer.cornerRadius = 10.0
         noticeCard.layer.borderWidth = 1.0
+        noticeCard.layer.masksToBounds = true
         noticeCard.addSubview(noticeStack)
         NSLayoutConstraint.activate([
             noticeStack.leadingAnchor.constraint(equalTo: noticeCard.leadingAnchor, constant: 12.0),
@@ -208,6 +209,7 @@ final class OperationView: UIView {
         stackView.addArrangedSubview(statusLabel)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
+        cardView.useTransparentAppearance()
         cardView.addContent(stackView)
         addSubview(cardView)
 
@@ -230,6 +232,7 @@ final class OperationView: UIView {
     // MARK: - Maquina de estados de botones
 
     func showPreInjectButtons(animated: Bool) {
+        injectButton.setTitle("MANTÉN PARA INYECTAR", for: .normal)
         setButtonsVisible(run: true, inject: true, clean: false, openGame: false, animated: animated)
     }
 
@@ -314,6 +317,7 @@ final class OperationView: UIView {
 
     private func startHold() {
         holdProgress = 0
+        injectButton.setTitle("PREPARANDO...", for: .normal)
         holdRingLayer.opacity = 1
         SoundService.shared.startHoldTone()
         HapticsService.light()
@@ -335,6 +339,7 @@ final class OperationView: UIView {
         holdTimer?.invalidate()
         holdTimer = nil
         SoundService.shared.stopHoldTone()
+        injectButton.setTitle("MANTÉN PARA INYECTAR", for: .normal)
         UIView.animate(withDuration: 0.2) {
             self.holdRingLayer.strokeEnd = 0
             self.holdRingLayer.opacity = 0
@@ -344,6 +349,7 @@ final class OperationView: UIView {
 	private func completeHold() {
 		isHoldingInject = false
 		SoundService.shared.stopHoldTone()
+        injectButton.setTitle("INYECTANDO...", for: .normal)
         UIView.animate(withDuration: 0.15) {
             self.holdRingLayer.opacity = 0
         } completion: { _ in

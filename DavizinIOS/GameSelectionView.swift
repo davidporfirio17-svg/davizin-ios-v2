@@ -42,6 +42,7 @@ final class GameSelectionView: UIView {
         categoryLabel.font = AppTheme.captionFont()
         categoryLabel.textAlignment = .center
         categoryLabel.adjustsFontForContentSizeCategory = true
+        applyTitleTracking(categoryLabel, value: 1.2)
 
         titleLabel.text = "Elige tu entorno"
         titleLabel.textColor = AppTheme.primaryText
@@ -55,6 +56,7 @@ final class GameSelectionView: UIView {
         subtitleLabel.textAlignment = .center
         subtitleLabel.numberOfLines = 0
         subtitleLabel.adjustsFontForContentSizeCategory = true
+        subtitleLabel.textColor = AppTheme.secondaryText.withAlphaComponent(0.78)
 
         freeFireButton.accessibilityIdentifier = "game.freeFire"
         freeFireMaxButton.accessibilityIdentifier = "game.freeFireMax"
