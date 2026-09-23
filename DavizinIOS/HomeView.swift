@@ -256,7 +256,7 @@ struct HomeView: View {
                     .font(.system(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(LinearGradient(colors: [.cyan, Color(red: 0.0, green: 0.7, blue: 1.0)], startPoint: .leading, endPoint: .trailing))
                     .shadow(color: .cyan.opacity(0.4), radius: 8)
-                Text("iOS Injector v\(appState.appVersion)")
+                Text("PREPARADOR iOS v\(appState.appVersion)")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.35))
                     .tracking(1.5)

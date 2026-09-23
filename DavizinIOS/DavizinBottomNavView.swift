@@ -8,6 +8,8 @@ final class DavizinBottomNavView: UIView {
     private let profileButton = UIButton(type: .system)
     private let modesLabel = UILabel()
     private let profileLabel = UILabel()
+    private let modesIndicator = UIView()
+    private let profileIndicator = UIView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -26,20 +28,24 @@ final class DavizinBottomNavView: UIView {
         profileButton.tintColor = item == .profile ? selectedColor : normalColor
         modesLabel.textColor = item == .modes ? selectedColor : normalColor
         profileLabel.textColor = item == .profile ? selectedColor : normalColor
+        UIView.animate(withDuration: AppTheme.durationPopover) {
+            self.modesIndicator.alpha = item == .modes ? 1.0 : 0.0
+            self.profileIndicator.alpha = item == .profile ? 1.0 : 0.0
+        }
     }
 
     enum Item { case modes, profile }
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
-        backgroundColor = AppTheme.card
+        backgroundColor = AppTheme.card.withAlphaComponent(0.88)
         layer.borderWidth = 1
         layer.borderColor = UIColor.white.withAlphaComponent(0.08).cgColor
 
         configureButton(modesButton, image: "square.grid.2x2.fill", label: modesLabel, text: "MODOS", action: #selector(modesTapped))
         configureButton(profileButton, image: "person.crop.circle.fill", label: profileLabel, text: "PERFIL", action: #selector(profileTapped))
 
-        let stack = UIStackView(arrangedSubviews: [makeItem(button: modesButton, label: modesLabel), makeItem(button: profileButton, label: profileLabel)])
+        let stack = UIStackView(arrangedSubviews: [makeItem(button: modesButton, label: modesLabel, indicator: modesIndicator), makeItem(button: profileButton, label: profileLabel, indicator: profileIndicator)])
         stack.axis = .horizontal
         stack.distribution = .fillEqually
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -68,8 +74,14 @@ final class DavizinBottomNavView: UIView {
         label.isUserInteractionEnabled = false
     }
 
-    private func makeItem(button: UIButton, label: UILabel) -> UIView {
-        let stack = UIStackView(arrangedSubviews: [button, label])
+    private func makeItem(button: UIButton, label: UILabel, indicator: UIView) -> UIView {
+        indicator.backgroundColor = AppTheme.accent
+        indicator.layer.cornerRadius = 1.5
+        indicator.alpha = 0.0
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.widthAnchor.constraint(equalToConstant: 30).isActive = true
+        indicator.heightAnchor.constraint(equalToConstant: 3).isActive = true
+        let stack = UIStackView(arrangedSubviews: [button, label, indicator])
         stack.axis = .vertical
         stack.alignment = .center
         stack.spacing = 2

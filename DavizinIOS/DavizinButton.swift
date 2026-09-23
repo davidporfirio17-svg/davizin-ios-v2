@@ -87,7 +87,7 @@ final class DavizinButton: UIButton {
             setTitle(title ?? currentTitle, for: .normal)
             spinner.startAnimating()
             spinner.isHidden = false
-            accessibilityValue = title ?? "Loading"
+            accessibilityValue = title ?? "Cargando"
         } else {
             spinner.stopAnimating()
             spinner.isHidden = true

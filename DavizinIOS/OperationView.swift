@@ -18,7 +18,7 @@ final class OperationView: UIView {
     private let successLabel = UILabel()
 
     // Estado 1 (antes de inyectar): solo estos dos son visibles.
-    private let runButton = DavizinButton(title: "EJECUTAR PROCESO", style: .secondary)
+    private let runButton = DavizinButton(title: "PREPARAR ENTORNO", style: .secondary)
     private let injectButton = DavizinButton(title: "MANTÉN PARA INYECTAR", style: .primary)
 
     // Estado 2 (despues de inyectar con exito): solo estos dos son visibles.
@@ -112,8 +112,8 @@ final class OperationView: UIView {
             statusRow.isHidden = false
         case .running:
             setStatusIndicator(color: AppTheme.warm, pulse: true)
-            runButton.setLoading(true, title: "EJECUTANDO...")
-            statusLabel.text = "Ejecutando proceso..."
+            runButton.setLoading(true, title: "PREPARANDO...")
+            statusLabel.text = "Preparando entorno..."
             statusLabel.isHidden = false
             statusRow.isHidden = false
         case .injecting:
