@@ -28,6 +28,72 @@ private let rankTiers = [
 
 private func currentRankTier(for count: Int) -> RankTier { rankTiers.last { count >= $0.minCount } ?? rankTiers[0] }
 
+private final class ProfileDisclosureSection: UIView {
+    private let titleLabel = UILabel()
+    private let chevron = UIImageView(image: UIImage(systemName: "chevron.down"))
+    private let bodyStack = UIStackView()
+    private var collapsedHeightConstraint: NSLayoutConstraint?
+    private var expanded = true
+
+    init(title: String, views: [UIView], expanded: Bool = true) {
+        self.expanded = expanded
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        layer.cornerRadius = 12
+        layer.borderWidth = 1
+        layer.borderColor = AppTheme.hairline.cgColor
+        backgroundColor = UIColor.white.withAlphaComponent(0.025)
+
+        titleLabel.text = title
+        titleLabel.font = .systemFont(ofSize: 10, weight: .heavy)
+        titleLabel.textColor = AppTheme.accent
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        chevron.tintColor = AppTheme.tertiaryText
+        chevron.translatesAutoresizingMaskIntoConstraints = false
+
+        let header = UIButton(type: .system)
+        header.accessibilityLabel = "Sección \(title.lowercased())"
+        header.addTarget(self, action: #selector(toggle), for: .touchUpInside)
+        header.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(header)
+        addSubview(titleLabel)
+        addSubview(chevron)
+
+        bodyStack.axis = .vertical
+        bodyStack.spacing = 11
+        bodyStack.translatesAutoresizingMaskIntoConstraints = false
+        views.forEach { bodyStack.addArrangedSubview($0) }
+        addSubview(bodyStack)
+
+        NSLayoutConstraint.activate([
+            header.leadingAnchor.constraint(equalTo: leadingAnchor), header.trailingAnchor.constraint(equalTo: trailingAnchor),
+            header.topAnchor.constraint(equalTo: topAnchor), header.heightAnchor.constraint(equalToConstant: 38),
+            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14), titleLabel.centerYAnchor.constraint(equalTo: header.centerYAnchor),
+            chevron.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14), chevron.centerYAnchor.constraint(equalTo: header.centerYAnchor),
+            bodyStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14), bodyStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            bodyStack.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 2), bodyStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -14)
+        ])
+        collapsedHeightConstraint = bodyStack.heightAnchor.constraint(equalToConstant: 0)
+        applyExpandedState(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    @objc private func toggle() {
+        expanded.toggle()
+        applyExpandedState(animated: true)
+    }
+
+    private func applyExpandedState(animated: Bool) {
+        let updates = {
+            self.bodyStack.isHidden = !self.expanded
+            self.collapsedHeightConstraint?.isActive = !self.expanded
+            self.chevron.transform = self.expanded ? .identity : CGAffineTransform(rotationAngle: -.pi / 2)
+        }
+        if animated { UIView.animate(withDuration: 0.2, animations: updates) } else { updates() }
+    }
+}
+
 final class ProfileView: UIView {
     weak var delegate: ProfileViewDelegate?
     var onRefreshRequested: (() -> Void)?
@@ -147,11 +213,6 @@ final class ProfileView: UIView {
         heroStack.axis = .horizontal; heroStack.alignment = .center; heroStack.spacing = 16
         heroStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let sectionTitle = UILabel()
-        sectionTitle.text = "CUENTA"
-        sectionTitle.font = .systemFont(ofSize: 10, weight: .heavy)
-        sectionTitle.textColor = AppTheme.accent
-
         let keyRow = makeRow(label: "Key", valueLabel: keyValueLabel)
         let statusRow = makeRow(label: "Estado", valueLabel: accountStatusLabel)
         let expirationRow = makeRow(label: "Expira en", valueLabel: expirationValueLabel)
@@ -193,15 +254,22 @@ final class ProfileView: UIView {
 
         let card = DavizinCardView()
         card.useTransparentAppearance()
-        let biometricRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Face ID / Touch ID antes de Inject"), biometricSwitch])
+        let biometricRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Face ID / Touch ID antes de inyectar"), biometricSwitch])
         biometricRow.axis = .horizontal
         biometricRow.alignment = .center
         biometricRow.distribution = .equalSpacing
-        let activationVoiceRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Audio \"Opción activada\" después de Inject"), activationVoiceSwitch])
+        let activationVoiceRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Audio \"Opción activada\" después de inyectar"), activationVoiceSwitch])
         activationVoiceRow.axis = .horizontal
         activationVoiceRow.alignment = .center
         activationVoiceRow.distribution = .equalSpacing
-        let stack = UIStackView(arrangedSubviews: [heroStack, sectionTitle, keyRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel, serviceStatusLabel, diagnosticsLabel, gamesLabel, historyLabel, appearanceControl, biometricRow, activationVoiceRow, refreshButton, activityLabel, logoutButton])
+
+        let accountSection = ProfileDisclosureSection(title: "CUENTA", views: [keyRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel])
+        let appearanceSection = ProfileDisclosureSection(title: "APARIENCIA", views: [appearanceControl])
+        let securitySection = ProfileDisclosureSection(title: "SEGURIDAD", views: [biometricRow])
+        let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
+        let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
+        let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [historyLabel, activityLabel], expanded: false)
+        let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, logoutButton])
         stack.axis = .vertical; stack.spacing = 13
         stack.setCustomSpacing(22, after: heroStack)
         stack.translatesAutoresizingMaskIntoConstraints = false
