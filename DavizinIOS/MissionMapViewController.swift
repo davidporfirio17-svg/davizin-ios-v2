@@ -9,6 +9,7 @@ import UIKit
 
 protocol MissionMapViewDelegate: AnyObject {
     func missionMapView(_ view: MissionMapView, didSelect mode: DavizinMode)
+    func missionMapViewDidRequestRefresh(_ view: MissionMapView)
 }
 
 final class MissionMapView: UIView {
@@ -22,6 +23,7 @@ final class MissionMapView: UIView {
     private var canvasHeightConstraint: NSLayoutConstraint?
     private let scrollHint = UILabel()
     private let modeStatusLabel = UILabel()
+    private let syncButton = UIButton(type: .system)
 
     /// Genera posiciones en zigzag para cualquier cantidad de modos (ya no
     /// esta fijo a 3 — antes, si el Worker mandaba mas modos, se dibujaban
@@ -58,8 +60,15 @@ final class MissionMapView: UIView {
         canvasHeightConstraint?.constant = canvasHeight
         scrollView.setContentOffset(.zero, animated: false)
         modeStatusLabel.text = modes.isEmpty ? "No hay modos disponibles" : "\(modes.count) modos disponibles"
+        syncButton.setTitle("↻  Actualizar configuración", for: .normal)
         buildNodes(selected: selected)
         setNeedsLayout()
+    }
+
+    func setSyncState(_ text: String, syncing: Bool = false) {
+        modeStatusLabel.text = text
+        syncButton.isEnabled = !syncing
+        syncButton.setTitle(syncing ? "Actualizando…" : "↻  Actualizar configuración", for: .normal)
     }
 
     private func configure() {
@@ -94,8 +103,12 @@ final class MissionMapView: UIView {
         modeStatusLabel.textColor = AppTheme.secondaryText
         modeStatusLabel.textAlignment = .center
         modeStatusLabel.text = "Sincronizando modos..."
+        syncButton.setTitle("↻  Actualizar configuración", for: .normal)
+        syncButton.setTitleColor(AppTheme.accent, for: .normal)
+        syncButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .bold)
+        syncButton.addTarget(self, action: #selector(refreshTapped), for: .touchUpInside)
 
-        let headerStack = UIStackView(arrangedSubviews: [eyebrow, title, subtitle, modeStatusLabel, scrollHint])
+        let headerStack = UIStackView(arrangedSubviews: [eyebrow, title, subtitle, modeStatusLabel, syncButton, scrollHint])
         headerStack.axis = .vertical
         headerStack.spacing = 4
         headerStack.setCustomSpacing(8, after: subtitle)
@@ -137,6 +150,10 @@ final class MissionMapView: UIView {
         ])
         canvasHeightConstraint = canvas.constraints.first { $0.firstAttribute == .height }
         scrollView.delegate = self
+    }
+
+    @objc private func refreshTapped() {
+        delegate?.missionMapViewDidRequestRefresh(self)
     }
 
     /// Muestra "desliza para ver mas" solo si de verdad hay contenido oculto

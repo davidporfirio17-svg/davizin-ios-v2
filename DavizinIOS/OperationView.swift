@@ -10,6 +10,7 @@ final class OperationView: UIView {
     private let cardView = DavizinCardView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
+    private let checklistLabel = UILabel()
     private let noticeCard = UIView()
     private let noticeTitleLabel = UILabel()
     private let noticeBodyLabel = UILabel()
@@ -80,6 +81,10 @@ final class OperationView: UIView {
             updateNotice()
             showPreInjectButtons(animated: false)
         }
+    }
+
+    func setPreflight(_ lines: [String]) {
+        checklistLabel.text = "VERIFICACIÓN\n" + lines.joined(separator: "\n")
     }
 
     override init(frame: CGRect) {
@@ -205,6 +210,11 @@ final class OperationView: UIView {
         subtitleLabel.isHidden = false
         updateSubtitle()
 
+        checklistLabel.font = AppTheme.monoFont(10)
+        checklistLabel.textColor = AppTheme.secondaryText
+        checklistLabel.numberOfLines = 0
+        checklistLabel.text = "VERIFICACIÓN\n✓ Sesión activa\n✓ Modo remoto seleccionado"
+
         noticeTitleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         noticeTitleLabel.numberOfLines = 0
         noticeBodyLabel.font = AppTheme.captionFont()
@@ -291,6 +301,7 @@ final class OperationView: UIView {
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
+        stackView.addArrangedSubview(checklistLabel)
         stackView.addArrangedSubview(noticeCard)
         stackView.addArrangedSubview(runButton)
         stackView.addArrangedSubview(injectButton)

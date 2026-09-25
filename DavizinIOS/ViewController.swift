@@ -423,6 +423,13 @@ final class ViewController: UIViewController {
         screen.delegate = self
         screen.selectedGame = selectedGame
         screen.selectedMode = selectedMode
+        let gameReady = NyxelInstalledGames.statusText().contains(selectedGame == .freeFireMax ? "✓ MAX instalado" : "✓ Free Fire instalado")
+        screen.setPreflight([
+            activeKey != nil && activeRemainingSeconds > 0 ? "✓ Key autorizada" : "✕ Sesión no autorizada",
+            activeRemainingSeconds > 0 ? "✓ Sesión activa" : "✕ Sesión expirada",
+            "✓ Modo remoto: \(selectedMode.displayName)",
+            gameReady ? "✓ Juego detectado" : "! Juego no detectado"
+        ])
         let gameToOpen = selectedGame
         screen.onOpenGame = { [weak self] in
             self?.openGame(gameToOpen)
@@ -667,6 +674,28 @@ extension ViewController: MissionMapViewDelegate {
         NyxelActivityLog.record("Modo seleccionado: \(mode.displayName)")
         onModeSelected?(mode)
         showOperation(animated: true)
+    }
+
+    func missionMapViewDidRequestRefresh(_ view: MissionMapView) {
+        guard let key = activeKey, !key.isEmpty else {
+            view.setSyncState("Sin key activa", syncing: false)
+            return
+        }
+        view.setSyncState("Sincronizando con el Worker…", syncing: true)
+        KeyValidator.validate(key: key) { [weak self, weak view] success, message, remaining, _ in
+            guard let self else { return }
+            if success && remaining > 0 {
+                self.setAccountSession(key: key, remainingSeconds: remaining, countryCode: KeyValidator.lastCountryCode)
+                NyxelActivityLog.record("Configuración remota sincronizada")
+                DispatchQueue.main.async {
+                    view?.setSyncState("Configuración sincronizada", syncing: false)
+                    self.showModeSelection(animated: false)
+                }
+            } else {
+                NyxelRemoteConfigStore.recordFailure(message)
+                view?.setSyncState("No se pudo sincronizar: \(message)", syncing: false)
+            }
+        }
     }
 }
 
