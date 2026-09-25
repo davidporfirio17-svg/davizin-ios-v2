@@ -1,5 +1,4 @@
 import UIKit
-import SwiftUI
 
 final class ViewController: UIViewController {
     /// Actívalo en false cuando conectes tus propios callbacks de aplicación.
@@ -33,8 +32,6 @@ final class ViewController: UIViewController {
     private var profileView: ProfileView?
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
-    private var homeState: AppState?
-    private var homeHostingController: UIHostingController<HomeView>?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
         .lightContent
@@ -263,7 +260,7 @@ final class ViewController: UIViewController {
         view.addSubview(contentContainerView)
 
         bottomNavView.onHome = { [weak self] in
-            self?.showHome(animated: true)
+            self?.showGameSelection(animated: true)
         }
         bottomNavView.onModes = { [weak self] in
             self?.showModeSelection(animated: true)
@@ -307,27 +304,6 @@ final class ViewController: UIViewController {
         let navigationHeight: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 78.0 : 68.0
         bottomNavHeightConstraint?.constant = visible ? navigationHeight : 0.0
         UIView.animate(withDuration: 0.2) { self.view.layoutIfNeeded() }
-    }
-
-    private func showHome(animated: Bool) {
-        guard currentStage != .login else { return }
-        currentStage = .home
-        setBottomNavigation(visible: true, selected: .home)
-        headerView.title = "Nyxel External"
-        headerView.showsBackButton = false
-        headerView.showsAvatarButton = false
-
-        let state = AppState()
-        if let activeKey, activeRemainingSeconds > 0 {
-            let expiry = Int64(Date().timeIntervalSince1970 * 1000) + Int64(activeRemainingSeconds) * 1000
-            state.saveKey(activeKey, expirationMs: expiry)
-        }
-        homeState = state
-        let home = HomeView(onContinue: { [weak self] in self?.showOperation(animated: true) })
-            .environmentObject(state)
-        let hosting = UIHostingController(rootView: home)
-        homeHostingController = hosting
-        display(hosting.view, animated: animated)
     }
 
     private func showLogin(animated: Bool) {
@@ -409,7 +385,7 @@ final class ViewController: UIViewController {
         currentStage = .gameSelection
         animatedBackgroundView.isHidden = false
         animatedBackgroundView.startAnimating()
-        setBottomNavigation(visible: true, selected: .modes)
+        setBottomNavigation(visible: true, selected: .home)
 		headerView.title = "Seleccionar entorno"
 		headerView.showsBackButton = true
 		headerView.showsAvatarButton = false
@@ -579,7 +555,7 @@ final class ViewController: UIViewController {
                 guard let self = self, self.currentStage == .login else { return }
                 screen.playExitAnimation {
                     guard self.currentStage == .login else { return }
-                    self.showHome(animated: true)
+                    self.showGameSelection(animated: true)
                 }
             }
         }
@@ -620,7 +596,7 @@ final class ViewController: UIViewController {
         case .home:
             break
         case .gameSelection:
-            showHome(animated: true)
+            showLogin(animated: true)
         case .modeSelection:
             showGameSelection(animated: true)
         case .operation:
@@ -630,7 +606,7 @@ final class ViewController: UIViewController {
             case .operation: showOperation(animated: true)
             case .modeSelection: showModeSelection(animated: true)
             case .gameSelection: showGameSelection(animated: true)
-            case .home: showHome(animated: true)
+            case .home: showGameSelection(animated: true)
             default: showModeSelection(animated: true)
             }
         }
