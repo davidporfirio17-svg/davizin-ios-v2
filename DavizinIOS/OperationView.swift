@@ -202,7 +202,7 @@ final class OperationView: UIView {
         subtitleLabel.textAlignment = .center
         subtitleLabel.numberOfLines = 0
         subtitleLabel.adjustsFontForContentSizeCategory = true
-        subtitleLabel.isHidden = true
+        subtitleLabel.isHidden = false
         updateSubtitle()
 
         noticeTitleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -247,9 +247,13 @@ final class OperationView: UIView {
         ])
 
         runButton.accessibilityIdentifier = "operation.runExploit"
+        runButton.accessibilityLabel = "Preparar entorno"
         injectButton.accessibilityIdentifier = "operation.inject"
+        injectButton.accessibilityLabel = "Mantener presionado para activar la configuración"
         cleanButton.accessibilityIdentifier = "operation.clean"
+        cleanButton.accessibilityLabel = "Limpiar sesión"
         openGameButton.accessibilityIdentifier = "operation.opengame"
+        openGameButton.accessibilityLabel = "Abrir juego"
 
         runButton.addTarget(self, action: #selector(runTapped), for: .touchUpInside)
         cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
@@ -347,7 +351,7 @@ final class OperationView: UIView {
 
     private func updateSubtitle() {
         titleLabel.text = "\(selectedGame.rawValue) / \(selectedMode.displayName)"
-        subtitleLabel.text = nil
+        subtitleLabel.text = "Prepara el entorno y mantén presionado para activar la configuración."
     }
 
     private func updateNotice() {

@@ -41,7 +41,7 @@ struct HomeView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .tracking(-0.4)
                     .foregroundStyle(primary)
-                Text("SECURE OPERATIONS · v\(appState.appVersion)")
+                Text("SECURE OPERATIONS · TEST BUILD · v\(appState.appVersion)")
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(1.1)
                     .foregroundStyle(muted)
@@ -132,8 +132,15 @@ struct HomeView: View {
                     .foregroundStyle(appState.isExpired ? Color(uiColor: AppTheme.failure) : accent)
                 Text(appState.isExpired ? "" : (appState.remainingDays == 1 ? "día restante" : "días restantes"))
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(secondary)
+                .foregroundStyle(secondary)
             }
+
+            HStack(spacing: 8) {
+                Image(systemName: appState.isInjected ? "checkmark.circle.fill" : "circle.dashed")
+                Text(appState.isInjected ? "Entorno preparado" : "Entorno pendiente")
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(appState.isInjected ? Color(uiColor: AppTheme.success) : secondary)
 
             if !appState.isExpired && appState.remainingDays <= 3 {
                 HStack(spacing: 8) {

@@ -17,7 +17,7 @@ class AppState: ObservableObject {
     @Published var remainingSeconds: Int = 0
     @Published var isExpired: Bool = false
     
-    let appVersion = "2.0"
+    let appVersion: String = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.4"
     let freeFireBundleID = "com.dts.freefiremax"
     let freeFireName = "Free Fire MAX"
     

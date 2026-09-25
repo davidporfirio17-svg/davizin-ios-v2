@@ -1,6 +1,6 @@
 import Foundation
 
-enum DavizinScreenStage: Equatable { case login, gameSelection, modeSelection, operation, profile }
+enum DavizinScreenStage: Equatable { case login, home, gameSelection, modeSelection, operation, profile }
 
 enum DavizinGame: String, CaseIterable { case freeFire = "Free Fire", freeFireMax = "Free Fire MAX" }
 
