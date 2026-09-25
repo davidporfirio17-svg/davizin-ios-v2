@@ -45,8 +45,8 @@ final class OperationView: UIView {
     private func setStatusIndicator(color: UIColor, pulse: Bool) {
         statusDot.backgroundColor = color
         statusDot.layer.shadowColor = color.cgColor
-        statusDot.layer.shadowRadius = pulse ? 7.0 : 4.0
-        statusDot.layer.shadowOpacity = pulse ? 0.85 : 0.45
+        statusDot.layer.shadowRadius = pulse ? 5.0 : 3.0
+        statusDot.layer.shadowOpacity = pulse ? 0.55 : 0.30
         statusDot.layer.removeAllAnimations()
         guard pulse else { return }
         let animation = CABasicAnimation(keyPath: "opacity")
@@ -107,24 +107,24 @@ final class OperationView: UIView {
             statusRow.isHidden = true
         case .checking:
             setStatusIndicator(color: AppTheme.accent, pulse: true)
-            statusLabel.text = "Comprobando entorno..."
+            statusLabel.text = "Comprobando el entorno..."
             statusLabel.isHidden = false
             statusRow.isHidden = false
         case .running:
             setStatusIndicator(color: AppTheme.warm, pulse: true)
             runButton.setLoading(true, title: "PREPARANDO...")
-            statusLabel.text = "Preparando entorno..."
+            statusLabel.text = "Preparando el entorno..."
             statusLabel.isHidden = false
             statusRow.isHidden = false
         case .injecting:
             setStatusIndicator(color: AppTheme.accentHot, pulse: true)
-            statusLabel.text = "Aplicando configuración..."
+            statusLabel.text = "Aplicando la configuración..."
             statusLabel.isHidden = false
             statusRow.isHidden = false
         case .cleaning:
             setStatusIndicator(color: AppTheme.warm, pulse: true)
             cleanButton.setLoading(true, title: "LIMPIANDO...")
-            statusLabel.text = "Limpiando sesión..."
+            statusLabel.text = "Limpiando la sesión..."
             statusLabel.isHidden = false
             statusRow.isHidden = false
         case .succeeded(let message):
@@ -226,7 +226,7 @@ final class OperationView: UIView {
         ])
         updateNotice()
 
-        successLabel.text = "✓  OPCIÓN ACTIVADA"
+        successLabel.text = "✓  CONFIGURACIÓN ACTIVADA"
         successLabel.textColor = AppTheme.success
         successLabel.font = .systemFont(ofSize: 14, weight: .black)
         successLabel.textAlignment = .center

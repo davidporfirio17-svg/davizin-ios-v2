@@ -42,10 +42,10 @@ private final class ProfileDisclosureSection: UIView {
         layer.cornerRadius = 12
         layer.borderWidth = 1
         layer.borderColor = AppTheme.hairline.cgColor
-        backgroundColor = UIColor.white.withAlphaComponent(0.025)
+        backgroundColor = UIColor.white.withAlphaComponent(0.035)
 
         titleLabel.text = title
-        titleLabel.font = .systemFont(ofSize: 10, weight: .heavy)
+        titleLabel.font = .systemFont(ofSize: 10, weight: .semibold)
         titleLabel.textColor = AppTheme.accent
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         chevron.tintColor = AppTheme.tertiaryText
@@ -158,7 +158,7 @@ final class ProfileView: UIView {
         countValueLabel.text = "\(count)"
         let next = rankTiers.first(where: { $0.minCount > count })?.minCount
         rankProgressLabel.text = next.map { "Progreso de rango: \(count)/\($0)" } ?? "Progreso de rango: máximo alcanzado"
-        deviceLabel.text = "DISPOSITIVO\n\(KeyValidator.getDeviceModel()) • \(NyxelSupportPolicy.currentSystemDescription)"
+        deviceLabel.text = "NYXEL EXTERNAL\n\(KeyValidator.getDeviceModel()) • \(NyxelSupportPolicy.currentSystemDescription)"
         appearanceControl.selectedSegmentIndex = NyxelAppearanceStore.theme.rawValue
         biometricSwitch.isOn = UserDefaults.standard.bool(forKey: "nyxel.biometric.enabled")
         activationVoiceSwitch.isOn = SoundService.shared.activationVoiceEnabled
@@ -182,8 +182,8 @@ final class ProfileView: UIView {
         avatarCircle.layer.borderWidth = 2
         avatarCircle.layer.borderColor = AppTheme.accent.cgColor
         avatarCircle.layer.shadowColor = AppTheme.accent.cgColor
-        avatarCircle.layer.shadowOpacity = 0.3
-        avatarCircle.layer.shadowRadius = 14
+        avatarCircle.layer.shadowOpacity = 0.16
+        avatarCircle.layer.shadowRadius = 9
         avatarCircle.clipsToBounds = true
         avatarCircle.translatesAutoresizingMaskIntoConstraints = false
 
@@ -202,7 +202,7 @@ final class ProfileView: UIView {
         avatarImageView.layer.addSublayer(progressTrack)
         avatarImageView.layer.addSublayer(progressRing)
 
-        nameLabel.text = "CUENTA ACTIVA"
+        nameLabel.text = "NYXEL EXTERNAL"
         nameLabel.font = AppTheme.titleFont(19)
         nameLabel.textColor = AppTheme.primaryText
         rankLabel.font = .systemFont(ofSize: 10, weight: .heavy)
@@ -249,10 +249,10 @@ final class ProfileView: UIView {
         activationVoiceSwitch.onTintColor = AppTheme.accent
         activationVoiceSwitch.addTarget(self, action: #selector(activationVoiceChanged), for: .valueChanged)
 
-        refreshButton.setTitle("↻  ACTUALIZAR DATOS", for: .normal)
+        refreshButton.setTitle("↻  ACTUALIZAR PERFIL", for: .normal)
         refreshButton.setTitleColor(AppTheme.accent, for: .normal)
         refreshButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .heavy)
-        refreshButton.backgroundColor = AppTheme.accentDim
+        refreshButton.backgroundColor = AppTheme.accentDim.withAlphaComponent(0.72)
         refreshButton.layer.cornerRadius = 10
         refreshButton.layer.borderWidth = 1
         refreshButton.layer.borderColor = AppTheme.accent.withAlphaComponent(0.35).cgColor
