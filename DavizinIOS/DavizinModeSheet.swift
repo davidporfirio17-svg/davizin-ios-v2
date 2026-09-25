@@ -18,24 +18,12 @@ protocol DavizinModeSheetDelegate: AnyObject {
 /// Worker que no está en esta tabla, cae a un ícono/descr. genéricos.
 private extension DavizinMode {
     var symbol: String {
-        switch id {
-        case "holograma": return "◈"
-        case "pecho": return "◇"
-        case "drag": return "◆"
-        case "body100": return "●"
-        default: return "▸"
-        }
+        return "▸"
     }
 
     var sheetDescription: String {
         if !noticeBody.isEmpty { return noticeBody }
-        switch id {
-        case "holograma": return "Cabeza translúcida animada"
-        case "pecho": return "Variante de acid modificada"
-        case "drag": return "Colisión desplazable"
-        case "body100": return "Hitbox completo original"
-        default: return "Modo de inyección"
-        }
+        return "Modo de inyección"
     }
 }
 

@@ -18,8 +18,7 @@ struct DavizinMode: Hashable, Codable, Identifiable {
     let oneTime: Bool
     let consumed: Bool
     /// Visibilidad independiente por juego — antes "enabled" era global y
-    /// afectaba ambos juegos a la vez. Ahora puedes tener Pecho visible solo
-    /// en Free Fire MAX y oculto en Free Fire normal, por ejemplo.
+    /// afectaba ambos juegos a la vez.
     let enabledFreeFire: Bool
     let enabledFreeFireMax: Bool
 

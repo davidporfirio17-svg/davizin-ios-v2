@@ -106,7 +106,7 @@ final class DavizinBridge {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
-            if result.success && mode.oneTime && mode.id == "holograma" {
+            if result.success && mode.oneTime {
                 self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
             } else {
                 DispatchQueue.main.async {
@@ -136,7 +136,7 @@ final class DavizinBridge {
                 self.hapticFeedback(success: ok)
                 if ok { DavizinModeCatalog.markConsumed(mode.id) }
                 self.operationInFlight = false
-                self.vc?.setOperationState(ok ? .succeeded(result.message) : .failed("La inyección se realizó, pero no se pudo confirmar el consumo de Holograma. No vuelvas a intentarlo hasta revisar la conexión."))
+                self.vc?.setOperationState(ok ? .succeeded(result.message) : .failed("La inyección se realizó, pero no se pudo confirmar el consumo del modo. No vuelvas a intentarlo hasta revisar la conexión."))
             }
         }.resume()
     }
@@ -232,9 +232,9 @@ final class DavizinBridge {
             let game = selectedGame
             let key = sessionKey
             let hwid = sessionHWID
-            if mode.oneTime && mode.id == "holograma" && !mode.consumed {
-                vc?.showNotice("⚠️ Holograma Pro — uso único\n\nUna vez inyectado correctamente, Holograma desaparecerá definitivamente de esta key. Si eliminas Free Fire o borras sus archivos, no será posible recuperarlo con esta misma key. Para volver a utilizarlo necesitarás una key Pro nueva. ¿Deseas continuar?") { [weak self] in
-                    self?.vc?.showNotice("🔴 Confirmación final\n\nEsta acción consumirá permanentemente Holograma de esta key y no se puede deshacer. ¿Confirmas la inyección?") { [weak self] in
+            if mode.oneTime && !mode.consumed {
+                vc?.showNotice("⚠️ Modo de uso único\n\nUna vez completado correctamente, este modo se consumirá definitivamente para esta key. ¿Deseas continuar?") { [weak self] in
+                    self?.vc?.showNotice("🔴 Confirmación final\n\nEsta acción consumirá permanentemente el modo y no se puede deshacer. ¿Confirmas la inyección?") { [weak self] in
                         self?.performInjection(game: game, mode: mode, key: key, hwid: hwid)
                     }
                 }

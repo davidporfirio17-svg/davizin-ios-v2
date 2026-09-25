@@ -135,12 +135,7 @@ final class ModeSelectionView: UIView {
     }
 
     private func iconName(for mode: DavizinMode) -> String {
-        switch mode.id.lowercased() {
-        case "drag": return "hand.draw.fill"
-        case "pecho": return "scope"
-        case "body100": return "bolt.fill"
-        default: return "slider.horizontal.3"
-        }
+        mode.accessTier == "pro" ? "lock.shield.fill" : "slider.horizontal.3"
     }
 
     @objc private func sheetTriggerTapped() {

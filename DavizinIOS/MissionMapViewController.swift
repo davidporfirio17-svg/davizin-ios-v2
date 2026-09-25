@@ -341,12 +341,7 @@ final class MissionNodeView: UIView {
 
 private extension DavizinMode {
     var symbol: String {
-        switch id {
-        case "drag": return "◆"
-        case "pecho": return "◇"
-        case "body100": return "●"
-        default: return "▸"
-        }
+        return "▸"
     }
 }
 
