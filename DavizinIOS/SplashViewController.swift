@@ -3,7 +3,7 @@ import UIKit
 // MARK: - SplashViewController — intro de marca.
 // El anillo se dibuja con CAShapeLayer.strokeEnd (equivalente nativo de
 // stroke-dashoffset animado en SVG que usamos en el HTML), luego aparece
-// la "N" y el texto "NYXEL". Se llama antes de decidir si mostrar el
+// la "N" y el texto "NYXEL EXTERNAL". Se llama antes de decidir si mostrar el
 // aviso (NoticeViewController) o el login.
 
 final class SplashViewController: UIViewController {
@@ -41,8 +41,8 @@ final class SplashViewController: UIViewController {
         ringLayer.strokeEnd = 0
         ringLayer.frame = CGRect(x: 0, y: 0, width: ringSize, height: ringSize)
         ringLayer.shadowColor = AppTheme.accent.cgColor
-        ringLayer.shadowRadius = 6
-        ringLayer.shadowOpacity = 0.8
+        ringLayer.shadowRadius = 4
+        ringLayer.shadowOpacity = 0.45
         ringLayer.shadowOffset = .zero
 
         ringContainer.layer.addSublayer(trackLayer)
@@ -55,12 +55,12 @@ final class SplashViewController: UIViewController {
         markLabel.alpha = 0
         markLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        wordLabel.text = "NYXEL"
-        wordLabel.font = .systemFont(ofSize: 12, weight: .heavy)
+        wordLabel.text = "NYXEL EXTERNAL"
+        wordLabel.font = .systemFont(ofSize: 11, weight: .semibold)
         wordLabel.textColor = AppTheme.tertiaryText
         wordLabel.textAlignment = .center
         wordLabel.alpha = 0
-        applyKerning(to: wordLabel, value: 5)
+        applyKerning(to: wordLabel, value: 2.5)
         wordLabel.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(ringContainer)

@@ -1,61 +1,56 @@
 import UIKit
 
-// MARK: - AppTheme v3 — Nyxel Final (ember/fuego)
-// Paleta exacta del prototipo HTML aprobado (nyxel-final.html):
-// fondo con tinte cafe-rojizo (NO negro puro), acento "ember" cian-fuego,
-// tipografia condensada pesada para titulos, mono para datos.
-
+// MARK: - AppTheme — Nyxel External
+// Dark premium utility: carbón profundo, texto cálido y un solo acento cian.
 enum AppTheme {
-    static let background      = UIColor(red: 0.051, green: 0.043, blue: 0.031, alpha: 1.0)  // #0D0906
-    static let backgroundRaise = UIColor(red: 0.086, green: 0.075, blue: 0.059, alpha: 1.0)   // #16130F
+    static let background      = UIColor(red: 0.025, green: 0.035, blue: 0.055, alpha: 1.0)
+    static let backgroundRaise = UIColor(red: 0.055, green: 0.070, blue: 0.095, alpha: 1.0)
     static let card            = backgroundRaise
-    static let hairline        = UIColor(white: 1.0, alpha: 0.10)
-    static let hairlineStrong  = UIColor(white: 1.0, alpha: 0.20)
+    static let hairline        = UIColor.white.withAlphaComponent(0.09)
+    static let hairlineStrong  = UIColor.white.withAlphaComponent(0.16)
 
-    static let primaryText     = UIColor(red: 0.984, green: 0.953, blue: 0.925, alpha: 1.0)   // #FBF3EC
-    static let secondaryText   = UIColor(red: 0.984, green: 0.953, blue: 0.925, alpha: 0.60)
-    static let tertiaryText    = UIColor(red: 0.984, green: 0.953, blue: 0.925, alpha: 0.32)
+    static let primaryText     = UIColor(red: 0.955, green: 0.970, blue: 0.985, alpha: 1.0)
+    static let secondaryText   = UIColor(red: 0.800, green: 0.840, blue: 0.890, alpha: 0.72)
+    static let tertiaryText    = UIColor(red: 0.700, green: 0.760, blue: 0.830, alpha: 0.42)
 
-    static let success         = UIColor(red: 0.498, green: 0.839, blue: 0.541, alpha: 1.0)   // #7FD68A
-    static let failure         = UIColor(red: 1.000, green: 0.361, blue: 0.361, alpha: 1.0)   // #FF5C5C
-    static let warm            = UIColor(red: 1.000, green: 0.690, blue: 0.125, alpha: 1.0)   // #FFB020
-    static let accentWarm      = warm  // alias: nombre usado en LoginView/DavizinBridge/DavizinCardView existentes
+    static let success         = UIColor(red: 0.420, green: 0.820, blue: 0.690, alpha: 1.0)
+    static let failure         = UIColor(red: 0.980, green: 0.360, blue: 0.400, alpha: 1.0)
+    static let warm            = UIColor(red: 1.000, green: 0.680, blue: 0.260, alpha: 1.0)
+    static let accentWarm      = warm
 
     static var accent: UIColor { NyxelAppearanceStore.accent }
     static var accentHot: UIColor { NyxelAppearanceStore.accentHot }
     static var accentDim: UIColor { NyxelAppearanceStore.accentDim }
 
-    // Alias de compatibilidad con codigo existente (DavizinButton, LoginView) que
-    // referencia nombres de la paleta anterior. Apuntan a los tokens nuevos.
     static let control         = card
     static let separator       = hairline
 
-    static let cardCornerRadius:    CGFloat = 18.0
+    static let cardCornerRadius:    CGFloat = 20.0
     static let controlCornerRadius: CGFloat = 14.0
-    static let standardSpacing:     CGFloat = 14.0
+    static let standardSpacing:     CGFloat = 16.0
     static let cardPadding:         CGFloat = 22.0
-    static let contentMaximumWidth: CGFloat = 320.0
+    static let contentMaximumWidth: CGFloat = 360.0
     static let controlHeight:       CGFloat = 52.0
 
-    static func titleFont(_ size: CGFloat = 26) -> UIFont { UIFont.systemFont(ofSize: size, weight: .black) }
-    static func bodyFont()    -> UIFont { UIFont.systemFont(ofSize: 13, weight: .regular) }
-    static func captionFont() -> UIFont { UIFont.systemFont(ofSize: 10, weight: .heavy) }
-    static func controlFont() -> UIFont { UIFont.systemFont(ofSize: 13, weight: .heavy) }
-    static func monoFont(_ size: CGFloat = 12) -> UIFont { UIFont.monospacedSystemFont(ofSize: size, weight: .semibold) }
+    static func titleFont(_ size: CGFloat = 26) -> UIFont { UIFont.systemFont(ofSize: size, weight: .bold) }
+    static func bodyFont()    -> UIFont { UIFont.systemFont(ofSize: 14, weight: .regular) }
+    static func captionFont() -> UIFont { UIFont.systemFont(ofSize: 10, weight: .semibold) }
+    static func controlFont() -> UIFont { UIFont.systemFont(ofSize: 14, weight: .semibold) }
+    static func monoFont(_ size: CGFloat = 12) -> UIFont { UIFont.monospacedSystemFont(ofSize: size, weight: .medium) }
 
-    static let titleTracking: CGFloat = -0.6
+    static let titleTracking: CGFloat = -0.35
+    static let durationButtonPress: TimeInterval = 0.15
+    static let durationPopover: TimeInterval = 0.20
+    static let durationModal: TimeInterval = 0.30
+    static let durationDrawer: TimeInterval = 0.40
 
     static func easeOutTiming() -> UICubicTimingParameters {
         UICubicTimingParameters(controlPoint1: CGPoint(x: 0.22, y: 1.0), controlPoint2: CGPoint(x: 0.36, y: 1.0))
     }
+
     static func drawerTiming() -> UICubicTimingParameters {
         UICubicTimingParameters(controlPoint1: CGPoint(x: 0.32, y: 0.72), controlPoint2: CGPoint(x: 0.0, y: 1.0))
     }
-
-    static let durationButtonPress: TimeInterval = 0.15
-    static let durationPopover: TimeInterval = 0.20
-    static let durationModal: TimeInterval = 0.30
-    static let durationDrawer: TimeInterval = 0.45
 
     static func countdownColor(remainingSeconds: Int) -> UIColor {
         if remainingSeconds <= 3600 { return failure }

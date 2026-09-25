@@ -278,9 +278,9 @@ final class LoginView: UIView {
         videoOverlay.isUserInteractionEnabled = false
         videoOverlay.backgroundColor = .clear
         videoGradient.colors = [
-            UIColor.black.withAlphaComponent(0.12).cgColor,
-            UIColor.black.withAlphaComponent(0.24).cgColor,
-            UIColor.black.withAlphaComponent(0.72).cgColor
+            UIColor.black.withAlphaComponent(0.20).cgColor,
+            UIColor.black.withAlphaComponent(0.32).cgColor,
+            UIColor.black.withAlphaComponent(0.80).cgColor
         ]
         videoGradient.locations = [0.0, 0.48, 1.0]
         videoGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
@@ -305,8 +305,8 @@ final class LoginView: UIView {
 			logoMark.contentMode = .scaleAspectFit
 			logoMark.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 24.0, weight: .bold)
 			logoMark.layer.shadowColor = AppTheme.accent.cgColor
-			logoMark.layer.shadowRadius = 14.0
-			logoMark.layer.shadowOpacity = 0.72
+			logoMark.layer.shadowRadius = 8.0
+			logoMark.layer.shadowOpacity = 0.42
 			logoMark.layer.shadowOffset = .zero
 			logoMark.heightAnchor.constraint(equalToConstant: 30.0).isActive = true
 

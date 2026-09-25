@@ -65,16 +65,16 @@ final class DavizinCardView: UIView {
         layer.masksToBounds = false
         layer.borderWidth = 1.0
         layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
-        layer.shadowColor = AppTheme.accentWarm.cgColor
-        layer.shadowOpacity = 0.28
-        layer.shadowRadius = 28.0
-        layer.shadowOffset = CGSize(width: 0.0, height: 16.0)
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.22
+        layer.shadowRadius = 18.0
+        layer.shadowOffset = CGSize(width: 0.0, height: 10.0)
 
         blurView.translatesAutoresizingMaskIntoConstraints = false
         blurView.layer.cornerRadius = AppTheme.cardCornerRadius
         blurView.layer.cornerCurve = .continuous
         blurView.clipsToBounds = true
-        blurView.alpha = 0.72
+        blurView.alpha = 0.62
         addSubview(blurView)
         blurView.davizinPinEdges(to: self)
 

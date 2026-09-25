@@ -14,7 +14,7 @@ final class ModeSelectionView: UIView {
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let footerLabel = UILabel()
-    private let sheetTriggerButton = DavizinButton(title: "◈ Elegir desde lista", style: .primary)
+    private let sheetTriggerButton = DavizinButton(title: "Ver todos los modos", style: .primary)
     private let stackView = UIStackView()
 
     /// Un botón por cada caso de DavizinMode, en el mismo orden del enum.
@@ -43,27 +43,27 @@ final class ModeSelectionView: UIView {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
-        categoryLabel.text = "02 / CONFIGURACIÓN"
+        categoryLabel.text = "02  ·  CONFIGURACIÓN"
         categoryLabel.textColor = AppTheme.tertiaryText
         categoryLabel.font = AppTheme.captionFont()
         categoryLabel.textAlignment = .center
         categoryLabel.adjustsFontForContentSizeCategory = true
         applyTitleTracking(categoryLabel, value: 1.2)
 
-        titleLabel.text = "Configura tu perfil"
+        titleLabel.text = "Elige tu modo"
         titleLabel.textColor = AppTheme.primaryText
         titleLabel.font = AppTheme.titleFont()
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
 
-        subtitleLabel.text = "Elige el modo que quieres activar en esta sesión."
+        subtitleLabel.text = "Selecciona una configuración para esta sesión."
         subtitleLabel.textColor = AppTheme.secondaryText
         subtitleLabel.font = AppTheme.bodyFont()
         subtitleLabel.textAlignment = .center
         subtitleLabel.numberOfLines = 0
         subtitleLabel.adjustsFontForContentSizeCategory = true
 
-        footerLabel.text = "Revisa tu selección antes de ejecutar la operación."
+        footerLabel.text = "Puedes cambiar de modo antes de iniciar la operación."
         footerLabel.textColor = AppTheme.secondaryText
         footerLabel.font = AppTheme.captionFont()
         footerLabel.textAlignment = .center
@@ -75,7 +75,7 @@ final class ModeSelectionView: UIView {
 
         stackView.axis = .vertical
         stackView.alignment = .fill
-        stackView.spacing = 12.0
+        stackView.spacing = 14.0
         stackView.translatesAutoresizingMaskIntoConstraints = false
 
         stackView.addArrangedSubview(categoryLabel)
@@ -98,7 +98,7 @@ final class ModeSelectionView: UIView {
             button.contentHorizontalAlignment = .left
             button.setImage(UIImage(systemName: iconName(for: mode)), for: .normal)
             button.tintColor = AppTheme.accent
-            button.imageEdgeInsets = UIEdgeInsets(top: 0, left: 2, bottom: 0, right: 10)
+            button.imageEdgeInsets = UIEdgeInsets(top: 0, left: 4, bottom: 0, right: 12)
             button.tag = index
             button.addTarget(self, action: #selector(modeTapped(_:)), for: .touchUpInside)
 
@@ -122,7 +122,7 @@ final class ModeSelectionView: UIView {
             cardView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -22.0),
             cardView.centerXAnchor.constraint(equalTo: centerXAnchor),
             cardView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 560.0 : AppTheme.contentMaximumWidth),
+            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 580.0 : AppTheme.contentMaximumWidth),
             stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 360.0 : 240.0)
         ] + buttonConstraints)
     }

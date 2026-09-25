@@ -1,4 +1,4 @@
-name: Build Davizin iOS
+name: Build Nyxel External iOS
 
 on:
   push:
@@ -50,14 +50,14 @@ jobs:
         
         mkdir -p /tmp/Payload
         cp -r "$APP" /tmp/Payload/DavizinIOS.app
-        cd /tmp && zip -r Davizin_unsigned.ipa Payload/
+        cd /tmp && zip -r Nyxel_External_unsigned.ipa Payload/
         
-        ls -lh /tmp/Davizin_unsigned.ipa
-        unzip -l /tmp/Davizin_unsigned.ipa | head -20
+        ls -lh /tmp/Nyxel_External_unsigned.ipa
+        unzip -l /tmp/Nyxel_External_unsigned.ipa | head -20
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
-        name: Davizin_iOS_unsigned
-        path: /tmp/Davizin_unsigned.ipa
+        name: Nyxel_External_iOS_unsigned
+        path: /tmp/Nyxel_External_unsigned.ipa
         retention-days: 30
