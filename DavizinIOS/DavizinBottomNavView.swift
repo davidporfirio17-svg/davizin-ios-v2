@@ -1,22 +1,14 @@
 import UIKit
 
 final class DavizinBottomNavView: UIView {
-    var onHome: (() -> Void)?
     var onModes: (() -> Void)?
-    var onOperation: (() -> Void)?
     var onProfile: (() -> Void)?
 
     private let modesButton = UIButton(type: .system)
-    private let homeButton = UIButton(type: .system)
-    private let operationButton = UIButton(type: .system)
     private let profileButton = UIButton(type: .system)
-    private let homeLabel = UILabel()
     private let modesLabel = UILabel()
-    private let operationLabel = UILabel()
     private let profileLabel = UILabel()
-    private let homeIndicator = UIView()
     private let modesIndicator = UIView()
-    private let operationIndicator = UIView()
     private let profileIndicator = UIView()
 
     override init(frame: CGRect) {
@@ -32,23 +24,17 @@ final class DavizinBottomNavView: UIView {
     func setSelected(_ item: Item) {
         let selectedColor = AppTheme.accent
         let normalColor = AppTheme.secondaryText
-        homeButton.tintColor = item == .home ? selectedColor : normalColor
         modesButton.tintColor = item == .modes ? selectedColor : normalColor
-        operationButton.tintColor = item == .operation ? selectedColor : normalColor
         profileButton.tintColor = item == .profile ? selectedColor : normalColor
-        homeLabel.textColor = item == .home ? selectedColor : normalColor
         modesLabel.textColor = item == .modes ? selectedColor : normalColor
-        operationLabel.textColor = item == .operation ? selectedColor : normalColor
         profileLabel.textColor = item == .profile ? selectedColor : normalColor
         UIView.animate(withDuration: AppTheme.durationPopover) {
-            self.homeIndicator.alpha = item == .home ? 1.0 : 0.0
             self.modesIndicator.alpha = item == .modes ? 1.0 : 0.0
-            self.operationIndicator.alpha = item == .operation ? 1.0 : 0.0
             self.profileIndicator.alpha = item == .profile ? 1.0 : 0.0
         }
     }
 
-    enum Item { case home, modes, operation, profile }
+    enum Item { case modes, profile }
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
@@ -62,12 +48,10 @@ final class DavizinBottomNavView: UIView {
         layer.shadowRadius = 14
         layer.shadowOffset = CGSize(width: 0, height: 6)
 
-        configureButton(homeButton, image: "house.fill", label: homeLabel, text: "INICIO", action: #selector(homeTapped))
         configureButton(modesButton, image: "square.grid.2x2.fill", label: modesLabel, text: "MODOS", action: #selector(modesTapped))
-        configureButton(operationButton, image: "bolt.fill", label: operationLabel, text: "OPERAR", action: #selector(operationTapped))
         configureButton(profileButton, image: "person.crop.circle.fill", label: profileLabel, text: "PERFIL", action: #selector(profileTapped))
 
-        let stack = UIStackView(arrangedSubviews: [makeItem(button: homeButton, label: homeLabel, indicator: homeIndicator), makeItem(button: modesButton, label: modesLabel, indicator: modesIndicator), makeItem(button: operationButton, label: operationLabel, indicator: operationIndicator), makeItem(button: profileButton, label: profileLabel, indicator: profileIndicator)])
+        let stack = UIStackView(arrangedSubviews: [makeItem(button: modesButton, label: modesLabel, indicator: modesIndicator), makeItem(button: profileButton, label: profileLabel, indicator: profileIndicator)])
         stack.axis = .horizontal
         stack.distribution = .fillEqually
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -84,7 +68,7 @@ final class DavizinBottomNavView: UIView {
             stackTop,
             stackBottom
         ])
-        setSelected(.home)
+        setSelected(.modes)
     }
 
     private func configureButton(_ button: UIButton, image: String, label: UILabel, text: String, action: Selector) {
@@ -116,9 +100,6 @@ final class DavizinBottomNavView: UIView {
     @objc private func modesTapped() {
         onModes?()
     }
-
-    @objc private func homeTapped() { onHome?() }
-    @objc private func operationTapped() { onOperation?() }
 
     @objc private func profileTapped() {
         onProfile?()

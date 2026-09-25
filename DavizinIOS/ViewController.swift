@@ -259,14 +259,8 @@ final class ViewController: UIViewController {
         contentContainerView.backgroundColor = .clear
         view.addSubview(contentContainerView)
 
-        bottomNavView.onHome = { [weak self] in
-            self?.showGameSelection(animated: true)
-        }
         bottomNavView.onModes = { [weak self] in
             self?.showModeSelection(animated: true)
-        }
-        bottomNavView.onOperation = { [weak self] in
-            self?.showOperation(animated: true)
         }
         bottomNavView.onProfile = { [weak self] in
             self?.showProfile(animated: true)
@@ -385,7 +379,7 @@ final class ViewController: UIViewController {
         currentStage = .gameSelection
         animatedBackgroundView.isHidden = false
         animatedBackgroundView.startAnimating()
-        setBottomNavigation(visible: true, selected: .home)
+        setBottomNavigation(visible: true, selected: .modes)
 		headerView.title = "Seleccionar entorno"
 		headerView.showsBackButton = true
 		headerView.showsAvatarButton = false
@@ -415,7 +409,7 @@ final class ViewController: UIViewController {
     }
 
     private func showOperation(animated: Bool) {
-        setBottomNavigation(visible: true, selected: .operation)
+        setBottomNavigation(visible: true, selected: .modes)
         guard DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) else {
             showModeSelection(animated: animated)
             return
