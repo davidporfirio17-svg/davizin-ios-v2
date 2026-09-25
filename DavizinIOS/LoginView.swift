@@ -305,7 +305,7 @@ final class LoginView: UIView {
 				logoMark.contentMode = .scaleAspectFit
 			logoMark.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 24.0, weight: .bold)
 			logoMark.layer.shadowColor = AppTheme.accent.cgColor
-				logoMark.layer.cornerRadius = 15.0
+                logoMark.layer.cornerRadius = 15.0
 				logoMark.layer.masksToBounds = true
 				logoMark.layer.shadowRadius = 8.0
 			logoMark.layer.shadowOpacity = 0.42
@@ -327,20 +327,20 @@ final class LoginView: UIView {
         subtitleLabel.adjustsFontForContentSizeCategory = true
 
         keyField.translatesAutoresizingMaskIntoConstraints = false
-        keyField.backgroundColor = UIColor.black.withAlphaComponent(0.28)
+        keyField.backgroundColor = UIColor.black.withAlphaComponent(0.42)
         keyField.textColor = AppTheme.primaryText
         keyField.tintColor = AppTheme.primaryText
         keyField.font = AppTheme.bodyFont()
         keyField.layer.cornerRadius = AppTheme.controlCornerRadius
         keyField.layer.cornerCurve = .continuous
         keyField.layer.borderWidth = 1.0
-        keyField.layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
+        keyField.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
         keyField.layer.shadowColor = AppTheme.accent.cgColor
         keyField.layer.shadowOffset = .zero
         keyField.layer.shadowRadius = 12.0
         keyField.layer.shadowOpacity = 0.0
         keyField.attributedPlaceholder = NSAttributedString(
-            string: "PEGA TU KEY DE ACCESO",
+            string: "INGRESA TU KEY DE ACCESO",
             attributes: [.foregroundColor: UIColor.white.withAlphaComponent(0.42)]
         )
         keyField.isSecureTextEntry = true
@@ -398,7 +398,7 @@ final class LoginView: UIView {
 
         stackView.axis = .vertical
         stackView.alignment = .fill
-        stackView.spacing = 12.0
+        stackView.spacing = 14.0
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.addArrangedSubview(logoMark)
         stackView.addArrangedSubview(titleLabel)

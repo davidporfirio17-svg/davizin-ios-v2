@@ -1,83 +1,81 @@
 import UIKit
 
-// MARK: - SplashViewController — intro de marca.
-// El anillo se dibuja con CAShapeLayer.strokeEnd (equivalente nativo de
-// stroke-dashoffset animado en SVG que usamos en el HTML), luego aparece
-// la "N" y el texto "NYXEL EXTERNAL". Se llama antes de decidir si mostrar el
-// aviso (NoticeViewController) o el login.
-
+// MARK: - SplashViewController — presentación de marca Nyxel External.
 final class SplashViewController: UIViewController {
     var onFinished: (() -> Void)?
 
-    private let ringLayer = CAShapeLayer()
-    private let markLabel = UILabel()
+    private let portraitView = UIImageView()
     private let wordLabel = UILabel()
+    private let captionLabel = UILabel()
+    private let progressLayer = CAShapeLayer()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = AppTheme.background
 
-        let ringSize: CGFloat = 84
-        let ringContainer = UIView()
-        ringContainer.translatesAutoresizingMaskIntoConstraints = false
-
-        let trackLayer = CAShapeLayer()
-        let path = UIBezierPath(arcCenter: CGPoint(x: ringSize / 2, y: ringSize / 2),
-                                 radius: ringSize / 2 - 3,
-                                 startAngle: -.pi / 2,
-                                 endAngle: .pi * 1.5,
-                                 clockwise: true)
-        trackLayer.path = path.cgPath
-        trackLayer.strokeColor = AppTheme.hairlineStrong.cgColor
-        trackLayer.fillColor = UIColor.clear.cgColor
-        trackLayer.lineWidth = 2.5
-        trackLayer.frame = CGRect(x: 0, y: 0, width: ringSize, height: ringSize)
-
-        ringLayer.path = path.cgPath
-        ringLayer.strokeColor = AppTheme.accent.cgColor
-        ringLayer.fillColor = UIColor.clear.cgColor
-        ringLayer.lineWidth = 2.5
-        ringLayer.lineCap = .round
-        ringLayer.strokeEnd = 0
-        ringLayer.frame = CGRect(x: 0, y: 0, width: ringSize, height: ringSize)
-        ringLayer.shadowColor = AppTheme.accent.cgColor
-        ringLayer.shadowRadius = 4
-        ringLayer.shadowOpacity = 0.45
-        ringLayer.shadowOffset = .zero
-
-        ringContainer.layer.addSublayer(trackLayer)
-        ringContainer.layer.addSublayer(ringLayer)
-
-        markLabel.text = "N"
-        markLabel.font = .systemFont(ofSize: 26, weight: .black)
-        markLabel.textColor = AppTheme.primaryText
-        markLabel.textAlignment = .center
-        markLabel.alpha = 0
-        markLabel.translatesAutoresizingMaskIntoConstraints = false
+        portraitView.image = UIImage(named: "NyxelAvatar")
+        portraitView.contentMode = .scaleAspectFill
+        portraitView.clipsToBounds = true
+        portraitView.layer.cornerRadius = 76
+        portraitView.layer.cornerCurve = .continuous
+        portraitView.layer.borderWidth = 1.0
+        portraitView.layer.borderColor = AppTheme.accent.withAlphaComponent(0.48).cgColor
+        portraitView.layer.shadowColor = AppTheme.accent.cgColor
+        portraitView.layer.shadowRadius = 24
+        portraitView.layer.shadowOpacity = 0.30
+        portraitView.layer.shadowOffset = .zero
+        portraitView.alpha = 0
+        portraitView.transform = CGAffineTransform(scaleX: 0.90, y: 0.90)
+        portraitView.translatesAutoresizingMaskIntoConstraints = false
 
         wordLabel.text = "NYXEL EXTERNAL"
-        wordLabel.font = .systemFont(ofSize: 11, weight: .semibold)
-        wordLabel.textColor = AppTheme.tertiaryText
+        wordLabel.font = .systemFont(ofSize: 15, weight: .bold)
+        wordLabel.textColor = AppTheme.primaryText
         wordLabel.textAlignment = .center
         wordLabel.alpha = 0
-        applyKerning(to: wordLabel, value: 2.5)
+        applyKerning(to: wordLabel, value: 2.4)
         wordLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        view.addSubview(ringContainer)
-        ringContainer.addSubview(markLabel)
+        captionLabel.text = "SECURE OPERATIONS"
+        captionLabel.font = AppTheme.captionFont()
+        captionLabel.textColor = AppTheme.tertiaryText
+        captionLabel.textAlignment = .center
+        captionLabel.alpha = 0
+        applyKerning(to: captionLabel, value: 1.6)
+        captionLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let track = CAShapeLayer()
+        let ringRect = CGRect(x: 0, y: 0, width: 164, height: 164)
+        let path = UIBezierPath(ovalIn: ringRect.insetBy(dx: 4, dy: 4))
+        track.path = path.cgPath
+        track.frame = ringRect
+        track.strokeColor = AppTheme.hairlineStrong.cgColor
+        track.fillColor = UIColor.clear.cgColor
+        track.lineWidth = 2
+
+        progressLayer.path = path.cgPath
+        progressLayer.frame = ringRect
+        progressLayer.strokeColor = AppTheme.accent.cgColor
+        progressLayer.fillColor = UIColor.clear.cgColor
+        progressLayer.lineWidth = 2
+        progressLayer.lineCap = .round
+        progressLayer.strokeEnd = 0
+        portraitView.layer.addSublayer(track)
+        portraitView.layer.addSublayer(progressLayer)
+
+        view.addSubview(portraitView)
         view.addSubview(wordLabel)
+        view.addSubview(captionLabel)
 
         NSLayoutConstraint.activate([
-            ringContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            ringContainer.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -14),
-            ringContainer.widthAnchor.constraint(equalToConstant: ringSize),
-            ringContainer.heightAnchor.constraint(equalToConstant: ringSize),
-
-            markLabel.centerXAnchor.constraint(equalTo: ringContainer.centerXAnchor),
-            markLabel.centerYAnchor.constraint(equalTo: ringContainer.centerYAnchor),
-
-            wordLabel.topAnchor.constraint(equalTo: ringContainer.bottomAnchor, constant: 18),
-            wordLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor)
+            portraitView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            portraitView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -34),
+            portraitView.widthAnchor.constraint(equalToConstant: 152),
+            portraitView.heightAnchor.constraint(equalToConstant: 152),
+            wordLabel.topAnchor.constraint(equalTo: portraitView.bottomAnchor, constant: 28),
+            wordLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            captionLabel.topAnchor.constraint(equalTo: wordLabel.bottomAnchor, constant: 8),
+            captionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor)
         ])
     }
 
@@ -87,30 +85,28 @@ final class SplashViewController: UIViewController {
     }
 
     private func animateSplash() {
-        let drawAnimation = CABasicAnimation(keyPath: "strokeEnd")
-        drawAnimation.fromValue = 0
-        drawAnimation.toValue = 1
-        drawAnimation.duration = 1.0
-        drawAnimation.timingFunction = CAMediaTimingFunction(controlPoints: 0.65, 0, 0.35, 1)
-        drawAnimation.fillMode = .forwards
-        drawAnimation.isRemovedOnCompletion = false
-        ringLayer.add(drawAnimation, forKey: "draw")
-        ringLayer.strokeEnd = 1
+        let draw = CABasicAnimation(keyPath: "strokeEnd")
+        draw.fromValue = 0
+        draw.toValue = 1
+        draw.duration = 0.85
+        draw.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        progressLayer.add(draw, forKey: "draw")
+        progressLayer.strokeEnd = 1
 
-        UIView.animate(withDuration: 0.4, delay: 0.75, options: [.curveEaseOut]) {
-            self.markLabel.alpha = 1
+        UIView.animate(withDuration: 0.60, delay: 0.12, options: [.curveEaseOut]) {
+            self.portraitView.alpha = 1
+            self.portraitView.transform = .identity
         }
-        UIView.animate(withDuration: 0.5, delay: 1.0, options: [.curveEaseOut]) {
+        UIView.animate(withDuration: 0.42, delay: 0.60, options: [.curveEaseOut]) {
             self.wordLabel.alpha = 1
+            self.captionLabel.alpha = 1
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.45) { [weak self] in
-            guard let self = self else { return }
-            UIView.animate(withDuration: 0.5, animations: {
+            guard let self else { return }
+            UIView.animate(withDuration: 0.36, animations: {
                 self.view.alpha = 0
-            }, completion: { _ in
-                self.onFinished?()
-            })
+            }, completion: { _ in self.onFinished?() })
         }
     }
 

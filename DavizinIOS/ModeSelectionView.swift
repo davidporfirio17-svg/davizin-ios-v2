@@ -92,10 +92,13 @@ final class ModeSelectionView: UIView {
             footerLabel.text = "No hay modos activos. Activa al menos uno desde el panel."
         }
         for (index, mode) in activeModes.enumerated() {
-            let button = DavizinButton(title: mode.displayName, style: .secondary)
+            let button = DavizinButton(title: "  \(mode.displayName)\n  DISPONIBLE", style: .secondary)
             button.accessibilityIdentifier = accessibilityIdentifier(for: mode)
             button.accessibilityHint = mode.noticeBody.isEmpty ? "Selecciona este modo para continuar." : mode.noticeBody
             button.contentHorizontalAlignment = .left
+            button.titleLabel?.numberOfLines = 2
+            button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+            button.titleLabel?.textAlignment = .left
             button.setImage(UIImage(systemName: iconName(for: mode)), for: .normal)
             button.tintColor = AppTheme.accent
             button.imageEdgeInsets = UIEdgeInsets(top: 0, left: 4, bottom: 0, right: 12)
@@ -104,7 +107,7 @@ final class ModeSelectionView: UIView {
 
             stackView.addArrangedSubview(button)
             buttonConstraints.append(
-                button.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
+                button.heightAnchor.constraint(equalToConstant: 64.0)
             )
 
             modeButtons.append((mode: mode, button: button))

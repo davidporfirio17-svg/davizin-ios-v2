@@ -38,9 +38,15 @@ final class DavizinBottomNavView: UIView {
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
-        backgroundColor = AppTheme.card.withAlphaComponent(0.88)
+        backgroundColor = AppTheme.backgroundRaise.withAlphaComponent(0.96)
+        layer.cornerRadius = 18
+        layer.cornerCurve = .continuous
         layer.borderWidth = 1
-        layer.borderColor = UIColor.white.withAlphaComponent(0.08).cgColor
+        layer.borderColor = AppTheme.hairline.cgColor
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.20
+        layer.shadowRadius = 14
+        layer.shadowOffset = CGSize(width: 0, height: 6)
 
         configureButton(modesButton, image: "square.grid.2x2.fill", label: modesLabel, text: "MODOS", action: #selector(modesTapped))
         configureButton(profileButton, image: "person.crop.circle.fill", label: profileLabel, text: "PERFIL", action: #selector(profileTapped))
@@ -57,8 +63,8 @@ final class DavizinBottomNavView: UIView {
         stackTop.priority = .defaultHigh
         stackBottom.priority = .defaultHigh
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: isPad ? 120 : 28),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: isPad ? -120 : -28),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: isPad ? 110 : 18),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: isPad ? -110 : -18),
             stackTop,
             stackBottom
         ])
@@ -71,7 +77,7 @@ final class DavizinBottomNavView: UIView {
         button.accessibilityLabel = text.capitalized
         button.addTarget(self, action: action, for: .touchUpInside)
         label.text = text
-        label.font = .systemFont(ofSize: UIDevice.current.userInterfaceIdiom == .pad ? 11 : 10, weight: .heavy)
+        label.font = .systemFont(ofSize: UIDevice.current.userInterfaceIdiom == .pad ? 11 : 10, weight: .semibold)
         label.textAlignment = .center
         label.textColor = AppTheme.secondaryText
         label.isUserInteractionEnabled = false
@@ -82,8 +88,8 @@ final class DavizinBottomNavView: UIView {
         indicator.layer.cornerRadius = 1.5
         indicator.alpha = 0.0
         indicator.translatesAutoresizingMaskIntoConstraints = false
-        indicator.widthAnchor.constraint(equalToConstant: 30).isActive = true
-        indicator.heightAnchor.constraint(equalToConstant: 3).isActive = true
+        indicator.widthAnchor.constraint(equalToConstant: 26).isActive = true
+        indicator.heightAnchor.constraint(equalToConstant: 2).isActive = true
         let stack = UIStackView(arrangedSubviews: [button, label, indicator])
         stack.axis = .vertical
         stack.alignment = .center

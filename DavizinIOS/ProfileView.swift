@@ -205,7 +205,7 @@ final class ProfileView: UIView {
         nameLabel.text = "NYXEL EXTERNAL"
         nameLabel.font = AppTheme.titleFont(19)
         nameLabel.textColor = AppTheme.primaryText
-        rankLabel.font = .systemFont(ofSize: 10, weight: .heavy)
+        rankLabel.font = .systemFont(ofSize: 10, weight: .semibold)
         rankLabel.translatesAutoresizingMaskIntoConstraints = false
         rankBadge.layer.cornerRadius = 100
         rankBadge.layer.borderWidth = 1
@@ -243,6 +243,9 @@ final class ProfileView: UIView {
         rankProgressLabel.font = AppTheme.monoFont(10)
         rankProgressLabel.textColor = AppTheme.accentHot
         appearanceControl.selectedSegmentIndex = NyxelAppearanceStore.theme.rawValue
+        appearanceControl.selectedSegmentTintColor = AppTheme.accent
+        appearanceControl.setTitleTextAttributes([.foregroundColor: AppTheme.background], for: .selected)
+        appearanceControl.setTitleTextAttributes([.foregroundColor: AppTheme.secondaryText], for: .normal)
         appearanceControl.addTarget(self, action: #selector(appearanceChanged), for: .valueChanged)
         biometricSwitch.onTintColor = AppTheme.accent
         biometricSwitch.addTarget(self, action: #selector(biometricChanged), for: .valueChanged)
@@ -276,7 +279,7 @@ final class ProfileView: UIView {
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
         let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [historyLabel, activityLabel], expanded: false)
         let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, logoutButton])
-        stack.axis = .vertical; stack.spacing = 13
+        stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: heroStack)
         stack.translatesAutoresizingMaskIntoConstraints = false
         card.translatesAutoresizingMaskIntoConstraints = false
@@ -321,7 +324,7 @@ final class ProfileView: UIView {
         onRefreshRequested?()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             self?.refreshButton.isEnabled = true
-            self?.refreshButton.setTitle("↻  ACTUALIZAR DATOS", for: .normal)
+            self?.refreshButton.setTitle("↻  ACTUALIZAR PERFIL", for: .normal)
             self?.refresh()
         }
     }
