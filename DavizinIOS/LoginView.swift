@@ -300,12 +300,14 @@ final class LoginView: UIView {
         addSubview(videoOverlay)
         sendSubviewToBack(videoBackground)
 
-		logoMark.image = UIImage(systemName: "bolt.shield.fill")
-		logoMark.tintColor = AppTheme.accent
-			logoMark.contentMode = .scaleAspectFit
+			logoMark.image = UIImage(named: "NyxelAvatar")
+			logoMark.tintColor = nil
+				logoMark.contentMode = .scaleAspectFit
 			logoMark.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 24.0, weight: .bold)
 			logoMark.layer.shadowColor = AppTheme.accent.cgColor
-			logoMark.layer.shadowRadius = 8.0
+				logoMark.layer.cornerRadius = 15.0
+				logoMark.layer.masksToBounds = true
+				logoMark.layer.shadowRadius = 8.0
 			logoMark.layer.shadowOpacity = 0.42
 			logoMark.layer.shadowOffset = .zero
 			logoMark.heightAnchor.constraint(equalToConstant: 30.0).isActive = true
