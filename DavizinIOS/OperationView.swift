@@ -74,7 +74,7 @@ final class OperationView: UIView {
         didSet { updateSubtitle() }
     }
 
-    var selectedMode: DavizinMode = .drag {
+    var selectedMode: DavizinMode? {
         didSet {
             updateSubtitle()
             updateNotice()
@@ -350,11 +350,15 @@ final class OperationView: UIView {
     }
 
     private func updateSubtitle() {
-        titleLabel.text = "\(selectedGame.rawValue) / \(selectedMode.displayName)"
+        titleLabel.text = "\(selectedGame.rawValue) / \(selectedMode?.displayName ?? "Modo no disponible")"
         subtitleLabel.text = "Prepara el entorno y mantén presionado para activar la configuración."
     }
 
     private func updateNotice() {
+        guard let selectedMode else {
+            noticeCard.isHidden = true
+            return
+        }
         let visible = selectedMode.noticeEnabled && !selectedMode.noticeTitle.isEmpty && !selectedMode.noticeBody.isEmpty
         noticeCard.isHidden = !visible
         guard visible else { return }

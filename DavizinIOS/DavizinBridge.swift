@@ -9,7 +9,7 @@ final class DavizinBridge {
     private var remainingSeconds: Int = 0
 
     /// Modo elegido por el usuario. Define que cache_res se inyecta.
-    private var selectedMode: DavizinMode = .drag
+    private var selectedMode: DavizinMode?
 
     /// Juego elegido. Define bundle ID y de que slots se descarga.
     private var selectedGame: DavizinGame = .freeFireMax
@@ -225,7 +225,10 @@ final class DavizinBridge {
     }
 
     private func startInjectionFlow() {
-            let mode = selectedMode
+            guard let mode = selectedMode else {
+                vc?.setOperationState(.failed("No hay un modo disponible en el Worker."))
+                return
+            }
             let game = selectedGame
             let key = sessionKey
             let hwid = sessionHWID

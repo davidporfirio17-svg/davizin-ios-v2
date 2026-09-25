@@ -34,10 +34,6 @@ struct DavizinMode: Hashable, Codable, Identifiable {
         }
     }
 
-    static let drag = DavizinMode(id: "drag", label: "Drag", enabled: true, noticeTitle: "⚠️ Drag — Precaución", noticeBody: "Modo para mejorar el arrastre y la precisión. Puede variar según la actualización.", noticeLevel: "yellow", noticeEnabled: true)
-    static let pecho = DavizinMode(id: "pecho", label: "Pecho", enabled: true, noticeTitle: "✅ Pecho — Estable", noticeBody: "Modo recomendado para uso normal.", noticeLevel: "green", noticeEnabled: true)
-    static let body100 = DavizinMode(id: "body100", label: "Body 100%", enabled: true, noticeTitle: "🛑 Body 100% — Cuidado", noticeBody: "Revisa el comportamiento después de cada actualización.", noticeLevel: "red", noticeEnabled: true)
-
     init(id: String, label: String, enabled: Bool, noticeTitle: String = "", noticeBody: String = "", noticeLevel: String = "yellow", noticeEnabled: Bool = true, accessTier: String = "basic", pathMax: String? = nil, pathNormal: String? = nil, oneTime: Bool = false, consumed: Bool = false, enabledFreeFire: Bool = true, enabledFreeFireMax: Bool = true) {
         self.id = id; self.label = label; self.enabled = enabled; self.noticeTitle = noticeTitle; self.noticeBody = noticeBody; self.noticeLevel = noticeLevel; self.noticeEnabled = noticeEnabled; self.accessTier = accessTier; self.pathMax = pathMax; self.pathNormal = pathNormal; self.oneTime = oneTime; self.consumed = consumed; self.enabledFreeFire = enabledFreeFire; self.enabledFreeFireMax = enabledFreeFireMax
     }
@@ -66,13 +62,12 @@ struct DavizinMode: Hashable, Codable, Identifiable {
 
 enum DavizinModeCatalog {
     private static let storageKey = "dz_remote_mode_config_v4"
-    private static let defaults: [DavizinMode] = [.drag, .pecho, .body100]
     static func all() -> [DavizinMode] {
         for key in [storageKey, "dz_remote_mode_config_v3", "dz_remote_mode_config_v2"] {
             guard let data = UserDefaults.standard.data(forKey: key), let saved = try? JSONDecoder().decode([DavizinMode].self, from: data) else { continue }
             return saved.filter { isSafeID($0.id) && !$0.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         }
-        return defaults
+        return []
     }
     static func enabledModes() -> [DavizinMode] { all().filter(\.enabled) }
     /// Visibilidad real que ve el usuario en el mapa: filtra tambien por juego.

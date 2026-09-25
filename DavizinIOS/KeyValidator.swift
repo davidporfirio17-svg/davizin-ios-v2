@@ -153,14 +153,13 @@ class KeyValidator {
 
                     // Si el login es exitoso, EXIGIMOS una sesión efímera emitida por el Worker.
                     if resp.success {
-							if let modes = resp.data?.modes {
-							guard modes.count <= 64 else {
+                            let modes = resp.data?.modes ?? []
+                            guard modes.count <= 64 else {
 								NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Demasiados modos")
 								completion(false, "Configuración inválida. Inténtalo más tarde.", 0, nil)
 								return
 							}
-							DavizinModeCatalog.save(modes)
-							}
+                            DavizinModeCatalog.save(modes)
 							guard let session = resp.data?.client_session, !session.isEmpty else {
 								NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Sesión ausente")
 								completion(false, "Respuesta incompleta. Servidor no autorizado.", 0, nil)

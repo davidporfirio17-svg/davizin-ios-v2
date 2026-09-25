@@ -19,7 +19,7 @@ final class ViewController: UIViewController {
 
     private var currentStage: DavizinScreenStage = .login
     private var selectedGame: DavizinGame = .freeFireMax
-    private var selectedMode: DavizinMode = .drag
+    private var selectedMode: DavizinMode?
     private var activeKey: String?
     private var activeCountryCode: String?
     private var activeRemainingSeconds: Int = 0
@@ -394,7 +394,7 @@ final class ViewController: UIViewController {
     private func showModeSelection(animated: Bool) {
         currentStage = .modeSelection
         setBottomNavigation(visible: true, selected: .modes)
-        if let firstActive = DavizinModeCatalog.enabledModes(for: selectedGame).first, !DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) {
+        if let firstActive = DavizinModeCatalog.enabledModes(for: selectedGame).first, selectedMode == nil || !DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode!) {
             selectedMode = firstActive
         }
 		headerView.title = "Configurar / \(selectedGame.rawValue)"
@@ -410,7 +410,7 @@ final class ViewController: UIViewController {
 
     private func showOperation(animated: Bool) {
         setBottomNavigation(visible: true, selected: .modes)
-        guard DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) else {
+        guard let selectedMode, DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) else {
             showModeSelection(animated: animated)
             return
         }
@@ -575,7 +575,7 @@ final class ViewController: UIViewController {
             case .runExploit:
                 message = "Run complete"
             case .inject:
-                message = "¡\(self.selectedMode.displayName) inyectado! (simulación)"
+                message = "Configuración inyectada (simulación)"
             case .clean:
                 message = "Successfully cleaned !"
             }
