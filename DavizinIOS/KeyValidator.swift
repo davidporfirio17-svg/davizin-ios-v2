@@ -105,10 +105,12 @@ class KeyValidator {
             return
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 15
+			var request = URLRequest(url: url)
+			request.httpMethod = "POST"
+			request.cachePolicy = .reloadIgnoringLocalCacheData
+			request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+			request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+			request.timeoutInterval = 15
         applySecurityHeaders(to: &request)
 
         let hwid = getDeviceHWID()
