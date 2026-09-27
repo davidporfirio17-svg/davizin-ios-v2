@@ -517,12 +517,12 @@ final class ViewController: UIViewController {
 		}
 		if NyxelCleanupFlow.stage == .readyToOpen {
 			NyxelCleanupFlow.requestReminderPermission { [weak self] allowed in
-				guard !allowed else { beginOpening(); return }
-				DispatchQueue.main.async {
-					self?.showNotice("Activa las notificaciones de Nyxel si quieres recibir el recordatorio. Si no, vuelve manualmente después de 10 segundos y pulsa LIMPIAR SESIÓN SÍ O SÍ.") {
-						beginOpening()
+					guard !allowed else { beginOpening(); return }
+					DispatchQueue.main.async {
+						self?.showNotice("Activa las notificaciones de Nyxel si quieres recibir el recordatorio. Si no, vuelve manualmente después de 7 segundos y pulsa LIMPIAR SESIÓN SÍ O SÍ.") {
+							beginOpening()
+						}
 					}
-				}
 			}
 		} else {
 			beginOpening()

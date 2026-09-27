@@ -212,7 +212,7 @@ enum NyxelCleanupFlow {
         content.title = "Nyxel: limpia la sesión"
         content.body = "Regresa a Nyxel y pulsa “Limpiar sesión” antes de volver a inyectar."
         content.sound = .default
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 10, repeats: false)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 7, repeats: false)
         let request = UNNotificationRequest(identifier: notificationID, content: content, trigger: trigger)
         center.add(request)
     }
