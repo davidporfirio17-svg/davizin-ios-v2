@@ -8,7 +8,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
-        true
+        return true
     }
 
     /// Mostrar el recordatorio aunque Nyxel todavía esté en primer plano.
