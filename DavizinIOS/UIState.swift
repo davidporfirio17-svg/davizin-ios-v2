@@ -113,37 +113,41 @@ enum NyxelCleanupFlow {
     private static let notificationID = "nyxel.test.cleanup.reminder"
     private static let center = UNUserNotificationCenter.current()
 
-    static var stage: NyxelCleanupStage {
+    private static var storedStage: NyxelCleanupStage {
         get {
             guard let raw = UserDefaults.standard.string(forKey: stageKey),
                   let value = NyxelCleanupStage(rawValue: raw) else { return .idle }
             return value
         }
-        private set { UserDefaults.standard.set(newValue.rawValue, forKey: stageKey) }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: stageKey) }
     }
 
-    static var game: DavizinGame? {
+    static var stage: NyxelCleanupStage { storedStage }
+
+    private static var storedGame: DavizinGame? {
         get {
             guard let raw = UserDefaults.standard.string(forKey: gameKey) else { return nil }
             return DavizinGame(rawValue: raw)
         }
-        private set {
+        set {
             if let newValue { UserDefaults.standard.set(newValue.rawValue, forKey: gameKey) }
             else { UserDefaults.standard.removeObject(forKey: gameKey) }
         }
     }
 
+    static var game: DavizinGame? { storedGame }
+
     static var hasPendingWork: Bool { stage != .idle }
 
     static func markInjectionWriteStarted(for game: DavizinGame) {
-        self.game = game
-        stage = .needsCleaning
+        storedGame = game
+        storedStage = .needsCleaning
         cancelReminder()
     }
 
     static func markInjectionSucceeded(for game: DavizinGame) {
-        guard self.game == game else { return }
-        stage = .readyToOpen
+        guard storedGame == game else { return }
+        storedStage = .readyToOpen
     }
 
     static func requestReminderPermission(completion: @escaping (Bool) -> Void) {
@@ -164,7 +168,7 @@ enum NyxelCleanupFlow {
     static func markGameOpened() {
         switch stage {
         case .readyToOpen:
-            stage = .waitingForReturn
+            storedStage = .waitingForReturn
             scheduleReminder()
         case .readyToReopen:
             finishCycle()
@@ -175,26 +179,26 @@ enum NyxelCleanupFlow {
 
     static func markReturnedToNyxel() {
         guard stage == .waitingForReturn else { return }
-        stage = .needsCleaning
+        storedStage = .needsCleaning
         cancelReminder()
     }
 
     static func prepareForRelaunch() {
         if stage == .waitingForReturn {
-            stage = .needsCleaning
+            storedStage = .needsCleaning
         }
         cancelReminder()
     }
 
     static func markCleaningSucceeded(for game: DavizinGame) {
-        guard stage == .needsCleaning, self.game == game else { return }
-        stage = .readyToReopen
+        guard stage == .needsCleaning, storedGame == game else { return }
+        storedStage = .readyToReopen
         cancelReminder()
     }
 
     static func finishCycle() {
-        stage = .idle
-        game = nil
+        storedStage = .idle
+        storedGame = nil
         cancelReminder()
     }
 
