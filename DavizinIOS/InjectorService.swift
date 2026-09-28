@@ -61,6 +61,39 @@ private func candidateDestPathsRel(for game: DavizinGame, mode: DavizinMode) -> 
     return candidates.filter { seen.insert($0).inserted }
 }
 
+private func candidateAvatarFoldersRel(for game: DavizinGame, mode: DavizinMode) -> [String] {
+    let configured = game == .freeFireMax ? mode.pathMax : mode.pathNormal
+    var folders: [String] = []
+    if let configured, isSafeRelativePath(configured) {
+        folders.append((configured as NSString).deletingLastPathComponent)
+    }
+    folders.append(kBaseFolder)
+    folders.append(contentsOf: kAlternateAvatarFolders)
+    var seen = Set<String>()
+    return folders.filter { !$0.isEmpty && seen.insert($0).inserted }
+}
+
+private func resolveExistingDestPathRel(container: String, game: DavizinGame, mode: DavizinMode, fileManager: FileManager) -> (path: String?, discovered: [String]) {
+    let exact = candidateDestPathsRel(for: game, mode: mode)
+    if let match = exact.first(where: { fileManager.fileExists(atPath: container + "/" + $0) }) {
+        return (match, [])
+    }
+
+    var discovered: [String] = []
+    for folder in candidateAvatarFoldersRel(for: game, mode: mode) {
+        let absoluteFolder = container + "/" + folder
+        guard let names = try? fileManager.contentsOfDirectory(atPath: absoluteFolder) else { continue }
+        for name in names where isSafeAssetFileName(name) {
+            let rel = folder + "/" + name
+            let backupName = (disguisedBackupPath(for: rel) as NSString).lastPathComponent
+            if name != backupName { discovered.append(rel) }
+        }
+    }
+    var seen = Set<String>()
+    discovered = discovered.filter { seen.insert($0).inserted }
+    return (discovered.count == 1 ? discovered[0] : nil, discovered)
+}
+
 private func activePathKey(for game: DavizinGame) -> String {
     return game == .freeFireMax ? "dz_active_path_max" : "dz_active_path_normal"
 }
@@ -306,9 +339,11 @@ class InjectorService {
         }
 
 		let candidateRels = candidateDestPathsRel(for: game, mode: mode)
-		guard let activeRel = candidateRels.first(where: { fm.fileExists(atPath: container + "/" + $0) }) else {
+		let resolved = resolveExistingDestPathRel(container: container, game: game, mode: mode, fileManager: fm)
+		guard let activeRel = resolved.path else {
+			let detail = resolved.discovered.isEmpty ? candidateRels.joined(separator: " | ") : resolved.discovered.joined(separator: " | ")
 			return InjectorResult(success: false,
-				message: "Archivo de Avatar no encontrado. Se probaron: \(candidateRels.joined(separator: " | "))")
+				message: "Archivo de Avatar no encontrado o ambiguo. Se encontraron: \(detail)")
 		}
 		let destPath   = container + "/" + activeRel
 		let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
