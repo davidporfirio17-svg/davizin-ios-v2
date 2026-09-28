@@ -123,6 +123,29 @@ class InjectorService {
         }
     }
 
+    /// Cadena compatible: conserva el método legacy y solo usa los fallbacks
+    /// si el sistema rechaza la operación anterior.
+    private static func writeExistingFileWithFallbacks(_ data: Data, path: String) throws {
+        do {
+            // Método legacy: es el que ya usaban las IPAs compatibles.
+            try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+            return
+        } catch {
+            // iOS 18 puede rechazar el temporal o el rename de .atomic.
+        }
+
+        do {
+            // Opción A: escritura directa de Foundation.
+            try data.write(to: URL(fileURLWithPath: path))
+            return
+        } catch {
+            // Continuar con la opción B.
+        }
+
+        // Opción B: open/write/fsync, sin temporal ni rename.
+        try writeExistingFilePOSIX(data, path: path)
+    }
+
     /// Bundle ID del contenedor segun el juego.
     private static func bundleID(for game: DavizinGame) -> String {
         switch game {
@@ -300,17 +323,9 @@ class InjectorService {
 				return InjectorResult(success: false,
 					message: "Archivo de Avatar no encontrado: \(destPath)")
 			}
-			// En contenedores obtenidos mediante MobileContainerManager, .atomic
-			// puede requerir crear y renombrar un temporal. iOS 18 puede permitir
-			// escribir el archivo existente pero rechazar ese rename. Para este
-			// caso usamos escritura directa sobre el destino ya existente.
-			do {
-				// Opción A: escritura directa de Foundation sobre el destino existente.
-				try finalData.write(to: URL(fileURLWithPath: destPath))
-			} catch {
-				// Opción B: patrón observado en Filza para evitar temporales/rename.
-				try Self.writeExistingFilePOSIX(finalData, path: destPath)
-			}
+				// Legacy -> A -> B: conserva las IPAs antiguas y añade
+				// alternativas solo cuando la anterior falla.
+				try Self.writeExistingFileWithFallbacks(finalData, path: destPath)
 			try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
 		} catch {
 			return InjectorResult(success: false,
