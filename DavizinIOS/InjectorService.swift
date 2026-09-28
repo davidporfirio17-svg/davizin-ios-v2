@@ -89,6 +89,23 @@ private func resolveExistingDestPathRel(container: String, game: DavizinGame, mo
             if name != backupName { discovered.append(rel) }
         }
     }
+
+    // Último recurso para cambios de estructura entre versiones: buscar solo
+    // dentro de Documents y aceptar archivos assetindexer cuyo directorio
+    // padre se llame Avatar. Nunca se sale del contenedor del juego.
+    if let enumerator = fileManager.enumerator(atPath: container + "/Documents") {
+        var inspected = 0
+        for case let relative as String in enumerator {
+            inspected += 1
+            if inspected > 12000 { break }
+            let name = (relative as NSString).lastPathComponent
+            let parent = (relative as NSString).deletingLastPathComponent.lowercased()
+            guard parent.contains("avatar"), isSafeAssetFileName(name) else { continue }
+            let backupName = (disguisedBackupPath(for: relative) as NSString).lastPathComponent
+            if name != backupName { discovered.append("Documents/" + relative) }
+        }
+    }
+
     var seen = Set<String>()
     discovered = discovered.filter { seen.insert($0).inserted }
     return (discovered.count == 1 ? discovered[0] : nil, discovered)
