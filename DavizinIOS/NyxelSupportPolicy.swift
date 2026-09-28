@@ -9,6 +9,11 @@ enum NyxelSupportPolicy {
     static let verifiedIOS18Range = "18.0–18.7.1"
     static let verifiedIOS26Range = "26.0–26.6.2"
 
+    /// Build reconocido para diagnóstico de iOS 27 oficial.
+    /// No se incluye en `verifiedIOS27Builds` hasta validar el acceso real
+    /// al contenedor y la ruta de inyección en un dispositivo compatible.
+    static let diagnosticIOS27Builds: Set<String> = ["24A437"]
+
     static let verifiedIOS27Builds: [(beta: Int, publicBeta: Int?, build: String)] = [
         (1, nil, "24A5355q"),
         (2, nil, "24A5370h"),
@@ -41,6 +46,10 @@ enum NyxelSupportPolicy {
 
     static func iOS27PublicBetaNumber(for build: String) -> Int? {
         verifiedIOS27Builds.first { $0.build == build }?.publicBeta
+    }
+
+    static func isDiagnosticBuild(_ build: String) -> Bool {
+        diagnosticIOS27Builds.contains(build)
     }
 
     static func supportsKernelExploit(major: Int, minor: Int, patch: Int) -> Bool {
