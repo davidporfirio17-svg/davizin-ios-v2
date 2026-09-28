@@ -106,7 +106,7 @@ class InjectorService {
                         ])
                     }
                     guard written > 0 else {
-                        throw NSError(domain: NSPOSIXErrorDomain, code: EIO, userInfo: [
+                        throw NSError(domain: NSPOSIXErrorDomain, code: Int(EIO), userInfo: [
                             NSLocalizedDescriptionKey: "write() no escribió datos"
                         ])
                     }
