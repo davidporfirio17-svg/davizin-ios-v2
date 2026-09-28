@@ -11,15 +11,6 @@ struct NyxelDeviceInfo: Equatable {
     let build: String
     let machineIdentifier: String
 
-    var compatibility: NyxelCompatibilityPolicy.Result {
-        NyxelCompatibilityPolicy.evaluate(
-            major: major,
-            minor: minor,
-            patch: patch,
-            build: build
-        )
-    }
-
     static var current: NyxelDeviceInfo {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         return NyxelDeviceInfo(
