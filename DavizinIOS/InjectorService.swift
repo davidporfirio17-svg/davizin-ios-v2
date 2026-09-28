@@ -74,6 +74,13 @@ private let kCacheBaseURL = "https://dz.davidporfirio17.workers.dev"
 
 class InjectorService {
 
+    private static func fileError(_ error: Error, path: String) -> String {
+        let ns = error as NSError
+        let exists = FileManager.default.fileExists(atPath: path)
+        let writable = FileManager.default.isWritableFile(atPath: path)
+        return "\(ns.domain) \(ns.code) · existe=\(exists ? "sí" : "no") · escribible=\(writable ? "sí" : "no") · \(error.localizedDescription)"
+    }
+
     /// Bundle ID del contenedor segun el juego.
     private static func bundleID(for game: DavizinGame) -> String {
         switch game {
@@ -219,30 +226,48 @@ class InjectorService {
 
         let activeRel = destPathRel(for: game, mode: mode)
         let destPath   = container + "/" + activeRel
-        let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
-        UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
-        let destDir    = (destPath as NSString).deletingLastPathComponent
+		let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
+		UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
+		let destDir    = (destPath as NSString).deletingLastPathComponent
 
-        try? fm.createDirectory(atPath: destDir,
-                                withIntermediateDirectories: true)
+		do {
+			try fm.createDirectory(atPath: destDir,
+			                       withIntermediateDirectories: true)
+		} catch {
+			return InjectorResult(success: false,
+				message: "No se puede preparar Avatar: \(Self.fileError(error, path: destDir))")
+		}
 
-        if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
-            do {
-                let original = try Data(contentsOf: URL(fileURLWithPath: destPath))
-                try original.write(to: URL(fileURLWithPath: backupPath))
-            } catch {
-                return InjectorResult(success: false,
-                    message: "Error haciendo backup: \(error.localizedDescription)")
-            }
-        }
+		guard fm.fileExists(atPath: destDir) else {
+			return InjectorResult(success: false,
+				message: "La carpeta Avatar no existe después de prepararla: \(destDir)")
+		}
 
-        do {
-            try finalData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
-            try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        } catch {
-            return InjectorResult(success: false,
-                message: "Error al inyectar: \(error.localizedDescription)")
-        }
+		if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
+			do {
+				let original = try Data(contentsOf: URL(fileURLWithPath: destPath))
+				try original.write(to: URL(fileURLWithPath: backupPath))
+			} catch {
+				return InjectorResult(success: false,
+					message: "Error haciendo backup: \(Self.fileError(error, path: backupPath))")
+			}
+		}
+
+		do {
+			guard fm.fileExists(atPath: destPath) else {
+				return InjectorResult(success: false,
+					message: "Archivo de Avatar no encontrado: \(destPath)")
+			}
+			// En contenedores obtenidos mediante MobileContainerManager, .atomic
+			// puede requerir crear y renombrar un temporal. iOS 18 puede permitir
+			// escribir el archivo existente pero rechazar ese rename. Para este
+			// caso usamos escritura directa sobre el destino ya existente.
+			try finalData.write(to: URL(fileURLWithPath: destPath))
+			try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
+		} catch {
+			return InjectorResult(success: false,
+				message: "Error al inyectar: \(Self.fileError(error, path: destPath))")
+		}
 
         return InjectorResult(success: true,
             message: "¡\(mode.displayName) inyectado! Cierra y abre Free Fire.")
