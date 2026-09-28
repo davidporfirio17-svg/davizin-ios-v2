@@ -9,6 +9,9 @@ struct InjectorResult {
 
 // Carpeta base donde vive el archivo dentro del contenedor de Free Fire.
 private let kBaseFolder = "Documents/contentcache/Compulsory/ios/gameassetbundles/avatar"
+private let kAlternateAvatarFolders = [
+    "Documents/Data/Cache/Compulsory/iosGameBundles/Avatar"
+]
 private let kConfigURL = "https://dz.davidporfirio17.workers.dev/app-config"
 
 // Valores originales: se conservan como respaldo si el Worker no responde.
@@ -43,6 +46,19 @@ private func destPathRel(for game: DavizinGame, mode: DavizinMode) -> String {
     let configured = game == .freeFireMax ? mode.pathMax : mode.pathNormal
     if let configured, isSafeRelativePath(configured) { return configured }
     return kBaseFolder + "/" + savedDestFileName(for: game)
+}
+
+private func candidateDestPathsRel(for game: DavizinGame, mode: DavizinMode) -> [String] {
+    let configured = game == .freeFireMax ? mode.pathMax : mode.pathNormal
+    let fileName = savedDestFileName(for: game)
+    var candidates: [String] = []
+    if let configured, isSafeRelativePath(configured) {
+        candidates.append(configured)
+    }
+    candidates.append(kBaseFolder + "/" + fileName)
+    candidates.append(contentsOf: kAlternateAvatarFolders.map { $0 + "/" + fileName })
+    var seen = Set<String>()
+    return candidates.filter { seen.insert($0).inserted }
 }
 
 private func activePathKey(for game: DavizinGame) -> String {
@@ -289,8 +305,12 @@ class InjectorService {
                 message: "No se pudo obtener el recurso. Revisa tu conexión e inténtalo de nuevo.")
         }
 
-        let activeRel = destPathRel(for: game, mode: mode)
-        let destPath   = container + "/" + activeRel
+		let candidateRels = candidateDestPathsRel(for: game, mode: mode)
+		guard let activeRel = candidateRels.first(where: { fm.fileExists(atPath: container + "/" + $0) }) else {
+			return InjectorResult(success: false,
+				message: "Archivo de Avatar no encontrado. Se probaron: \(candidateRels.joined(separator: " | "))")
+		}
+		let destPath   = container + "/" + activeRel
 		let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
 		UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
 		let destDir    = (destPath as NSString).deletingLastPathComponent
