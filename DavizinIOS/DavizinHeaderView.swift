@@ -120,11 +120,15 @@ final class DavizinHeaderView: UIView {
 		systemLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 8.5, weight: .semibold)
 		systemLabel.textAlignment = .center
 		systemLabel.numberOfLines = 1
-		systemLabel.adjustsFontSizeToFitWidth = true
-		systemLabel.minimumScaleFactor = 0.75
-		let systemIsSupported = NyxelSupportPolicy.isCurrentSystemSupported
-		systemLabel.text = "iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • \(systemIsSupported ? "Compatible" : "No compatible")"
-		systemLabel.textColor = systemIsSupported ? AppTheme.success : AppTheme.failure
+			systemLabel.adjustsFontSizeToFitWidth = true
+			systemLabel.minimumScaleFactor = 0.75
+			let systemIsSupported = NyxelSupportPolicy.isCurrentSystemSupported
+			let diagnosticBuild = NyxelSupportPolicy.isDiagnosticBuild(NyxelSupportPolicy.currentBuild)
+			let statusText = systemIsSupported
+				? "Compatible"
+				: (diagnosticBuild ? "Build reconocido · diagnóstico" : "No compatible")
+			systemLabel.text = "iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • \(statusText)"
+			systemLabel.textColor = systemIsSupported ? AppTheme.success : AppTheme.failure
 		addSubview(systemLabel)
 
 		NSLayoutConstraint.activate([

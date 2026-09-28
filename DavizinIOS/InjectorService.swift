@@ -48,6 +48,14 @@ private func activePathKey(for game: DavizinGame) -> String {
     return game == .freeFireMax ? "dz_active_path_max" : "dz_active_path_normal"
 }
 
+private func originalMissingKey(for game: DavizinGame) -> String {
+    return game == .freeFireMax ? "dz_original_missing_max" : "dz_original_missing_normal"
+}
+
+private func restoreCompletedKey(for game: DavizinGame) -> String {
+    return game == .freeFireMax ? "dz_restore_completed_max" : "dz_restore_completed_normal"
+}
+
 private func legacyDestPathRel(for game: DavizinGame) -> String {
     return kBaseFolder + "/" + savedDestFileName(for: game)
 }
@@ -226,7 +234,8 @@ class InjectorService {
         try? fm.createDirectory(atPath: destDir,
                                 withIntermediateDirectories: true)
 
-        if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
+        let originalFileExists = fm.fileExists(atPath: destPath)
+        if originalFileExists && !fm.fileExists(atPath: backupPath) {
             do {
                 let original = try Data(contentsOf: URL(fileURLWithPath: destPath))
                 try original.write(to: URL(fileURLWithPath: backupPath))
@@ -236,6 +245,17 @@ class InjectorService {
             }
         }
 
+        let hasBackup = fm.fileExists(atPath: backupPath)
+        let originalWasMissing = !originalFileExists && !hasBackup
+        guard hasBackup || originalWasMissing else {
+            return InjectorResult(success: false,
+                message: "No se encontró un archivo original restaurable. No se inyectó nada.")
+        }
+
+        UserDefaults.standard.set(originalWasMissing, forKey: originalMissingKey(for: game))
+        UserDefaults.standard.set(false, forKey: restoreCompletedKey(for: game))
+        NyxelCleanupFlow.markInjectionWriteStarted(for: game)
+
         do {
             try finalData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
             try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
@@ -244,8 +264,10 @@ class InjectorService {
                 message: "Error al inyectar: \(error.localizedDescription)")
         }
 
+        NyxelCleanupFlow.markInjectionSucceeded(for: game)
+
         return InjectorResult(success: true,
-            message: "¡\(mode.displayName) inyectado! Cierra y abre Free Fire.")
+            message: "¡\(mode.displayName) inyectado! Abre Free Fire, espera 8–10 segundos, vuelve a Nyxel y limpia la sesión.")
     }
 
     static func uninject(game: DavizinGame) -> InjectorResult {
@@ -262,23 +284,37 @@ class InjectorService {
         let destPath   = container + "/" + activeRel
         let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
 
-        guard fm.fileExists(atPath: backupPath) else {
+        if fm.fileExists(atPath: backupPath) {
+            do {
+                let backupData = try Data(contentsOf: URL(fileURLWithPath: backupPath))
+                try backupData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
+                UserDefaults.standard.set(true, forKey: restoreCompletedKey(for: game))
+                try fm.removeItem(atPath: backupPath)
+                try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
+            } catch {
+                return InjectorResult(success: false,
+                    message: "Error al restaurar: \(error.localizedDescription)")
+            }
+        } else if UserDefaults.standard.bool(forKey: originalMissingKey(for: game)) {
+            do {
+                if fm.fileExists(atPath: destPath) { try fm.removeItem(atPath: destPath) }
+                UserDefaults.standard.set(true, forKey: restoreCompletedKey(for: game))
+            } catch {
+                return InjectorResult(success: false,
+                    message: "Error al retirar el archivo temporal: \(error.localizedDescription)")
+            }
+        } else if UserDefaults.standard.bool(forKey: restoreCompletedKey(for: game)) {
+            // El original ya quedó escrito; un cierre de Nyxel pudo ocurrir
+            // antes de que la etapa persistente avanzara a la reapertura.
+        } else {
             return InjectorResult(success: false,
-                message: "No hay backup para restaurar")
+                message: "No hay un respaldo restaurable; no se confirmó la limpieza.")
         }
 
-        do {
-            let backupData = try Data(contentsOf: URL(fileURLWithPath: backupPath))
-            try backupData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
-            try? fm.removeItem(atPath: backupPath)
-            try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        } catch {
-            return InjectorResult(success: false,
-                message: "Error al restaurar: \(error.localizedDescription)")
-        }
+        UserDefaults.standard.set(false, forKey: originalMissingKey(for: game))
 
         return InjectorResult(success: true,
-            message: "¡Restaurado! Cierra y abre Free Fire.")
+            message: "Sesión limpia. Pulsa Abrir juego para volver a Free Fire.")
     }
 
     /// Resultado del chequeo de compatibilidad del dispositivo.
