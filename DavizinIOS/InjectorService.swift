@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Darwin
 
 struct InjectorResult {
     let success: Bool
@@ -79,6 +80,47 @@ class InjectorService {
         let exists = FileManager.default.fileExists(atPath: path)
         let writable = FileManager.default.isWritableFile(atPath: path)
         return "\(ns.domain) \(ns.code) · existe=\(exists ? "sí" : "no") · escribible=\(writable ? "sí" : "no") · \(error.localizedDescription)"
+    }
+
+    /// Fallback B: escribe sobre un archivo existente mediante POSIX, sin
+    /// crear un temporal ni hacer rename. No crea archivos nuevos.
+    private static func writeExistingFilePOSIX(_ data: Data, path: String) throws {
+        let fd = open(path, O_WRONLY | O_TRUNC | O_CLOEXEC | O_NOFOLLOW)
+        guard fd >= 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [
+                NSLocalizedDescriptionKey: "open() rechazado para el destino"
+            ])
+        }
+        defer { close(fd) }
+
+        do {
+            try data.withUnsafeBytes { buffer in
+                guard let base = buffer.baseAddress else { return }
+                var offset = 0
+                while offset < data.count {
+                    let written = write(fd, base.advanced(by: offset), data.count - offset)
+                    if written < 0 {
+                        if errno == EINTR { continue }
+                        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [
+                            NSLocalizedDescriptionKey: "write() rechazado para el destino"
+                        ])
+                    }
+                    guard written > 0 else {
+                        throw NSError(domain: NSPOSIXErrorDomain, code: EIO, userInfo: [
+                            NSLocalizedDescriptionKey: "write() no escribió datos"
+                        ])
+                    }
+                    offset += written
+                }
+            }
+            guard fsync(fd) == 0 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [
+                    NSLocalizedDescriptionKey: "fsync() rechazado para el destino"
+                ])
+            }
+        } catch {
+            throw error
+        }
     }
 
     /// Bundle ID del contenedor segun el juego.
@@ -262,7 +304,13 @@ class InjectorService {
 			// puede requerir crear y renombrar un temporal. iOS 18 puede permitir
 			// escribir el archivo existente pero rechazar ese rename. Para este
 			// caso usamos escritura directa sobre el destino ya existente.
-			try finalData.write(to: URL(fileURLWithPath: destPath))
+			do {
+				// Opción A: escritura directa de Foundation sobre el destino existente.
+				try finalData.write(to: URL(fileURLWithPath: destPath))
+			} catch {
+				// Opción B: patrón observado en Filza para evitar temporales/rename.
+				try Self.writeExistingFilePOSIX(finalData, path: destPath)
+			}
 			try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
 		} catch {
 			return InjectorResult(success: false,
