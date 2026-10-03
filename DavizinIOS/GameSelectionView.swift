@@ -15,6 +15,8 @@ final class GameSelectionView: UIView {
     private let freeFireMaxButton = DavizinButton(title: "FREE FIRE MAX", style: .secondary)
     private let freeFireSubtitle = UILabel()
     private let freeFireMaxSubtitle = UILabel()
+    private let freeFireCompatibility = UILabel()
+    private let freeFireMaxCompatibility = UILabel()
     private let stackView = UIStackView()
 
     private(set) var selectedGame: DavizinGame?
@@ -37,6 +39,17 @@ final class GameSelectionView: UIView {
         freeFireMaxSubtitle.text = game == .freeFireMax ? "✓ SELECCIONADO · OPTIMIZADO" : "Entorno optimizado"
         freeFireSubtitle.textColor = game == .freeFire ? AppTheme.accent : AppTheme.tertiaryText
         freeFireMaxSubtitle.textColor = game == .freeFireMax ? AppTheme.accent : AppTheme.tertiaryText
+        refreshCompatibilityIndicators()
+    }
+
+    private func refreshCompatibilityIndicators() {
+        let systemOK = NyxelSupportPolicy.isCurrentSystemSupported
+        let freeFireOK = systemOK && InjectorService.isBundleAvailable(for: .freeFire)
+        let freeFireMaxOK = systemOK && InjectorService.isBundleAvailable(for: .freeFireMax)
+        freeFireCompatibility.text = freeFireOK ? "● Bundle compatible" : "● Bundle no compatible"
+        freeFireMaxCompatibility.text = freeFireMaxOK ? "● Bundle compatible" : "● Bundle no compatible"
+        freeFireCompatibility.textColor = freeFireOK ? AppTheme.success : AppTheme.failure
+        freeFireMaxCompatibility.textColor = freeFireMaxOK ? AppTheme.success : AppTheme.failure
     }
 
     private func configure() {
@@ -83,6 +96,12 @@ final class GameSelectionView: UIView {
             $0.textAlignment = .left
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
+        [freeFireCompatibility, freeFireMaxCompatibility].forEach {
+            $0.font = AppTheme.captionFont()
+            $0.textAlignment = .left
+            $0.translatesAutoresizingMaskIntoConstraints = false
+        }
+        refreshCompatibilityIndicators()
         freeFireButton.addTarget(self, action: #selector(freeFireTapped), for: .touchUpInside)
         freeFireMaxButton.addTarget(self, action: #selector(freeFireMaxTapped), for: .touchUpInside)
 
@@ -93,8 +112,8 @@ final class GameSelectionView: UIView {
         stackView.addArrangedSubview(categoryLabel)
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
-        let freeFireChoice = UIStackView(arrangedSubviews: [freeFireButton, freeFireSubtitle])
-        let freeFireMaxChoice = UIStackView(arrangedSubviews: [freeFireMaxButton, freeFireMaxSubtitle])
+        let freeFireChoice = UIStackView(arrangedSubviews: [freeFireButton, freeFireSubtitle, freeFireCompatibility])
+        let freeFireMaxChoice = UIStackView(arrangedSubviews: [freeFireMaxButton, freeFireMaxSubtitle, freeFireMaxCompatibility])
         [freeFireChoice, freeFireMaxChoice].forEach {
             $0.axis = .vertical
             $0.alignment = .fill
@@ -118,7 +137,9 @@ final class GameSelectionView: UIView {
             freeFireButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             freeFireMaxButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             freeFireSubtitle.heightAnchor.constraint(equalToConstant: 14.0),
-            freeFireMaxSubtitle.heightAnchor.constraint(equalToConstant: 14.0)
+            freeFireMaxSubtitle.heightAnchor.constraint(equalToConstant: 14.0),
+            freeFireCompatibility.heightAnchor.constraint(equalToConstant: 14.0),
+            freeFireMaxCompatibility.heightAnchor.constraint(equalToConstant: 14.0)
         ])
     }
 

@@ -82,6 +82,15 @@ class InjectorService {
         }
     }
 
+    /// Comprueba si el bundle está instalado y accesible en el sistema verificado.
+    /// Esta función solo informa el estado; no modifica archivos ni intenta inyectar.
+    static func isBundleAvailable(for game: DavizinGame) -> Bool {
+        guard NyxelSupportPolicy.isCurrentSystemSupported else { return false }
+        var error: NSString?
+        guard let container = DavizinGetContainerPath(bundleID(for: game), &error) else { return false }
+        return FileManager.default.fileExists(atPath: container)
+    }
+
     /// Ruta del Worker para cada modo y juego (descarga desde KV).
     /// Free Fire MAX usa slots base; Free Fire normal usa el sufijo _ff.
     private static func remoteSlot(for mode: DavizinMode, game: DavizinGame) -> String {

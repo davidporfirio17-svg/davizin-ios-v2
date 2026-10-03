@@ -1,10 +1,17 @@
 import Foundation
 import Darwin
 
-/// Versiones de iOS/iPadOS verificadas para las funciones de acceso de Nyxel.
-/// La versión mínima de Xcode permite instalar la app; esta política controla
-/// las funciones que dependen del comportamiento interno del sistema.
+/// Política única de compatibilidad para las funciones verificadas de Nyxel.
+/// La instalación puede comenzar en iOS 16, pero el acceso a los bundles
+/// solo se habilita cuando la versión/build del sistema está verificada.
 enum NyxelSupportPolicy {
+    enum Status {
+        case supported
+        case unsupported
+
+        var label: String { self == .supported ? "Compatible" : "No compatible" }
+    }
+
     static let verifiedIOS17Range = "17.0–17.7.x"
     static let verifiedIOS18Range = "18.0–18.7.1"
     static let verifiedIOS26Range = "26.0–26.6.2"
@@ -43,37 +50,25 @@ enum NyxelSupportPolicy {
         verifiedIOS27Builds.first { $0.build == build }?.publicBeta
     }
 
-    static func supportsKernelExploit(major: Int, minor: Int, patch: Int) -> Bool {
+    static func supportsVerifiedSystem(major: Int, minor: Int, patch: Int, build: String) -> Bool {
         guard minor >= 0, patch >= 0 else { return false }
 
-        if major == 17 {
-            return minor <= 7
-        }
-
-        if major == 18 {
-            return minor < 7 || (minor == 7 && patch <= 1)
-        }
-
-        return false
-    }
-
-    static func isSupported(major: Int, minor: Int, patch: Int, build: String) -> Bool {
-        if supportsKernelExploit(major: major, minor: minor, patch: patch) {
-            return true
-        }
-
-        if major == 26 {
-            guard minor >= 0, patch >= 0 else { return false }
-            return minor < 6 || (minor == 6 && patch <= 2)
-        }
-
+        if major == 17 { return minor <= 7 }
+        if major == 18 { return minor < 7 || (minor == 7 && patch <= 1) }
+        if major == 26 { return minor < 6 || (minor == 6 && patch <= 2) }
         guard major == 27, minor == 0, patch == 0 else { return false }
         return iOS27BetaNumber(for: build) != nil
     }
 
+    static func isSupported(major: Int, minor: Int, patch: Int, build: String) -> Bool {
+        supportsVerifiedSystem(major: major, minor: minor, patch: patch, build: build)
+    }
+
+    static var status: Status { isCurrentSystemSupported ? .supported : .unsupported }
+
     static var isCurrentSystemSupported: Bool {
         let version = currentVersion
-        return isSupported(
+        return supportsVerifiedSystem(
             major: version.majorVersion,
             minor: version.minorVersion,
             patch: version.patchVersion,
@@ -86,5 +81,9 @@ enum NyxelSupportPolicy {
         let versionText = "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
         let build = currentBuild
         return build.isEmpty ? "iOS/iPadOS \(versionText)" : "iOS/iPadOS \(versionText) (\(build))"
+    }
+
+    static var supportedRangesDescription: String {
+        "iOS 17.0–17.7.x · iOS 18.0–18.7.1 · iOS 26.0–26.6.2 · iOS 27.0 builds verificados"
     }
 }
