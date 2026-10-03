@@ -103,17 +103,44 @@ final class DavizinBridge {
 
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
         vc?.setOperationState(.injecting)
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+
+        // Los modos marcados como "hybrid" en la configuración remota usan el
+        // Packet Tunnel local antes de descargar/aplicar el recurso. Los modos
+        // normales conservan exactamente el flujo anterior.
+        let wantsHybrid = mode.accessTier.lowercased() == "hybrid"
+            || mode.id.lowercased().contains("hybrid")
+            || mode.label.lowercased().contains("hybrid")
+
+        let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
-            let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
-            if result.success && mode.oneTime {
-                self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
-            } else {
-                DispatchQueue.main.async {
-                    self.hapticFeedback(success: result.success)
-                    self.operationInFlight = false
-                    self.vc?.setOperationState(result.success ? .succeeded(result.message) : .failed(result.message))
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
+                if result.success && mode.oneTime {
+                    self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
+                } else {
+                    DispatchQueue.main.async {
+                        self.hapticFeedback(success: result.success)
+                        self.operationInFlight = false
+                        self.vc?.setOperationState(result.success ? .succeeded(result.message) : .failed(result.message))
+                    }
                 }
+            }
+        }
+
+        guard wantsHybrid else {
+            injectNow()
+            return
+        }
+
+        NixelHybridCoordinator.start { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .success:
+                NyxelActivityLog.record("Hybrid VPN preparado")
+                injectNow()
+            case .failure(let error):
+                self.operationInFlight = false
+                self.vc?.setOperationState(.failed("NYX-VPN — No se pudo preparar Hybrid: \(error.localizedDescription)"))
             }
         }
     }
