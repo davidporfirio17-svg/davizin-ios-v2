@@ -90,6 +90,23 @@ final class ViewController: UIViewController {
         operationView?.setHybridDiagnostic(text)
     }
 
+    func requestPairingPIN(completion: @escaping (String) -> Void) {
+        let alert = UIAlertController(title: "Pairing de Developer Mode",
+                                      message: "Escribe el PIN que muestra el iPad en Privacidad y seguridad → Modo desarrollador.",
+                                      preferredStyle: .alert)
+        alert.addTextField { field in
+            field.placeholder = "PIN"
+            field.keyboardType = .numberPad
+            field.textContentType = .oneTimeCode
+        }
+        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Conectar", style: .default) { _ in
+            let pin = alert.textFields?.first?.text ?? ""
+            completion(pin)
+        })
+        present(alert, animated: true)
+    }
+
     /// Actualiza el contador de tiempo restante en el header.
     func setCountdownText(_ text: String) {
         headerView.countdownText = text

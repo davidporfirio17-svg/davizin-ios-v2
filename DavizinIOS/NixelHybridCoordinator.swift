@@ -149,6 +149,7 @@ enum NixelExploitCoordinator {
 
 struct NixelRemotePairingService {
     let name: String
+    let regType: String
     let endpoint: Network.NWEndpoint
 }
 
@@ -194,7 +195,7 @@ final class NixelPairingProbe {
                 guard let self else { return }
                 for result in results {
                     if case let .service(name, _, _, _) = result.endpoint {
-                        self.serviceMap[name] = NixelRemotePairingService(name: name, endpoint: result.endpoint)
+                        self.serviceMap[name] = NixelRemotePairingService(name: name, regType: serviceType, endpoint: result.endpoint)
                     }
                 }
                 if !self.serviceMap.isEmpty {
@@ -352,9 +353,6 @@ protocol NixelPairingAuthenticator {
     )
 }
 
-/// Adaptador deliberadamente aislado. Aquí se conectará el protocolo de
-/// pairing de External/Xtar cuando se disponga de su formato de registro y
-/// handshake; no acepta un PIN como éxito sin una respuesta autenticada.
 final class NixelExternalPairingAuthenticator: NixelPairingAuthenticator {
     func authenticate(
         service: NixelRemotePairingService,
@@ -362,7 +360,31 @@ final class NixelExternalPairingAuthenticator: NixelPairingAuthenticator {
         storedRecord: Data?,
         completion: @escaping (NixelPairingAuthenticationResult) -> Void
     ) {
-        completion(.unavailable("El handshake autenticado de Remote Pairing aún no está integrado para \(service.name)."))
+        guard let storedRecord, !storedRecord.isEmpty else {
+            completion(.unavailable("No existe un registro RPairing preparado para \(service.name)."))
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = storedRecord.withUnsafeBytes { rawBuffer -> Int32 in
+                guard let base = rawBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -20 }
+                return service.name.withCString { name in
+                    service.regType.withCString { regType in
+                        "Nyxel".withCString { hostname in
+                            pin.withCString { pinValue in
+                                nyxel_pair_rppairing(name, regType, hostname, pinValue, base, storedRecord.count, nil)
+                            }
+                        }
+                    }
+                }
+            }
+            DispatchQueue.main.async {
+                if result == 0 {
+                    completion(.authenticated(record: storedRecord))
+                } else {
+                    completion(.rejected("El túnel RPairing no se pudo completar (código \(result))."))
+                }
+            }
+        }
     }
 }
 

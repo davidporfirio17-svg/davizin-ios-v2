@@ -14,6 +14,9 @@ typedef struct sockaddr idevice_sockaddr;
 
 IdeviceFfiError *rp_pairing_file_generate(const char *hostname,
                                            void **out);
+IdeviceFfiError *rp_pairing_file_from_bytes(const unsigned char *data,
+                                             size_t len,
+                                             void **out);
 IdeviceFfiError *rp_pairing_file_to_bytes(void *handle,
                                           unsigned char **out_data,
                                           size_t *out_len);

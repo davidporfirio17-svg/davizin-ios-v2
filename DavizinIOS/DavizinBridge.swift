@@ -219,7 +219,12 @@ final class DavizinBridge {
                         guard let self else { return }
                         self.vc?.setHybridDiagnostic(state.message)
                         if case .pairingRequired = state {
-                            self.vc?.setHybridDiagnostic("\(state.message). PIN/registro requeridos; no se marcará como emparejado todavía.")
+                            self.vc?.setHybridDiagnostic("\(state.message). Introduce el PIN cuando el iPad lo solicite.")
+                            self.vc?.requestPairingPIN { pin in
+                                NixelPairingSession.shared.submitPIN(pin) { nextState in
+                                    self.vc?.setHybridDiagnostic(nextState.message)
+                                }
+                            }
                         }
                     }
                     self.vc?.setOperationState(.succeeded("Hybrid VPN conectado; pairing pendiente"))
