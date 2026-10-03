@@ -501,7 +501,13 @@ final class ViewController: UIViewController {
         guard var request = profileRequest(path: "/profile/me", method: "PUT", contentType: "application/json") else { return }
         let payload: [String: String] = ["username": draft.username, "displayName": draft.name, "description": draft.description]
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
-        URLSession.shared.dataTask(with: request).resume()
+        URLSession.shared.dataTask(with: request) { [weak screen] data, _, _ in
+            guard let data, let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let profile = root["profile"] as? [String: Any] else { return }
+            DispatchQueue.main.async {
+                screen?.setUsernameLocked(profile["usernameLocked"] as? Bool ?? true)
+            }
+        }.resume()
     }
 
     private func loadRemoteProfile(into screen: ProfileView) {
@@ -512,9 +518,13 @@ final class ViewController: UIViewController {
             let name = profile["displayName"] as? String ?? "NYXEL EXTERNAL"
             let username = profile["username"] as? String ?? "@nyxel_user"
             let description = profile["description"] as? String ?? ""
+            let usernameLocked = profile["usernameLocked"] as? Bool ?? true
             let avatarURL = profile["avatarUrl"] as? String
             let coverURL = profile["coverUrl"] as? String
-            DispatchQueue.main.async { screen.updateProfile(name: name, username: username, description: description) }
+            DispatchQueue.main.async {
+                screen.setUsernameLocked(usernameLocked)
+                screen.updateProfile(name: name, username: username, description: description)
+            }
             self?.downloadProfileImage(avatarURL, target: .avatar, into: screen)
             self?.downloadProfileImage(coverURL, target: .cover, into: screen)
         }.resume()
@@ -538,7 +548,8 @@ final class ViewController: UIViewController {
 
     private func presentProfileEditor(for screen: ProfileView) {
         let draft = screen.profileDraft
-        let alert = UIAlertController(title: "Editar perfil", message: "Personaliza cómo te verán tus clientes.", preferredStyle: .alert)
+        let message = screen.isUsernameLocked ? "Personaliza cómo te verán tus clientes. El usuario ya está fijado; solo un administrador puede cambiarlo." : "Personaliza cómo te verán tus clientes."
+        let alert = UIAlertController(title: "Editar perfil", message: message, preferredStyle: .alert)
         alert.addTextField { field in
             field.placeholder = "Nombre"
             field.text = draft.name
@@ -549,6 +560,7 @@ final class ViewController: UIViewController {
             field.text = draft.username
             field.autocapitalizationType = .none
             field.clearButtonMode = .whileEditing
+            field.isEnabled = !screen.isUsernameLocked
         }
         alert.addTextField { field in
             field.placeholder = "Descripción"

@@ -131,6 +131,9 @@ final class ProfileView: UIView {
     private let nameLabel = UILabel()
     private let usernameLabel = UILabel()
     private let descriptionLabel = UILabel()
+    private let aboutUsernameLabel = UILabel()
+    private let aboutBioLabel = UILabel()
+    private let aboutCountryLabel = UILabel()
     private let editProfileButton = UIButton(type: .system)
     private let avatarEditButton = UIButton(type: .system)
     private let coverEditButton = UIButton(type: .system)
@@ -160,6 +163,9 @@ final class ProfileView: UIView {
     private var activeCountryCode: String?
     private var activeRemainingSeconds = 0
     private var initialRemainingSeconds = 0
+    private var usernameLocked = false
+
+    var isUsernameLocked: Bool { usernameLocked }
 
     override init(frame: CGRect) { super.init(frame: frame); configure() }
     required init?(coder: NSCoder) { super.init(coder: coder); configure() }
@@ -184,6 +190,9 @@ final class ProfileView: UIView {
         rankBadge.backgroundColor = tier.color.withAlphaComponent(0.12)
         keyValueLabel.text = maskedKey(activeKey)
         countryValueLabel.text = countryName(for: activeCountryCode)
+        aboutUsernameLabel.text = usernameLabel.text ?? "@nyxel_user"
+        aboutBioLabel.text = descriptionLabel.text ?? "Sin descripción todavía."
+        aboutCountryLabel.text = countryName(for: activeCountryCode)
         accountStatusLabel.text = activeKey == nil ? "Sin validar" : (activeRemainingSeconds > 0 ? "Activa" : "Expirada")
         accountStatusLabel.textColor = activeRemainingSeconds > 0 ? AppTheme.success : AppTheme.failure
         expirationValueLabel.text = formattedRemaining(activeRemainingSeconds)
@@ -210,7 +219,7 @@ final class ProfileView: UIView {
         translatesAutoresizingMaskIntoConstraints = false
 
         avatarCircle.backgroundColor = AppTheme.card
-        avatarCircle.layer.cornerRadius = 46
+        avatarCircle.layer.cornerRadius = 59
         avatarCircle.layer.borderWidth = 2
         avatarCircle.layer.borderColor = AppTheme.accent.cgColor
         avatarCircle.layer.shadowColor = AppTheme.accent.cgColor
@@ -235,17 +244,24 @@ final class ProfileView: UIView {
         avatarImageView.layer.addSublayer(progressRing)
 
         nameLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.name") ?? "NYXEL EXTERNAL"
-        nameLabel.font = AppTheme.titleFont(19)
+        nameLabel.font = AppTheme.titleFont(23)
         nameLabel.textColor = AppTheme.primaryText
+        nameLabel.adjustsFontSizeToFitWidth = true
+        nameLabel.minimumScaleFactor = 0.72
         usernameLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.username") ?? "@nyxel_user"
-        usernameLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        usernameLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         usernameLabel.textColor = AppTheme.accent
         usernameLabel.adjustsFontSizeToFitWidth = true
         usernameLabel.minimumScaleFactor = 0.75
         descriptionLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.description") ?? "Perfil de prueba de Nyxel External. Aquí podrás mostrar tu identidad y actividad."
-        descriptionLabel.font = .systemFont(ofSize: 12, weight: .regular)
+        descriptionLabel.font = .systemFont(ofSize: 14, weight: .regular)
         descriptionLabel.textColor = AppTheme.secondaryText
         descriptionLabel.numberOfLines = 0
+        [aboutUsernameLabel, aboutBioLabel, aboutCountryLabel].forEach {
+            $0.font = .systemFont(ofSize: 14, weight: .regular)
+            $0.textColor = AppTheme.primaryText
+            $0.numberOfLines = 0
+        }
 
         socialHeader.translatesAutoresizingMaskIntoConstraints = false
         socialHeader.backgroundColor = UIColor.white.withAlphaComponent(0.025)
@@ -305,6 +321,11 @@ final class ProfileView: UIView {
         let statusRow = makeRow(label: "Estado", valueLabel: accountStatusLabel)
         let expirationRow = makeRow(label: "Expira en", valueLabel: expirationValueLabel)
         let countRow = makeRow(label: "Inyecciones totales", valueLabel: countValueLabel)
+        let aboutSection = ProfileDisclosureSection(title: "MÁS INFORMACIÓN", views: [
+            makeInfoBlock(title: "Usuario", valueLabel: aboutUsernameLabel),
+            makeInfoBlock(title: "Descripción", valueLabel: aboutBioLabel),
+            makeInfoBlock(title: "País", valueLabel: aboutCountryLabel)
+        ])
 
         serviceStatusLabel.font = AppTheme.monoFont(11)
         diagnosticsLabel.font = UIFont.monospacedSystemFont(ofSize: 10, weight: .medium)
@@ -360,7 +381,7 @@ final class ProfileView: UIView {
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
         let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [historyLabel, activityLabel], expanded: false)
-        let stack = UIStackView(arrangedSubviews: [socialHeader, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, logoutButton])
+        let stack = UIStackView(arrangedSubviews: [socialHeader, aboutSection, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, logoutButton])
         stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: socialHeader)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -377,24 +398,24 @@ final class ProfileView: UIView {
         logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
-            socialHeader.heightAnchor.constraint(equalToConstant: 258),
+            socialHeader.heightAnchor.constraint(equalToConstant: 330),
             coverView.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor),
             coverView.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor),
             coverView.topAnchor.constraint(equalTo: socialHeader.topAnchor),
-            coverView.heightAnchor.constraint(equalToConstant: 136),
-            avatarCircle.widthAnchor.constraint(equalToConstant: 92), avatarCircle.heightAnchor.constraint(equalToConstant: 92),
+            coverView.heightAnchor.constraint(equalToConstant: 175),
+            avatarCircle.widthAnchor.constraint(equalToConstant: 118), avatarCircle.heightAnchor.constraint(equalToConstant: 118),
             avatarCircle.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
-            avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 91),
+            avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 112),
             avatarImageView.leadingAnchor.constraint(equalTo: avatarCircle.leadingAnchor), avatarImageView.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor),
             avatarImageView.topAnchor.constraint(equalTo: avatarCircle.topAnchor), avatarImageView.bottomAnchor.constraint(equalTo: avatarCircle.bottomAnchor),
             nameLabel.leadingAnchor.constraint(equalTo: avatarCircle.trailingAnchor, constant: 16),
-            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: socialHeader.trailingAnchor, constant: -16),
-            nameLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 145),
+            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: editProfileButton.leadingAnchor, constant: -12),
+            nameLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 188),
             usernameLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
             usernameLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
             usernameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
             editProfileButton.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -16),
-            editProfileButton.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 96),
+            editProfileButton.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 132),
             editProfileButton.widthAnchor.constraint(equalToConstant: 112),
             editProfileButton.heightAnchor.constraint(equalToConstant: 32),
             avatarEditButton.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor, constant: -4),
@@ -411,7 +432,7 @@ final class ProfileView: UIView {
             rankBadge.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 7),
             descriptionLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
             descriptionLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
-            descriptionLabel.topAnchor.constraint(equalTo: rankBadge.bottomAnchor, constant: 13),
+            descriptionLabel.topAnchor.constraint(equalTo: rankBadge.bottomAnchor, constant: 16),
             descriptionLabel.bottomAnchor.constraint(lessThanOrEqualTo: socialHeader.bottomAnchor, constant: -16),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor), scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor), scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -429,6 +450,17 @@ final class ProfileView: UIView {
         valueLabel.font = AppTheme.monoFont(13); valueLabel.textColor = AppTheme.accentHot; valueLabel.textAlignment = .right
         let row = UIStackView(arrangedSubviews: [left, valueLabel]); row.axis = .horizontal; row.distribution = .equalSpacing
         return row
+    }
+
+    private func makeInfoBlock(title: String, valueLabel: UILabel) -> UIView {
+        let titleLabel = UILabel()
+        titleLabel.text = title.uppercased()
+        titleLabel.font = .systemFont(ofSize: 10, weight: .semibold)
+        titleLabel.textColor = AppTheme.tertiaryText
+        let stack = UIStackView(arrangedSubviews: [titleLabel, valueLabel])
+        stack.axis = .vertical
+        stack.spacing = 5
+        return stack
     }
 
     private func configureEditButton(_ button: UIButton, title: String?, imageName: String) {
@@ -449,13 +481,23 @@ final class ProfileView: UIView {
         (nameLabel.text ?? "NYXEL EXTERNAL", usernameLabel.text ?? "@nyxel_user", descriptionLabel.text ?? "")
     }
 
+    func setUsernameLocked(_ locked: Bool) {
+        usernameLocked = locked
+        usernameLabel.textColor = locked ? AppTheme.secondaryText : AppTheme.accent
+    }
+
     func updateProfile(name: String, username: String, description: String) {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
         nameLabel.text = cleanName.isEmpty ? "NYXEL EXTERNAL" : cleanName
-        usernameLabel.text = cleanUsername.isEmpty ? "@nyxel_user" : (cleanUsername.hasPrefix("@") ? cleanUsername : "@" + cleanUsername)
+        if !usernameLocked {
+            usernameLabel.text = cleanUsername.isEmpty ? "@nyxel_user" : (cleanUsername.hasPrefix("@") ? cleanUsername : "@" + cleanUsername)
+        }
         descriptionLabel.text = cleanDescription.isEmpty ? "Sin descripción todavía." : cleanDescription
+        aboutUsernameLabel.text = usernameLabel.text
+        aboutBioLabel.text = descriptionLabel.text
+        aboutCountryLabel.text = countryName(for: activeCountryCode)
         UserDefaults.standard.set(nameLabel.text, forKey: "nyxel.profile.name")
         UserDefaults.standard.set(usernameLabel.text, forKey: "nyxel.profile.username")
         UserDefaults.standard.set(descriptionLabel.text, forKey: "nyxel.profile.description")
