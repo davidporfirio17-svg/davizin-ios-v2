@@ -215,33 +215,11 @@ final class DavizinBridge {
                 switch result {
                 case .success:
                     self.vc?.setHybridStatus(.connected)
-                    self.vc?.setHybridDiagnostic("VPN local conectada. Buscando servicio Remote Pairing…")
-                    NixelPairingProbe.shared.scan { [weak self] probe in
+                    NixelPairingSession.shared.begin { [weak self] state in
                         guard let self else { return }
-                        switch probe {
-                        case .servicesFound(let services):
-                            let devices = services.map(\.name).joined(separator: ", ")
-                            NyxelActivityLog.record("Remote Pairing detectado: \(devices)")
-                            self.vc?.setHybridDiagnostic("Servicio Remote Pairing detectado: \(devices). Comprobando transporte…")
-                            if let service = services.first {
-                                NixelPairingProbe.shared.probeTransport(service: service) { [weak self] transport in
-                                    guard let self else { return }
-                                    switch transport {
-                                    case .reachable(let name):
-                                        NyxelActivityLog.record("Remote Pairing accesible: \(name)")
-                                        self.vc?.setHybridDiagnostic("Remote Pairing accesible: \(name). Pairing autenticado y Developer Mode aún requieren verificación.")
-                                    case .unreachable(let message):
-                                        NyxelActivityLog.record("Remote Pairing no accesible: \(message)")
-                                        self.vc?.setHybridDiagnostic("Servicio Remote Pairing detectado, pero no accesible: \(message)")
-                                    }
-                                }
-                            }
-                        case .noService:
-                            NyxelActivityLog.record("Remote Pairing: ningún servicio detectado")
-                            self.vc?.setHybridDiagnostic("VPN local conectada. No se detectó Remote Pairing; conecta el iPad por USB o activa su servicio de pairing.")
-                        case .unavailable(let message):
-                            NyxelActivityLog.record("Remote Pairing no disponible: \(message)")
-                            self.vc?.setHybridDiagnostic("VPN local conectada. La búsqueda Remote Pairing no está disponible: \(message)")
+                        self.vc?.setHybridDiagnostic(state.message)
+                        if case .pairingRequired = state {
+                            self.vc?.setHybridDiagnostic("\(state.message). PIN/registro requeridos; no se marcará como emparejado todavía.")
                         }
                     }
                     self.vc?.setOperationState(.succeeded("Hybrid VPN conectado; pairing pendiente"))

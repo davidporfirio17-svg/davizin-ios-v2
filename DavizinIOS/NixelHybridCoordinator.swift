@@ -157,6 +157,81 @@ final class NixelPairingProbe {
     }
 }
 
+enum NixelPairingSessionState {
+    case idle
+    case searching
+    case serviceDetected(String)
+    case transportReachable(String)
+    case pairingRequired(String)
+    case failed(String)
+
+    var message: String {
+        switch self {
+        case .idle: return "Pairing sin iniciar"
+        case .searching: return "Buscando Remote Pairing…"
+        case .serviceDetected(let name): return "Servicio detectado: \(name)"
+        case .transportReachable(let name): return "Transporte accesible: \(name)"
+        case .pairingRequired(let name): return "Pairing autenticado requerido para \(name)"
+        case .failed(let message): return message
+        }
+    }
+}
+
+/// Orquesta el tramo observable del flujo External: descubrimiento, alcance
+/// del transporte y pausa explícita antes del PIN/registro de pairing.
+/// La autenticación real se deja detrás de un adaptador porque requiere el
+/// protocolo privado y el registro de pairing de la IPA de referencia.
+final class NixelPairingSession {
+    static let shared = NixelPairingSession()
+    private(set) var state: NixelPairingSessionState = .idle
+    private var service: NixelRemotePairingService?
+
+    private init() {}
+
+    func begin(onState: @escaping (NixelPairingSessionState) -> Void) {
+        stop()
+        update(.searching, onState: onState)
+        NixelPairingProbe.shared.scan { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .servicesFound(let services):
+                guard let service = services.first else {
+                    self.update(.failed("No hay un servicio Remote Pairing utilizable."), onState: onState)
+                    return
+                }
+                self.service = service
+                self.update(.serviceDetected(service.name), onState: onState)
+                NixelPairingProbe.shared.probeTransport(service: service) { [weak self] transport in
+                    guard let self else { return }
+                    switch transport {
+                    case .reachable(let name):
+                        self.update(.transportReachable(name), onState: onState)
+                        self.update(.pairingRequired(name), onState: onState)
+                    case .unreachable(let message):
+                        self.update(.failed("Servicio detectado, pero transporte no accesible: \(message)"), onState: onState)
+                    }
+                }
+            case .noService:
+                self.update(.failed("No se detectó ningún servicio Remote Pairing."), onState: onState)
+            case .unavailable(let message):
+                self.update(.failed("Remote Pairing no disponible: \(message)"), onState: onState)
+            }
+        }
+    }
+
+    func stop() {
+        NixelPairingProbe.shared.stop()
+        service = nil
+        state = .idle
+    }
+
+    private func update(_ next: NixelPairingSessionState, onState: @escaping (NixelPairingSessionState) -> Void) {
+        state = next
+        NyxelActivityLog.record("Pairing: \(next.message)")
+        onState(next)
+    }
+}
+
 /// Punto único para el flujo Hybrid/Jailbreak.
 ///
 /// La VPN es una dependencia de coordinación; una conexión exitosa no se
@@ -192,7 +267,7 @@ enum NixelHybridCoordinator {
     }
 
     static func stop() {
-        NixelPairingProbe.shared.stop()
+        NixelPairingSession.shared.stop()
         NixelVPNManager.shared.stop()
     }
 
