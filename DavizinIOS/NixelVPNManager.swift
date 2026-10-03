@@ -71,7 +71,7 @@ final class NixelVPNManager: NSObject {
     func stop() { manager?.connection.stopVPNTunnel() }
 
     @objc private func statusChanged() {
-        NyxelActivityLog.record("Hybrid VPN: \(statusText(status))")
+        NyxelActivityLog.record("Hybrid VPN: \(Self.statusText(status))")
     }
 
     static func statusText(_ status: NEVPNStatus) -> String {
