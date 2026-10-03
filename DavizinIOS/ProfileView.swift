@@ -330,6 +330,7 @@ final class ProfileView: UIView {
             coverImageView.bottomAnchor.constraint(equalTo: coverView.bottomAnchor)
         ])
         socialHeader.addSubview(coverView)
+        coverView.isHidden = true
         socialHeader.addSubview(avatarCircle)
         socialHeader.addSubview(nameLabel)
         socialHeader.addSubview(usernameLabel)
@@ -339,6 +340,7 @@ final class ProfileView: UIView {
         configureEditButton(editProfileButton, title: "EDITAR PERFIL", imageName: "pencil")
         configureEditButton(avatarEditButton, title: nil, imageName: "camera.fill")
         configureEditButton(coverEditButton, title: nil, imageName: "photo.fill")
+        coverEditButton.isHidden = true
         socialHeader.addSubview(editProfileButton)
         socialHeader.addSubview(avatarEditButton)
         socialHeader.addSubview(coverEditButton)
@@ -395,7 +397,8 @@ final class ProfileView: UIView {
         let searchRow = UIStackView(arrangedSubviews: [publicSearchField, publicSearchButton])
         searchRow.axis = .horizontal
         searchRow.spacing = 8
-        let searchSection = ProfileDisclosureSection(title: "BUSCAR USUARIOS", views: [searchRow, publicSearchResultLabel])
+        let searchSection = ProfileDisclosureSection(title: "COMUNIDAD", views: [searchRow, publicSearchResultLabel])
+        searchSection.isHidden = true
         profileTabs.selectedSegmentIndex = 0
         profileTabs.selectedSegmentTintColor = AppTheme.accent
         profileTabs.setTitleTextAttributes([.foregroundColor: AppTheme.background, .font: UIFont.systemFont(ofSize: 10, weight: .bold)], for: .selected)
@@ -411,7 +414,7 @@ final class ProfileView: UIView {
         metricsRow.spacing = 8
         metricsRow.distribution = .fillEqually
         let modeBlock = makeInfoBlock(title: "MODO MÁS USADO", valueLabel: mostUsedModeLabel)
-        let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [metricsRow, modeBlock, searchSection])
+        let activitySection = ProfileDisclosureSection(title: "PLAYER STATS", views: [metricsRow, modeBlock, searchSection])
 
         serviceStatusLabel.font = AppTheme.monoFont(11)
         diagnosticsLabel.font = UIFont.monospacedSystemFont(ofSize: 10, weight: .medium)
@@ -472,10 +475,11 @@ final class ProfileView: UIView {
         showLastSeenSwitch.isOn = UserDefaults.standard.object(forKey: "nyxel.privacy.lastSeen") as? Bool ?? true
         showStatsSwitch.isOn = UserDefaults.standard.object(forKey: "nyxel.privacy.stats") as? Bool ?? true
         let privacySection = ProfileDisclosureSection(title: "PRIVACIDAD", views: [privacyRow("Mostrar país", showCountrySwitch), privacyRow("Mostrar última conexión", showLastSeenSwitch), privacyRow("Mostrar estadísticas", showStatsSwitch)], expanded: false)
-        let settingsSection = ProfileDisclosureSection(title: "CUENTA Y CONFIGURACIÓN", views: [accountSection, privacySection, appearanceSection, securitySection, audioSection, diagnosticSection, historyActivitySection], expanded: false)
-        let stack = UIStackView(arrangedSubviews: [socialHeader, profileTabs, aboutSection, activitySection, settingsSection, refreshButton, logoutButton])
-        tabViews = [aboutSection, activitySection, settingsSection]
-        tabViews.enumerated().forEach { $0.element.isHidden = $0.offset != 0 }
+        let settingsSection = ProfileDisclosureSection(title: "PLAYER SETTINGS", views: [accountSection, privacySection, appearanceSection, securitySection, audioSection, diagnosticSection, historyActivitySection], expanded: false)
+        profileTabs.isHidden = true
+        let stack = UIStackView(arrangedSubviews: [socialHeader, activitySection, settingsSection, refreshButton, logoutButton])
+        tabViews = [activitySection, settingsSection]
+        tabViews.forEach { $0.isHidden = false }
         stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: socialHeader)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -491,36 +495,36 @@ final class ProfileView: UIView {
         refreshButton.addTarget(self, action: #selector(refreshTapped), for: .touchUpInside)
         logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
 
-        nameLabel.textAlignment = .center
-        usernameLabel.textAlignment = .center
+        nameLabel.textAlignment = .left
+        usernameLabel.textAlignment = .left
         NSLayoutConstraint.activate([
-            socialHeader.heightAnchor.constraint(equalToConstant: 382),
+            socialHeader.heightAnchor.constraint(equalToConstant: 228),
             coverView.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor),
             coverView.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor),
             coverView.topAnchor.constraint(equalTo: socialHeader.topAnchor),
-            coverView.heightAnchor.constraint(equalToConstant: 205),
+            coverView.heightAnchor.constraint(equalToConstant: 0),
             coverBrandLabel.leadingAnchor.constraint(equalTo: coverView.leadingAnchor, constant: 16),
             coverBrandLabel.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 16),
             coverStatusLabel.trailingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: -16),
             coverStatusLabel.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 12),
             coverStatusLabel.widthAnchor.constraint(equalToConstant: 82),
             coverStatusLabel.heightAnchor.constraint(equalToConstant: 24),
-            avatarCircle.widthAnchor.constraint(equalToConstant: 118), avatarCircle.heightAnchor.constraint(equalToConstant: 118),
-            avatarCircle.centerXAnchor.constraint(equalTo: socialHeader.centerXAnchor),
-            avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 136),
+            avatarCircle.widthAnchor.constraint(equalToConstant: 92), avatarCircle.heightAnchor.constraint(equalToConstant: 92),
+            avatarCircle.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 20),
+            avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 28),
             avatarImageView.leadingAnchor.constraint(equalTo: avatarCircle.leadingAnchor), avatarImageView.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor),
             avatarImageView.topAnchor.constraint(equalTo: avatarCircle.topAnchor), avatarImageView.bottomAnchor.constraint(equalTo: avatarCircle.bottomAnchor),
-            nameLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
-            nameLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
-            nameLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 258),
-            usernameLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
-            usernameLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
+            nameLabel.leadingAnchor.constraint(equalTo: avatarCircle.trailingAnchor, constant: 16),
+            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: editProfileButton.leadingAnchor, constant: -12),
+            nameLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 37),
+            usernameLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            usernameLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
             usernameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
-            profileMetaLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
-            profileMetaLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
+            profileMetaLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            profileMetaLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
             profileMetaLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 8),
             editProfileButton.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -16),
-            editProfileButton.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 132),
+            editProfileButton.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 20),
             editProfileButton.widthAnchor.constraint(equalToConstant: 112),
             editProfileButton.heightAnchor.constraint(equalToConstant: 32),
             avatarEditButton.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor, constant: -4),
