@@ -86,6 +86,10 @@ final class ViewController: UIViewController {
         operationView?.setHybridStatus(status)
     }
 
+    func setHybridDiagnostic(_ text: String) {
+        operationView?.setHybridDiagnostic(text)
+    }
+
     /// Actualiza el contador de tiempo restante en el header.
     func setCountdownText(_ text: String) {
         headerView.countdownText = text

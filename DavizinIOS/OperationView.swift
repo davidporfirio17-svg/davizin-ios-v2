@@ -119,6 +119,10 @@ final class OperationView: UIView {
         }
     }
 
+    func setHybridDiagnostic(_ text: String) {
+        hybridStatusLabel.text = text
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         configure()

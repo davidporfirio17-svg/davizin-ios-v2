@@ -207,6 +207,7 @@ final class DavizinBridge {
                 vc?.setOperationState(.succeeded("Hybrid VPN detenido"))
                 return
             }
+            vc?.setHybridDiagnostic(NixelHybridCoordinator.diagnostics().summary)
             vc?.setHybridStatus(.connecting)
             NixelHybridCoordinator.start { [weak self] result in
                 guard let self else { return }
@@ -214,6 +215,7 @@ final class DavizinBridge {
                 switch result {
                 case .success:
                     self.vc?.setHybridStatus(.connected)
+                    self.vc?.setHybridDiagnostic("VPN local conectada. Pairing y Developer Mode quedan pendientes de verificación con el iPad.")
                     self.vc?.setOperationState(.succeeded("Hybrid VPN conectado; pairing pendiente"))
                 case .failure(let error):
                     self.vc?.setHybridStatus(.failed(error.localizedDescription))
