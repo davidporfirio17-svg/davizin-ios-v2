@@ -226,6 +226,10 @@ final class DavizinBridge {
                                 }
                             }
                         }
+                        if case .failed(let message) = state {
+                            self.vc?.setHybridStatus(.failed(message))
+                            self.vc?.setOperationState(.failed("NYX-PAIRING — \(message)"))
+                        }
                     }
                     self.vc?.setOperationState(.succeeded("Hybrid VPN conectado; pairing pendiente"))
                 case .failure(let error):
