@@ -548,7 +548,7 @@ final class ViewController: UIViewController {
 
     private func presentProfileEditor(for screen: ProfileView) {
         let draft = screen.profileDraft
-        let message = screen.isUsernameLocked ? "Personaliza cómo te verán tus clientes. El usuario ya está fijado; solo un administrador puede cambiarlo." : "Personaliza cómo te verán tus clientes."
+        let message = screen.isUsernameLocked ? "Personaliza cómo te verán tus clientes. El usuario ya está fijado; solo un administrador puede cambiarlo." : "Personaliza cómo te verán tus clientes. AVISO: el nombre de usuario solo se puede guardar una vez y después ya no podrás cambiarlo."
         let alert = UIAlertController(title: "Editar perfil", message: message, preferredStyle: .alert)
         alert.addTextField { field in
             field.placeholder = "Nombre"
@@ -556,7 +556,7 @@ final class ViewController: UIViewController {
             field.clearButtonMode = .whileEditing
         }
         alert.addTextField { field in
-            field.placeholder = "Usuario"
+            field.placeholder = screen.isUsernameLocked ? "Usuario bloqueado" : "Usuario (se bloquea al guardar)"
             field.text = draft.username
             field.autocapitalizationType = .none
             field.clearButtonMode = .whileEditing

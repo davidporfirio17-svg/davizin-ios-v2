@@ -163,7 +163,7 @@ final class ProfileView: UIView {
     private var activeCountryCode: String?
     private var activeRemainingSeconds = 0
     private var initialRemainingSeconds = 0
-    private var usernameLocked = false
+    private var usernameLocked = UserDefaults.standard.bool(forKey: "nyxel.profile.username.locked")
 
     var isUsernameLocked: Bool { usernameLocked }
 
@@ -381,7 +381,8 @@ final class ProfileView: UIView {
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
         let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [historyLabel, activityLabel], expanded: false)
-        let stack = UIStackView(arrangedSubviews: [socialHeader, aboutSection, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, logoutButton])
+        let settingsSection = ProfileDisclosureSection(title: "CUENTA Y CONFIGURACIÓN", views: [accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection], expanded: false)
+        let stack = UIStackView(arrangedSubviews: [socialHeader, aboutSection, settingsSection, refreshButton, logoutButton])
         stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: socialHeader)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -483,6 +484,7 @@ final class ProfileView: UIView {
 
     func setUsernameLocked(_ locked: Bool) {
         usernameLocked = locked
+        UserDefaults.standard.set(locked, forKey: "nyxel.profile.username.locked")
         usernameLabel.textColor = locked ? AppTheme.secondaryText : AppTheme.accent
     }
 
@@ -493,6 +495,7 @@ final class ProfileView: UIView {
         nameLabel.text = cleanName.isEmpty ? "NYXEL EXTERNAL" : cleanName
         if !usernameLocked {
             usernameLabel.text = cleanUsername.isEmpty ? "@nyxel_user" : (cleanUsername.hasPrefix("@") ? cleanUsername : "@" + cleanUsername)
+            if !cleanUsername.isEmpty { setUsernameLocked(true) }
         }
         descriptionLabel.text = cleanDescription.isEmpty ? "Sin descripción todavía." : cleanDescription
         aboutUsernameLabel.text = usernameLabel.text
