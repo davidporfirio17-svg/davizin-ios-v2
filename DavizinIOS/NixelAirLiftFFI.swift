@@ -25,7 +25,7 @@ enum NixelAirLiftFFI {
             throw Error.generationFailed
         }
 
-        var handle: UnsafeMutablePointer<RpPairingFileHandle>?
+        var handle: UnsafeMutableRawPointer?
         let generateError = hostname.withCString { name in
             rp_pairing_file_generate(name, &handle)
         }
