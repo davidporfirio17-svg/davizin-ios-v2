@@ -60,6 +60,13 @@ final class NixelVPNManager: NSObject {
         return proto.providerBundleIdentifier == Self.tunnelBundleIdentifier && manager?.isEnabled == true
     }
 
+    var tunnelPluginPresent: Bool {
+        guard let plugins = Bundle.main.builtInPlugInsURL else { return false }
+        return FileManager.default.fileExists(
+            atPath: plugins.appendingPathComponent("ExternalTunnel.appex").path
+        )
+    }
+
     func load(completion: @escaping (Result<Void, Error>) -> Void) {
         NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
             DispatchQueue.main.async {
@@ -85,7 +92,7 @@ final class NixelVPNManager: NSObject {
             case .failure(let error):
                 completion(.failure(error))
             case .success:
-                guard NSClassFromString("NETunnelProviderManager") != nil else {
+                guard self.tunnelPluginPresent else {
                     let error = TunnelError.extensionUnavailable
                     self.lastError = error
                     completion(.failure(error))
@@ -96,9 +103,13 @@ final class NixelVPNManager: NSObject {
                 let proto = (manager.protocolConfiguration as? NETunnelProviderProtocol) ?? NETunnelProviderProtocol()
                 proto.providerBundleIdentifier = Self.tunnelBundleIdentifier
                 proto.serverAddress = "10.7.0.1"
+                let iface = UserDefaults.standard.string(forKey: "nyxel.hybrid.iface") ?? "10.7.1.1/32"
+                let peer = UserDefaults.standard.string(forKey: "nyxel.hybrid.peer") ?? "10.7.0.1/32"
+                UserDefaults.standard.set(iface, forKey: "nyxel.hybrid.iface")
+                UserDefaults.standard.set(peer, forKey: "nyxel.hybrid.peer")
                 proto.providerConfiguration = [
-                    "TunnelIfaceIP": "10.7.1.1/32",
-                    "TunnelPeerIP": "10.7.0.1/32",
+                    "TunnelIfaceIP": iface,
+                    "TunnelPeerIP": peer,
                     "HybridMode": true,
                     "Flow": "jailbreak-hybrid"
                 ]
@@ -111,8 +122,20 @@ final class NixelVPNManager: NSObject {
                             self.lastError = error
                             completion(.failure(error))
                         } else {
-                            self.manager = manager
-                            completion(.success(()))
+                            // iOS puede devolver una instancia desactualizada
+                            // después de saveToPreferences; recargar evita
+                            // iniciar un perfil que aún no quedó persistido.
+                            manager.loadFromPreferences { reloadError in
+                                DispatchQueue.main.async {
+                                    if let reloadError {
+                                        self.lastError = reloadError
+                                        completion(.failure(reloadError))
+                                    } else {
+                                        self.manager = manager
+                                        completion(.success(()))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -128,6 +151,12 @@ final class NixelVPNManager: NSObject {
             case .failure(let error):
                 completion(.failure(error))
             case .success:
+                guard self.tunnelPluginPresent else {
+                    let error = TunnelError.extensionUnavailable
+                    self.lastError = error
+                    completion(.failure(error))
+                    return
+                }
                 guard let connection = self.manager?.connection else {
                     let error = TunnelError.preferencesUnavailable
                     self.lastError = error

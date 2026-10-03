@@ -14,12 +14,14 @@ struct NixelHybridDiagnostics {
     let systemVersion: String
     let tunnelStatus: String
     let tunnelConfigured: Bool
+    let tunnelPluginPresent: Bool
     let pairing: NixelCheckState
     let developerMode: NixelCheckState
 
     var summary: String {
         let configured = tunnelConfigured ? "configurado" : "sin configurar"
-        return "Dispositivo local: \(deviceModel) · iOS/iPadOS \(systemVersion) · Túnel: \(tunnelStatus) (\(configured)) · Pairing: \(pairing.rawValue) · Developer Mode: \(developerMode.rawValue)"
+        let plugin = tunnelPluginPresent ? "presente" : "ausente"
+        return "Dispositivo local: \(deviceModel) · iOS/iPadOS \(systemVersion) · Túnel: \(tunnelStatus) (\(configured), extensión \(plugin)) · Pairing: \(pairing.rawValue) · Developer Mode: \(developerMode.rawValue)"
     }
 }
 
@@ -169,6 +171,7 @@ enum NixelHybridCoordinator {
             systemVersion: device.systemVersion,
             tunnelStatus: NixelVPNManager.statusText(vpn.status),
             tunnelConfigured: vpn.isConfigured,
+            tunnelPluginPresent: vpn.tunnelPluginPresent,
             pairing: .notChecked,
             developerMode: .notChecked
         )
