@@ -1,4 +1,5 @@
 import UIKit
+import PhotosUI
 
 final class ViewController: UIViewController {
     /// Actívalo en false cuando conectes tus propios callbacks de aplicación.
@@ -30,6 +31,7 @@ final class ViewController: UIViewController {
     private var gameSelectionView: GameSelectionView?
     private var missionMapView: MissionMapView?
     private var profileView: ProfileView?
+    private var profileMediaTarget: ProfileMediaTarget?
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
 
@@ -453,6 +455,13 @@ final class ViewController: UIViewController {
         screen.onAppearanceChanged = { [weak self] in
             self?.showProfile(animated: true)
         }
+        screen.onEditProfileRequested = { [weak self, weak screen] in
+            guard let screen else { return }
+            self?.presentProfileEditor(for: screen)
+        }
+        screen.onRequestMedia = { [weak self] target in
+            self?.presentProfileMediaPicker(target: target)
+        }
         screen.onRefreshRequested = { [weak self, weak screen] in
             guard let self, let key = self.activeKey, !key.isEmpty else { return }
             KeyValidator.validate(key: key) { [weak self, weak screen] success, message, remaining, _ in
@@ -470,6 +479,49 @@ final class ViewController: UIViewController {
         screen.refresh()
         profileView = screen
         display(screen, animated: animated)
+    }
+
+    private func presentProfileEditor(for screen: ProfileView) {
+        let draft = screen.profileDraft
+        let alert = UIAlertController(title: "Editar perfil", message: "Personaliza cómo te verán tus clientes.", preferredStyle: .alert)
+        alert.addTextField { field in
+            field.placeholder = "Nombre"
+            field.text = draft.name
+            field.clearButtonMode = .whileEditing
+        }
+        alert.addTextField { field in
+            field.placeholder = "Usuario"
+            field.text = draft.username
+            field.autocapitalizationType = .none
+            field.clearButtonMode = .whileEditing
+        }
+        alert.addTextField { field in
+            field.placeholder = "Descripción"
+            field.text = draft.description
+            field.clearButtonMode = .whileEditing
+        }
+        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Guardar", style: .default) { [weak self, weak screen, weak alert] _ in
+            let fields = alert?.textFields ?? []
+            let name = fields.count > 0 ? (fields[0].text ?? "") : ""
+            let username = fields.count > 1 ? (fields[1].text ?? "") : ""
+            let description = fields.count > 2 ? (fields[2].text ?? "") : ""
+            screen?.updateProfile(name: name, username: username, description: description)
+            NyxelActivityLog.record("Perfil actualizado")
+            self?.view.setNeedsLayout()
+        })
+        present(alert, animated: true)
+    }
+
+    private func presentProfileMediaPicker(target: ProfileMediaTarget) {
+        var configuration = PHPickerConfiguration(photoLibrary: .shared())
+        configuration.filter = .images
+        configuration.selectionLimit = 1
+        configuration.preferredAssetRepresentationMode = .current
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        profileMediaTarget = target
+        present(picker, animated: true)
     }
 
 	/// Abre Free Fire (MAX o normal) usando su esquema de URL.
@@ -648,6 +700,25 @@ extension ViewController: ProfileViewDelegate {
     func profileViewDidTapLogout(_ view: ProfileView) {
         setAccountSession(key: nil, remainingSeconds: 0)
         showLogin(animated: true)
+    }
+}
+
+extension ViewController: PHPickerViewControllerDelegate {
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        dismiss(animated: true)
+        guard let result = results.first, let target = profileMediaTarget else {
+            profileMediaTarget = nil
+            return
+        }
+        profileMediaTarget = nil
+        guard result.itemProvider.canLoadObject(ofClass: UIImage.self) else { return }
+        result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
+            guard let image = object as? UIImage else { return }
+            DispatchQueue.main.async {
+                self?.profileView?.setProfileImage(image, target: target)
+                NyxelActivityLog.record(target == .avatar ? "Foto de perfil actualizada" : "Portada actualizada")
+            }
+        }
     }
 }
 

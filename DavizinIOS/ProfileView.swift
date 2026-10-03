@@ -4,6 +4,27 @@ protocol ProfileViewDelegate: AnyObject {
     func profileViewDidTapLogout(_ view: ProfileView)
 }
 
+enum ProfileMediaTarget: Equatable {
+    case avatar
+    case cover
+}
+
+private enum ProfileMediaStore {
+    private static func url(for name: String) -> URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent(name)
+    }
+
+    static func load(_ name: String) -> UIImage? {
+        guard let url = url(for: name), let data = try? Data(contentsOf: url) else { return nil }
+        return UIImage(data: data)
+    }
+
+    static func save(_ image: UIImage, as name: String) {
+        guard let data = image.jpegData(compressionQuality: 0.9), let url = url(for: name) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+}
+
 enum SessionStats {
     private static let key = "dz_injection_count"
     static var injectionCount: Int {
@@ -98,15 +119,21 @@ final class ProfileView: UIView {
     weak var delegate: ProfileViewDelegate?
     var onRefreshRequested: (() -> Void)?
     var onAppearanceChanged: (() -> Void)?
+    var onEditProfileRequested: (() -> Void)?
+    var onRequestMedia: ((ProfileMediaTarget) -> Void)?
 
     private let socialHeader = UIView()
     private let coverView = UIView()
     private let coverGradient = CAGradientLayer()
+    private let coverImageView = UIImageView()
     private let avatarCircle = UIView()
     private let avatarImageView = UIImageView()
     private let nameLabel = UILabel()
     private let usernameLabel = UILabel()
     private let descriptionLabel = UILabel()
+    private let editProfileButton = UIButton(type: .system)
+    private let avatarEditButton = UIButton(type: .system)
+    private let coverEditButton = UIButton(type: .system)
     private let rankBadge = UIView()
     private let rankLabel = UILabel()
     private let keyValueLabel = UILabel()
@@ -192,7 +219,7 @@ final class ProfileView: UIView {
         avatarCircle.clipsToBounds = true
         avatarCircle.translatesAutoresizingMaskIntoConstraints = false
 
-        avatarImageView.image = UIImage(named: "NyxelAvatar")
+        avatarImageView.image = ProfileMediaStore.load("nyxel-profile-avatar.jpg") ?? UIImage(named: "NyxelAvatar")
         avatarImageView.contentMode = .scaleAspectFill
         avatarImageView.clipsToBounds = true
         avatarImageView.translatesAutoresizingMaskIntoConstraints = false
@@ -207,7 +234,7 @@ final class ProfileView: UIView {
         avatarImageView.layer.addSublayer(progressTrack)
         avatarImageView.layer.addSublayer(progressRing)
 
-        nameLabel.text = "NYXEL EXTERNAL"
+        nameLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.name") ?? "NYXEL EXTERNAL"
         nameLabel.font = AppTheme.titleFont(19)
         nameLabel.textColor = AppTheme.primaryText
         usernameLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.username") ?? "@nyxel_user"
@@ -215,7 +242,7 @@ final class ProfileView: UIView {
         usernameLabel.textColor = AppTheme.accent
         usernameLabel.adjustsFontSizeToFitWidth = true
         usernameLabel.minimumScaleFactor = 0.75
-        descriptionLabel.text = "Perfil de prueba de Nyxel External. Aquí podrás mostrar tu identidad y actividad."
+        descriptionLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.description") ?? "Perfil de prueba de Nyxel External. Aquí podrás mostrar tu identidad y actividad."
         descriptionLabel.font = .systemFont(ofSize: 12, weight: .regular)
         descriptionLabel.textColor = AppTheme.secondaryText
         descriptionLabel.numberOfLines = 0
@@ -239,12 +266,32 @@ final class ProfileView: UIView {
         coverGradient.startPoint = CGPoint(x: 0, y: 0)
         coverGradient.endPoint = CGPoint(x: 1, y: 1)
         coverView.layer.insertSublayer(coverGradient, at: 0)
+        coverImageView.image = ProfileMediaStore.load("nyxel-profile-cover.jpg")
+        coverImageView.contentMode = .scaleAspectFill
+        coverImageView.clipsToBounds = true
+        coverImageView.translatesAutoresizingMaskIntoConstraints = false
+        coverView.addSubview(coverImageView)
+        NSLayoutConstraint.activate([
+            coverImageView.leadingAnchor.constraint(equalTo: coverView.leadingAnchor),
+            coverImageView.trailingAnchor.constraint(equalTo: coverView.trailingAnchor),
+            coverImageView.topAnchor.constraint(equalTo: coverView.topAnchor),
+            coverImageView.bottomAnchor.constraint(equalTo: coverView.bottomAnchor)
+        ])
         socialHeader.addSubview(coverView)
         socialHeader.addSubview(avatarCircle)
         socialHeader.addSubview(nameLabel)
         socialHeader.addSubview(usernameLabel)
         socialHeader.addSubview(rankBadge)
         socialHeader.addSubview(descriptionLabel)
+        configureEditButton(editProfileButton, title: "EDITAR PERFIL", imageName: "pencil")
+        configureEditButton(avatarEditButton, title: nil, imageName: "camera.fill")
+        configureEditButton(coverEditButton, title: nil, imageName: "photo.fill")
+        socialHeader.addSubview(editProfileButton)
+        socialHeader.addSubview(avatarEditButton)
+        socialHeader.addSubview(coverEditButton)
+        editProfileButton.addTarget(self, action: #selector(editProfileTapped), for: .touchUpInside)
+        avatarEditButton.addTarget(self, action: #selector(editAvatarTapped), for: .touchUpInside)
+        coverEditButton.addTarget(self, action: #selector(editCoverTapped), for: .touchUpInside)
 
         rankLabel.font = .systemFont(ofSize: 10, weight: .semibold)
         rankLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -346,6 +393,18 @@ final class ProfileView: UIView {
             usernameLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
             usernameLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
             usernameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
+            editProfileButton.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -16),
+            editProfileButton.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 96),
+            editProfileButton.widthAnchor.constraint(equalToConstant: 112),
+            editProfileButton.heightAnchor.constraint(equalToConstant: 32),
+            avatarEditButton.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor, constant: -4),
+            avatarEditButton.bottomAnchor.constraint(equalTo: avatarCircle.bottomAnchor, constant: -4),
+            avatarEditButton.widthAnchor.constraint(equalToConstant: 30),
+            avatarEditButton.heightAnchor.constraint(equalToConstant: 30),
+            coverEditButton.trailingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: -14),
+            coverEditButton.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 14),
+            coverEditButton.widthAnchor.constraint(equalToConstant: 34),
+            coverEditButton.heightAnchor.constraint(equalToConstant: 34),
             rankBadge.heightAnchor.constraint(equalToConstant: 22), rankLabel.leadingAnchor.constraint(equalTo: rankBadge.leadingAnchor, constant: 10),
             rankLabel.trailingAnchor.constraint(equalTo: rankBadge.trailingAnchor, constant: -10), rankLabel.centerYAnchor.constraint(equalTo: rankBadge.centerYAnchor),
             rankBadge.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
@@ -371,6 +430,52 @@ final class ProfileView: UIView {
         let row = UIStackView(arrangedSubviews: [left, valueLabel]); row.axis = .horizontal; row.distribution = .equalSpacing
         return row
     }
+
+    private func configureEditButton(_ button: UIButton, title: String?, imageName: String) {
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setImage(UIImage(systemName: imageName), for: .normal)
+        button.setTitle(title, for: .normal)
+        button.tintColor = AppTheme.background
+        button.setTitleColor(AppTheme.background, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 10, weight: .heavy)
+        button.backgroundColor = AppTheme.accent
+        button.layer.cornerRadius = 9
+        button.layer.borderWidth = 1
+        button.layer.borderColor = UIColor.white.withAlphaComponent(0.28).cgColor
+        button.accessibilityLabel = title ?? "Cambiar imagen"
+    }
+
+    var profileDraft: (name: String, username: String, description: String) {
+        (nameLabel.text ?? "NYXEL EXTERNAL", usernameLabel.text ?? "@nyxel_user", descriptionLabel.text ?? "")
+    }
+
+    func updateProfile(name: String, username: String, description: String) {
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        nameLabel.text = cleanName.isEmpty ? "NYXEL EXTERNAL" : cleanName
+        usernameLabel.text = cleanUsername.isEmpty ? "@nyxel_user" : (cleanUsername.hasPrefix("@") ? cleanUsername : "@" + cleanUsername)
+        descriptionLabel.text = cleanDescription.isEmpty ? "Sin descripción todavía." : cleanDescription
+        UserDefaults.standard.set(nameLabel.text, forKey: "nyxel.profile.name")
+        UserDefaults.standard.set(usernameLabel.text, forKey: "nyxel.profile.username")
+        UserDefaults.standard.set(descriptionLabel.text, forKey: "nyxel.profile.description")
+    }
+
+    func setProfileImage(_ image: UIImage, target: ProfileMediaTarget) {
+        switch target {
+        case .avatar:
+            avatarImageView.image = image
+            ProfileMediaStore.save(image, as: "nyxel-profile-avatar.jpg")
+        case .cover:
+            coverImageView.image = image
+            ProfileMediaStore.save(image, as: "nyxel-profile-cover.jpg")
+        }
+        setNeedsLayout()
+    }
+
+    @objc private func editProfileTapped() { onEditProfileRequested?() }
+    @objc private func editAvatarTapped() { onRequestMedia?(.avatar) }
+    @objc private func editCoverTapped() { onRequestMedia?(.cover) }
 
     @objc private func refreshTapped() {
         refreshButton.isEnabled = false
