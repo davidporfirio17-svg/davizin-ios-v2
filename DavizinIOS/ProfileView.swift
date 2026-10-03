@@ -138,6 +138,12 @@ final class ProfileView: UIView {
     private let publicSearchField = UITextField()
     private let publicSearchButton = UIButton(type: .system)
     private let publicSearchResultLabel = UILabel()
+    private let profileTabs = UISegmentedControl(items: ["PERFIL", "ACTIVIDAD", "INFORMACIÓN"])
+    private let headMetricLabel = UILabel()
+    private let neckMetricLabel = UILabel()
+    private let chestMetricLabel = UILabel()
+    private let mostUsedModeLabel = UILabel()
+    private var tabViews: [UIView] = []
     private let editProfileButton = UIButton(type: .system)
     private let avatarEditButton = UIButton(type: .system)
     private let coverEditButton = UIButton(type: .system)
@@ -317,6 +323,7 @@ final class ProfileView: UIView {
         rankLabel.translatesAutoresizingMaskIntoConstraints = false
         rankBadge.layer.cornerRadius = 100
         rankBadge.layer.borderWidth = 1
+        rankBadge.isHidden = true
         rankBadge.translatesAutoresizingMaskIntoConstraints = false
         rankBadge.addSubview(rankLabel)
 
@@ -357,6 +364,22 @@ final class ProfileView: UIView {
         searchRow.axis = .horizontal
         searchRow.spacing = 8
         let searchSection = ProfileDisclosureSection(title: "BUSCAR USUARIOS", views: [searchRow, publicSearchResultLabel])
+        profileTabs.selectedSegmentIndex = 0
+        profileTabs.selectedSegmentTintColor = AppTheme.accent
+        profileTabs.setTitleTextAttributes([.foregroundColor: AppTheme.background, .font: UIFont.systemFont(ofSize: 10, weight: .bold)], for: .selected)
+        profileTabs.setTitleTextAttributes([.foregroundColor: AppTheme.secondaryText, .font: UIFont.systemFont(ofSize: 10, weight: .semibold)], for: .normal)
+        profileTabs.addTarget(self, action: #selector(profileTabChanged), for: .valueChanged)
+        profileTabs.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        let metricsRow = UIStackView(arrangedSubviews: [
+            makeMetricCard(title: "HEAD", valueLabel: headMetricLabel),
+            makeMetricCard(title: "CUELLO", valueLabel: neckMetricLabel),
+            makeMetricCard(title: "PECHO", valueLabel: chestMetricLabel)
+        ])
+        metricsRow.axis = .horizontal
+        metricsRow.spacing = 8
+        metricsRow.distribution = .fillEqually
+        let modeBlock = makeInfoBlock(title: "MODO MÁS USADO", valueLabel: mostUsedModeLabel)
+        let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [metricsRow, modeBlock, searchSection])
 
         serviceStatusLabel.font = AppTheme.monoFont(11)
         diagnosticsLabel.font = UIFont.monospacedSystemFont(ofSize: 10, weight: .medium)
@@ -411,9 +434,11 @@ final class ProfileView: UIView {
         let securitySection = ProfileDisclosureSection(title: "SEGURIDAD", views: [biometricRow])
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
-        let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [historyLabel, activityLabel], expanded: false)
-        let settingsSection = ProfileDisclosureSection(title: "CUENTA Y CONFIGURACIÓN", views: [accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection], expanded: false)
-        let stack = UIStackView(arrangedSubviews: [socialHeader, aboutSection, searchSection, settingsSection, refreshButton, logoutButton])
+        let historyActivitySection = ProfileDisclosureSection(title: "HISTORIAL TÉCNICO", views: [historyLabel, activityLabel], expanded: false)
+        let settingsSection = ProfileDisclosureSection(title: "CUENTA Y CONFIGURACIÓN", views: [accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, historyActivitySection], expanded: false)
+        let stack = UIStackView(arrangedSubviews: [socialHeader, profileTabs, aboutSection, activitySection, settingsSection, refreshButton, logoutButton])
+        tabViews = [aboutSection, activitySection, settingsSection]
+        tabViews.enumerated().forEach { $0.element.isHidden = $0.offset != 0 }
         stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: socialHeader)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -495,6 +520,28 @@ final class ProfileView: UIView {
         return stack
     }
 
+    private func makeMetricCard(title: String, valueLabel: UILabel) -> UIView {
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = .systemFont(ofSize: 9, weight: .bold)
+        titleLabel.textColor = AppTheme.secondaryText
+        valueLabel.text = "0"
+        valueLabel.font = AppTheme.titleFont(24)
+        valueLabel.textColor = AppTheme.accent
+        valueLabel.textAlignment = .center
+        let stack = UIStackView(arrangedSubviews: [titleLabel, valueLabel])
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = 5
+        stack.isLayoutMarginsRelativeArrangement = true
+        stack.layoutMargins = UIEdgeInsets(top: 12, left: 6, bottom: 12, right: 6)
+        stack.backgroundColor = AppTheme.backgroundRaise
+        stack.layer.cornerRadius = 12
+        stack.layer.borderWidth = 1
+        stack.layer.borderColor = AppTheme.hairline.cgColor
+        return stack
+    }
+
     private func configureEditButton(_ button: UIButton, title: String?, imageName: String) {
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setImage(UIImage(systemName: imageName), for: .normal)
@@ -527,6 +574,13 @@ final class ProfileView: UIView {
     func showPublicSearchError(_ text: String) {
         publicSearchResultLabel.text = text
         publicSearchResultLabel.textColor = AppTheme.failure
+    }
+
+    func setRemoteStats(head: Int, neck: Int, chest: Int, mostUsedMode: String) {
+        headMetricLabel.text = "\(head)"
+        neckMetricLabel.text = "\(neck)"
+        chestMetricLabel.text = "\(chest)"
+        mostUsedModeLabel.text = mostUsedMode.isEmpty ? "Sin datos todavía" : mostUsedMode
     }
 
     func updateProfile(name: String, username: String, description: String) {
@@ -565,6 +619,9 @@ final class ProfileView: UIView {
         guard !query.isEmpty else { showPublicSearchError("Escribe un usuario para buscar."); return }
         publicSearchResultLabel.text = "Buscando…"
         onSearchRequested?(query)
+    }
+    @objc private func profileTabChanged() {
+        tabViews.enumerated().forEach { $0.element.isHidden = $0.offset != profileTabs.selectedSegmentIndex }
     }
     @objc private func editAvatarTapped() { onRequestMedia?(.avatar) }
     @objc private func editCoverTapped() { onRequestMedia?(.cover) }

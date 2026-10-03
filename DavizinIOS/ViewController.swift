@@ -533,9 +533,15 @@ final class ViewController: UIViewController {
             let usernameLocked = profile["usernameLocked"] as? Bool ?? true
             let avatarURL = profile["avatarUrl"] as? String
             let coverURL = profile["coverUrl"] as? String
+            let usage = profile["usage"] as? [String: Any] ?? [:]
+            let head = usage["head"] as? Int ?? 0
+            let neck = usage["neck"] as? Int ?? 0
+            let chest = usage["chest"] as? Int ?? 0
+            let mostUsedMode = profile["mostUsedMode"] as? String ?? ""
             DispatchQueue.main.async {
                 screen.setUsernameLocked(usernameLocked)
                 screen.updateProfile(name: name, username: username, description: description)
+                screen.setRemoteStats(head: head, neck: neck, chest: chest, mostUsedMode: mostUsedMode)
             }
             self?.downloadProfileImage(avatarURL, target: .avatar, into: screen)
             self?.downloadProfileImage(coverURL, target: .cover, into: screen)
