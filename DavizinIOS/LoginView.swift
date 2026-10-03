@@ -433,15 +433,15 @@ final class LoginView: UIView {
         ]
         NSLayoutConstraint.activate(commonConstraints)
 
-        portraitLayoutConstraints = [
-            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor, constant: 18.0),
-            cardView.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -18.0),
+		portraitLayoutConstraints = [
+			cardView.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor, constant: 18.0),
+			cardView.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -18.0),
             cardView.centerXAnchor.constraint(equalTo: safeAreaLayoutGuide.centerXAnchor),
-            cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
-            cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 18.0),
-            cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
-            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 380.0)
-        ]
+			cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
+			cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 18.0),
+			cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
+			cardView.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 560.0 : 380.0)
+		]
 
         if UIDevice.current.userInterfaceIdiom == .pad {
             landscapeLayoutConstraints = [
@@ -451,7 +451,7 @@ final class LoginView: UIView {
                 cardView.centerYAnchor.constraint(equalTo: safeAreaLayoutGuide.centerYAnchor),
                 cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.topAnchor, constant: 18.0),
                 cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.bottomAnchor, constant: -18.0),
-                cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 440.0)
+				cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 560.0)
             ]
         } else {
             landscapeLayoutConstraints = [
