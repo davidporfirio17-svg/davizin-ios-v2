@@ -207,11 +207,9 @@ final class DavizinBridge {
                 vc?.setOperationState(.idle)
                 return
             }
-            vc?.setHybridStatus(.pairingRequired)
-            vc?.setHybridDiagnostic("Primero completa Pair with 2424 en Developer Mode.")
-            vc?.requestExternalPairing { [weak self] in
-                self?.startHybridAfterExternalPairing()
-            }
+            vc?.setHybridStatus(.connecting)
+            vc?.setHybridDiagnostic("Iniciando LocalDevVPN de AirLift y comprobando Remote Pairing…")
+            startHybridAfterExternalPairing()
 
         case .runExploit:
             vc?.setOperationState(.running)
@@ -256,12 +254,11 @@ final class DavizinBridge {
         }
     }
 
-    /// Continúa el flujo únicamente después de que el usuario vuelve de
-    /// Developer Mode. El PIN pertenece al diálogo del sistema/AirLift y no
-    /// se solicita ni se considera confirmado dentro de Nixel.
+    /// Inicia el flujo equivalente a LocalDevVPN de External. El PIN pertenece
+    /// al controlador AirLift/RPairing y no se simula desde la UI de Nixel.
     private func startHybridAfterExternalPairing() {
         vc?.setHybridStatus(.connecting)
-        vc?.setHybridDiagnostic("Pairing manual completado por el usuario; conectando túnel local…")
+        vc?.setHybridDiagnostic("Conectando LocalDevVPN; esperando servicios AirLift/RSD…")
         NixelHybridCoordinator.start { [weak self] result in
             guard let self else { return }
             self.operationInFlight = false
@@ -274,7 +271,7 @@ final class DavizinBridge {
                     self.vc?.setHybridDiagnostic(state.message)
                     switch state {
                     case .pairingRequired(_):
-                        self.vc?.setHybridDiagnostic("\(state.message). Developer Mode debe mostrar el dispositivo como Enlazado.")
+                        self.vc?.setHybridDiagnostic("\(state.message). El pairing debe completarse desde el flujo AirLift, no desde Developer Mode.")
                         self.vc?.setHybridStatus(.connected)
                         self.vc?.setOperationState(.idle)
                     case .failed(let message):

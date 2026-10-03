@@ -90,55 +90,6 @@ final class ViewController: UIViewController {
         operationView?.setHybridDiagnostic(text)
     }
 
-    /// Reproduce el paso observable de External: el PIN no se introduce en
-    /// Nyxel. iOS lo solicita dentro de Developer Mode después de elegir
-    /// "Pair with 2424" y AirLift lo entrega mediante una notificación.
-    func requestExternalPairing(completion: @escaping () -> Void) {
-        let alert = UIAlertController(
-            title: "Emparejar con 2424",
-            message: "1. Abre Ajustes → Privacidad y seguridad → Modo desarrollador.\n2. Pulsa Pair with 2424.\n3. Introduce el PIN que recibas de 3105 AirLift.\n4. Regresa a Nyxel y pulsa Continuar.\n\nNo introduzcas el PIN en esta app: el sistema debe mostrar Enlazado.",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Abrir Ajustes", style: .default) { _ in
-            var leftNyxel = false
-            var backgroundObserver: NSObjectProtocol?
-            var foregroundObserver: NSObjectProtocol?
-            let finishAfterReturn: () -> Void = {
-                guard leftNyxel else { return }
-                if let backgroundObserver { NotificationCenter.default.removeObserver(backgroundObserver) }
-                if let foregroundObserver { NotificationCenter.default.removeObserver(foregroundObserver) }
-                completion()
-            }
-            backgroundObserver = NotificationCenter.default.addObserver(
-                forName: UIApplication.didEnterBackgroundNotification,
-                object: nil,
-                queue: .main
-            ) { _ in
-                leftNyxel = true
-            }
-            foregroundObserver = NotificationCenter.default.addObserver(
-                forName: UIApplication.didBecomeActiveNotification,
-                object: nil,
-                queue: .main
-            ) { _ in
-                finishAfterReturn()
-            }
-            let urls = [
-                URL(string: "App-Prefs:root=Privacy&path=DEVELOPER_MODE"),
-                URL(string: UIApplication.openSettingsURLString)
-            ].compactMap { $0 }
-            guard let url = urls.first else {
-                completion()
-                return
-            }
-            UIApplication.shared.open(url, options: [:]) { opened in
-                if !opened { completion() }
-            }
-        })
-        present(alert, animated: true)
-    }
-
     /// Actualiza el contador de tiempo restante en el header.
     func setCountdownText(_ text: String) {
         headerView.countdownText = text

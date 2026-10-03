@@ -110,8 +110,8 @@ final class OperationView: UIView {
             hybridStatusLabel.textColor = AppTheme.warm
         case .pairingRequired:
             hybridButton.setLoading(false)
-            hybridButton.setTitle("CONTINUAR HYBRID", for: .normal)
-            hybridStatusLabel.text = "Pairing manual pendiente en Developer Mode · Pair with 2424"
+            hybridButton.setTitle("REINTENTAR AIRLIFT / HYBRID", for: .normal)
+            hybridStatusLabel.text = "Pairing AirLift pendiente · no depende de un menú público de Developer Mode"
             hybridStatusLabel.textColor = AppTheme.warm
         case .connected:
             hybridButton.setLoading(false)

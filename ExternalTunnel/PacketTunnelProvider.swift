@@ -6,6 +6,7 @@ import NetworkExtension
 final class PacketTunnelProvider: NEPacketTunnelProvider {
     private let interfaceAddress = "10.7.1.1"
     private let peerAddress = "10.7.0.1"
+    private var acceptingPackets = false
 
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         let configured = (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration as? [String: Any]
@@ -24,7 +25,27 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 completionHandler(error)
                 return
             }
+            // External mantiene el packet flow activo después de configurar
+            // la interfaz. Sin este loop iOS muestra la VPN como conectada,
+            // pero el flujo queda vacío y Remote Pairing acaba en NOC 65669.
+            self.acceptingPackets = true
+            self.ext_readLoop()
             completionHandler(nil)
+        }
+    }
+
+    /// Mantiene drenado el flujo local y devuelve los paquetes al flujo, igual
+    /// que el read loop observable en la extensión External de referencia.
+    /// El backend RPairing vive en la app; esta extensión no inventa un peer
+    /// remoto ni afirma que el handshake haya terminado.
+    private func ext_readLoop() {
+        guard acceptingPackets else { return }
+        packetFlow.readPackets { [weak self] packets, protocols in
+            guard let self, self.acceptingPackets else { return }
+            if !packets.isEmpty {
+                self.packetFlow.writePackets(packets, withProtocols: protocols)
+            }
+            self.ext_readLoop()
         }
     }
 
@@ -34,6 +55,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
+        acceptingPackets = false
         completionHandler()
     }
 }
