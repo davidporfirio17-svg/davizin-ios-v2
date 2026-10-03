@@ -121,6 +121,7 @@ final class ProfileView: UIView {
     var onAppearanceChanged: (() -> Void)?
     var onEditProfileRequested: (() -> Void)?
     var onRequestMedia: ((ProfileMediaTarget) -> Void)?
+    var onSearchRequested: ((String) -> Void)?
 
     private let socialHeader = UIView()
     private let coverView = UIView()
@@ -134,6 +135,9 @@ final class ProfileView: UIView {
     private let aboutUsernameLabel = UILabel()
     private let aboutBioLabel = UILabel()
     private let aboutCountryLabel = UILabel()
+    private let publicSearchField = UITextField()
+    private let publicSearchButton = UIButton(type: .system)
+    private let publicSearchResultLabel = UILabel()
     private let editProfileButton = UIButton(type: .system)
     private let avatarEditButton = UIButton(type: .system)
     private let coverEditButton = UIButton(type: .system)
@@ -249,16 +253,16 @@ final class ProfileView: UIView {
         nameLabel.adjustsFontSizeToFitWidth = true
         nameLabel.minimumScaleFactor = 0.72
         usernameLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.username") ?? "@nyxel_user"
-        usernameLabel.font = .systemFont(ofSize: 15, weight: .semibold)
+        usernameLabel.font = .systemFont(ofSize: 18, weight: .bold)
         usernameLabel.textColor = AppTheme.accent
         usernameLabel.adjustsFontSizeToFitWidth = true
         usernameLabel.minimumScaleFactor = 0.75
         descriptionLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.description") ?? "Perfil de prueba de Nyxel External. Aquí podrás mostrar tu identidad y actividad."
-        descriptionLabel.font = .systemFont(ofSize: 14, weight: .regular)
+        descriptionLabel.font = .systemFont(ofSize: 16, weight: .medium)
         descriptionLabel.textColor = AppTheme.secondaryText
         descriptionLabel.numberOfLines = 0
         [aboutUsernameLabel, aboutBioLabel, aboutCountryLabel].forEach {
-            $0.font = .systemFont(ofSize: 14, weight: .regular)
+            $0.font = .systemFont(ofSize: 15, weight: .regular)
             $0.textColor = AppTheme.primaryText
             $0.numberOfLines = 0
         }
@@ -326,6 +330,33 @@ final class ProfileView: UIView {
             makeInfoBlock(title: "Descripción", valueLabel: aboutBioLabel),
             makeInfoBlock(title: "País", valueLabel: aboutCountryLabel)
         ])
+        publicSearchField.placeholder = "Buscar usuario"
+        publicSearchField.textColor = AppTheme.primaryText
+        publicSearchField.font = .systemFont(ofSize: 14, weight: .medium)
+        publicSearchField.autocapitalizationType = .none
+        publicSearchField.backgroundColor = AppTheme.backgroundRaise
+        publicSearchField.layer.cornerRadius = 10
+        publicSearchField.layer.borderWidth = 1
+        publicSearchField.layer.borderColor = AppTheme.hairline.cgColor
+        publicSearchField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 1))
+        publicSearchField.leftViewMode = .always
+        publicSearchField.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        publicSearchButton.setTitle("BUSCAR", for: .normal)
+        publicSearchButton.setTitleColor(AppTheme.background, for: .normal)
+        publicSearchButton.backgroundColor = AppTheme.accent
+        publicSearchButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .heavy)
+        publicSearchButton.layer.cornerRadius = 10
+        publicSearchButton.widthAnchor.constraint(equalToConstant: 82).isActive = true
+        publicSearchButton.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        publicSearchButton.addTarget(self, action: #selector(searchPublicProfileTapped), for: .touchUpInside)
+        publicSearchResultLabel.text = "Busca un usuario para ver su perfil público."
+        publicSearchResultLabel.textColor = AppTheme.secondaryText
+        publicSearchResultLabel.font = AppTheme.monoFont(11)
+        publicSearchResultLabel.numberOfLines = 0
+        let searchRow = UIStackView(arrangedSubviews: [publicSearchField, publicSearchButton])
+        searchRow.axis = .horizontal
+        searchRow.spacing = 8
+        let searchSection = ProfileDisclosureSection(title: "BUSCAR USUARIOS", views: [searchRow, publicSearchResultLabel])
 
         serviceStatusLabel.font = AppTheme.monoFont(11)
         diagnosticsLabel.font = UIFont.monospacedSystemFont(ofSize: 10, weight: .medium)
@@ -382,7 +413,7 @@ final class ProfileView: UIView {
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
         let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [historyLabel, activityLabel], expanded: false)
         let settingsSection = ProfileDisclosureSection(title: "CUENTA Y CONFIGURACIÓN", views: [accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection], expanded: false)
-        let stack = UIStackView(arrangedSubviews: [socialHeader, aboutSection, settingsSection, refreshButton, logoutButton])
+        let stack = UIStackView(arrangedSubviews: [socialHeader, aboutSection, searchSection, settingsSection, refreshButton, logoutButton])
         stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: socialHeader)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -488,6 +519,16 @@ final class ProfileView: UIView {
         usernameLabel.textColor = locked ? AppTheme.secondaryText : AppTheme.accent
     }
 
+    func showPublicSearchResult(_ text: String) {
+        publicSearchResultLabel.text = text
+        publicSearchResultLabel.textColor = AppTheme.primaryText
+    }
+
+    func showPublicSearchError(_ text: String) {
+        publicSearchResultLabel.text = text
+        publicSearchResultLabel.textColor = AppTheme.failure
+    }
+
     func updateProfile(name: String, username: String, description: String) {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -519,6 +560,12 @@ final class ProfileView: UIView {
     }
 
     @objc private func editProfileTapped() { onEditProfileRequested?() }
+    @objc private func searchPublicProfileTapped() {
+        let query = (publicSearchField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { showPublicSearchError("Escribe un usuario para buscar."); return }
+        publicSearchResultLabel.text = "Buscando…"
+        onSearchRequested?(query)
+    }
     @objc private func editAvatarTapped() { onRequestMedia?(.avatar) }
     @objc private func editCoverTapped() { onRequestMedia?(.cover) }
 

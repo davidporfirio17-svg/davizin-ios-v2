@@ -417,6 +417,7 @@ final class ViewController: UIViewController {
             showModeSelection(animated: animated)
             return
         }
+        recordProfileActivity(for: selectedMode)
         currentStage = .operation
 		headerView.title = "Control / \(selectedMode.displayName)"
 		headerView.showsBackButton = true
@@ -463,6 +464,9 @@ final class ViewController: UIViewController {
         screen.onRequestMedia = { [weak self] target in
             self?.presentProfileMediaPicker(target: target)
         }
+        screen.onSearchRequested = { [weak self, weak screen] query in
+            self?.searchPublicProfile(query, in: screen)
+        }
         screen.onRefreshRequested = { [weak self, weak screen] in
             guard let self, let key = self.activeKey, !key.isEmpty else { return }
             KeyValidator.validate(key: key) { [weak self, weak screen] success, message, remaining, _ in
@@ -496,10 +500,18 @@ final class ViewController: UIViewController {
         return request
     }
 
+    private func recordProfileActivity(for mode: DavizinMode) {
+        guard var request = profileRequest(path: "/profile/activity", method: "POST", contentType: "application/json") else { return }
+        let lower = mode.displayName.lowercased()
+        let category = lower.contains("head") ? "head" : (lower.contains("cuello") || lower.contains("neck") ? "neck" : (lower.contains("pecho") || lower.contains("chest") ? "chest" : ""))
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["mode": mode.displayName, "category": category])
+        URLSession.shared.dataTask(with: request).resume()
+    }
+
     private func syncRemoteProfile(_ screen: ProfileView) {
         let draft = screen.profileDraft
         guard var request = profileRequest(path: "/profile/me", method: "PUT", contentType: "application/json") else { return }
-        let payload: [String: String] = ["username": draft.username, "displayName": draft.name, "description": draft.description]
+        let payload: [String: String] = ["username": draft.username, "displayName": draft.name, "description": draft.description, "countryCode": KeyValidator.lastCountryCode ?? ""]
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         URLSession.shared.dataTask(with: request) { [weak screen] data, _, _ in
             guard let data, let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -527,6 +539,33 @@ final class ViewController: UIViewController {
             }
             self?.downloadProfileImage(avatarURL, target: .avatar, into: screen)
             self?.downloadProfileImage(coverURL, target: .cover, into: screen)
+        }.resume()
+    }
+
+    private func searchPublicProfile(_ query: String, in screen: ProfileView?) {
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        guard let request = profileRequest(path: "/profiles/search?q=\(encoded)") else { return }
+        URLSession.shared.dataTask(with: request) { [weak screen] data, _, _ in
+            guard let data, let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let profiles = root["profiles"] as? [[String: Any]], let first = profiles.first else {
+                DispatchQueue.main.async { screen?.showPublicSearchError("No se encontró ese usuario.") }
+                return
+            }
+            let username = first["username"] as? String ?? "@usuario"
+            let name = first["displayName"] as? String ?? "Sin nombre"
+            let bio = first["description"] as? String ?? "Sin biografía"
+            let country = first["countryCode"] as? String ?? "No indicado"
+            let mode = first["mostUsedMode"] as? String ?? "Sin datos"
+            let usage = first["usage"] as? [String: Any] ?? [:]
+            let head = usage["head"] as? Int ?? 0
+            let neck = usage["neck"] as? Int ?? 0
+            let chest = usage["chest"] as? Int ?? 0
+            let last = (first["lastSeenAt"] as? NSNumber)?.doubleValue ?? 0
+            let date = last > 0 ? Date(timeIntervalSince1970: last / 1000) : nil
+            let formatter = DateFormatter(); formatter.dateFormat = "dd/MM/yyyy HH:mm"
+            let lastText = date.map { formatter.string(from: $0) } ?? "Sin conexión registrada"
+            let text = "\(username)\n\(name)\n\n\(bio)\n\nPaís: \(country)\nÚltima conexión: \(lastText)\nModo más usado: \(mode)\nHead: \(head)  •  Cuello: \(neck)  •  Pecho: \(chest)"
+            DispatchQueue.main.async { screen?.showPublicSearchResult(text) }
         }.resume()
     }
 
