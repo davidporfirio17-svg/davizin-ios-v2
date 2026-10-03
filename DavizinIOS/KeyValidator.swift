@@ -99,6 +99,15 @@ class KeyValidator {
     }
 
     static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int, String?) -> Void) {
+        // Check system compatibility before attempting key validation
+        guard NyxelOperationGuard.canProceedWithKeyValidation() else {
+            let errorMsg = "Sistema no soportado: \(NyxelSupportPolicy.currentSystemDescription)"
+            nyxelLog("Key validation blocked: \(errorMsg)", level: "WARN")
+            NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.unsupportedSystem) — \(errorMsg)")
+            completion(false, errorMsg, 0, nil)
+            return
+        }
+        
         let serverURL = "https://dz.davidporfirio17.workers.dev"
         guard let url = URL(string: "\(serverURL)/check") else {
             completion(false, "URL inválida", 0, nil)
