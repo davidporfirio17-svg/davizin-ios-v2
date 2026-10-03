@@ -200,12 +200,9 @@ final class NixelPairingProbe {
                     self.finish(.servicesFound(Array(self.serviceMap.values).sorted { $0.name < $1.name }))
                 }
             }
-            browser.stateChangedHandler = { [weak self] state in
+            browser.stateUpdateHandler = { [weak self] state in
                 guard let self else { return }
-                if case .failed(let error) = state, self.browsers.allSatisfy({
-                    if case .failed = $0.state { return true }
-                    return false
-                }) {
+                if case .failed(let error) = state {
                     self.finish(.unavailable(error.localizedDescription))
                 }
             }
