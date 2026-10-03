@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import NetworkExtension
+import Security
 import UIKit
 
 enum NixelCheckState: String {
@@ -157,11 +158,72 @@ final class NixelPairingProbe {
     }
 }
 
+/// Guarda el registro de pairing como blob opaco en Keychain. El protocolo
+/// que lo produce/consume se mantiene separado para no mezclar credenciales
+/// con la UI o con la configuración VPN.
+final class NixelPairingRecordStore {
+    static let shared = NixelPairingRecordStore()
+    private let service = "com.apple.mobile.MobileHouseArrest.nyxel.pairing"
+
+    private init() {}
+
+    func save(_ record: Data, deviceID: String) throws {
+        let account = deviceID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !account.isEmpty, !record.isEmpty else { throw StoreError.invalidRecord }
+        let base: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(base as CFDictionary)
+        var item = base
+        item[kSecValueData as String] = record
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let status = SecItemAdd(item as CFDictionary, nil)
+        guard status == errSecSuccess else { throw StoreError.keychain(status) }
+    }
+
+    func load(deviceID: String) -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: deviceID,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
+        return result as? Data
+    }
+
+    func remove(deviceID: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: deviceID
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
+    enum StoreError: LocalizedError {
+        case invalidRecord
+        case keychain(OSStatus)
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidRecord: return "Registro de pairing vacío o sin identificador de dispositivo."
+            case .keychain(let status): return "Keychain rechazó el registro de pairing (\(status))."
+            }
+        }
+    }
+}
+
 enum NixelPairingSessionState {
     case idle
     case searching
     case serviceDetected(String)
     case transportReachable(String)
+    case pairingRecordFound(String)
     case pairingRequired(String)
     case failed(String)
 
@@ -171,6 +233,7 @@ enum NixelPairingSessionState {
         case .searching: return "Buscando Remote Pairing…"
         case .serviceDetected(let name): return "Servicio detectado: \(name)"
         case .transportReachable(let name): return "Transporte accesible: \(name)"
+        case .pairingRecordFound(let name): return "Registro local encontrado para \(name); autenticación pendiente"
         case .pairingRequired(let name): return "Pairing autenticado requerido para \(name)"
         case .failed(let message): return message
         }
@@ -206,6 +269,9 @@ final class NixelPairingSession {
                     switch transport {
                     case .reachable(let name):
                         self.update(.transportReachable(name), onState: onState)
+                        if NixelPairingRecordStore.shared.load(deviceID: name) != nil {
+                            self.update(.pairingRecordFound(name), onState: onState)
+                        }
                         self.update(.pairingRequired(name), onState: onState)
                     case .unreachable(let message):
                         self.update(.failed("Servicio detectado, pero transporte no accesible: \(message)"), onState: onState)
