@@ -32,6 +32,7 @@ final class ViewController: UIViewController {
     private var missionMapView: MissionMapView?
     private var profileView: ProfileView?
     private var profileMediaTarget: ProfileMediaTarget?
+    private let profileAPIBaseURL = "https://nyxel-profile-api.davidporfirio17.workers.dev"
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
 
@@ -479,6 +480,60 @@ final class ViewController: UIViewController {
         screen.refresh()
         profileView = screen
         display(screen, animated: animated)
+        loadRemoteProfile(into: screen)
+    }
+
+    private func profileRequest(path: String, method: String = "GET", contentType: String? = nil) -> URLRequest? {
+        guard let url = URL(string: profileAPIBaseURL + path) else { return nil }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.timeoutInterval = 20
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        if let contentType { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
+        if let session = KeyValidator.currentSessionToken, !session.isEmpty {
+            request.setValue(session, forHTTPHeaderField: "X-DZ-Session")
+        }
+        return request
+    }
+
+    private func syncRemoteProfile(_ screen: ProfileView) {
+        let draft = screen.profileDraft
+        guard var request = profileRequest(path: "/profile/me", method: "PUT", contentType: "application/json") else { return }
+        let payload: [String: String] = ["username": draft.username, "displayName": draft.name, "description": draft.description]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        URLSession.shared.dataTask(with: request).resume()
+    }
+
+    private func loadRemoteProfile(into screen: ProfileView) {
+        guard let request = profileRequest(path: "/profile/me") else { return }
+        URLSession.shared.dataTask(with: request) { [weak self, weak screen] data, _, _ in
+            guard let data, let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let profile = root["profile"] as? [String: Any], let screen else { return }
+            let name = profile["displayName"] as? String ?? "NYXEL EXTERNAL"
+            let username = profile["username"] as? String ?? "@nyxel_user"
+            let description = profile["description"] as? String ?? ""
+            let avatarURL = profile["avatarUrl"] as? String
+            let coverURL = profile["coverUrl"] as? String
+            DispatchQueue.main.async { screen.updateProfile(name: name, username: username, description: description) }
+            self?.downloadProfileImage(avatarURL, target: .avatar, into: screen)
+            self?.downloadProfileImage(coverURL, target: .cover, into: screen)
+        }.resume()
+    }
+
+    private func downloadProfileImage(_ string: String?, target: ProfileMediaTarget, into screen: ProfileView) {
+        guard let string, let url = URL(string: string) else { return }
+        URLSession.shared.dataTask(with: url) { [weak screen] data, _, _ in
+            guard let data, let image = UIImage(data: data) else { return }
+            DispatchQueue.main.async { screen?.setProfileImage(image, target: target) }
+        }.resume()
+    }
+
+    private func uploadProfileImage(_ image: UIImage, target: ProfileMediaTarget) {
+        let path = target == .avatar ? "/profile/avatar" : "/profile/cover"
+        guard var request = profileRequest(path: path, method: "POST", contentType: "image/jpeg"),
+              let data = image.jpegData(compressionQuality: 0.88) else { return }
+        request.httpBody = data
+        URLSession.shared.dataTask(with: request).resume()
     }
 
     private func presentProfileEditor(for screen: ProfileView) {
@@ -507,6 +562,7 @@ final class ViewController: UIViewController {
             let username = fields.count > 1 ? (fields[1].text ?? "") : ""
             let description = fields.count > 2 ? (fields[2].text ?? "") : ""
             screen?.updateProfile(name: name, username: username, description: description)
+            if let screen { self?.syncRemoteProfile(screen) }
             NyxelActivityLog.record("Perfil actualizado")
             self?.view.setNeedsLayout()
         })
@@ -716,6 +772,7 @@ extension ViewController: PHPickerViewControllerDelegate {
             guard let image = object as? UIImage else { return }
             DispatchQueue.main.async {
                 self?.profileView?.setProfileImage(image, target: target)
+                self?.uploadProfileImage(image, target: target)
                 NyxelActivityLog.record(target == .avatar ? "Foto de perfil actualizada" : "Portada actualizada")
             }
         }
