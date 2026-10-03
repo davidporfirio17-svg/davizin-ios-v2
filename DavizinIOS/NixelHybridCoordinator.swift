@@ -75,6 +75,25 @@ enum NixelExploitExecutionResult {
     case blocked(String)
 }
 
+struct NixelExploitPreflight {
+    let pairingAuthenticated: Bool
+    let developerModeEnabled: Bool
+    let kernelAccessActive: Bool
+
+    static let notReady = NixelExploitPreflight(
+        pairingAuthenticated: false,
+        developerModeEnabled: false,
+        kernelAccessActive: false
+    )
+
+    var blockingReason: String? {
+        if !pairingAuthenticated { return "Pairing autenticado pendiente." }
+        if !developerModeEnabled { return "Developer Mode no confirmado." }
+        if !kernelAccessActive { return "Acceso al kernel no verificado." }
+        return nil
+    }
+}
+
 protocol NixelExploitBackend {
     func execute(completion: @escaping (NixelExploitExecutionResult) -> Void)
 }
@@ -111,12 +130,17 @@ enum NixelExploitCoordinator {
     }
 
     static func execute(
+        preflight: NixelExploitPreflight = .notReady,
         backend: NixelExploitBackend = NixelUnavailableExploitBackend(),
         completion: @escaping (NixelExploitExecutionResult) -> Void
     ) {
         let assessment = assess()
         if case .unsupported = assessment.phase {
             completion(.blocked(assessment.message))
+            return
+        }
+        if let reason = preflight.blockingReason {
+            completion(.blocked(reason))
             return
         }
         backend.execute(completion: completion)
