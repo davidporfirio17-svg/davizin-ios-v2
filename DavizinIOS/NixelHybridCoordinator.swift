@@ -185,7 +185,8 @@ final class NixelPairingProbe {
 
         let serviceTypes = [
             "_remotepairing._tcp",
-            "_remotepairing-pairable-host._tcp"
+            "_remotepairing-pairable-host._tcp",
+            "_3105airlift._tcp"
         ]
         browsers = serviceTypes.map { serviceType in
             let browser = NWBrowser(for: .bonjour(type: serviceType, domain: nil), using: .tcp)
