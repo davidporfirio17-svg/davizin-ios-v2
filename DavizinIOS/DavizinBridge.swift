@@ -136,11 +136,11 @@ final class DavizinBridge {
             guard let self = self else { return }
             switch result {
             case .success:
-                NyxelActivityLog.record("Hybrid VPN preparado")
+                NyxelActivityLog.record("Hybrid VPN conectado; continúa el flujo autorizado")
                 injectNow()
             case .failure(let error):
                 self.operationInFlight = false
-                self.vc?.setOperationState(.failed("NYX-VPN — No se pudo preparar Hybrid: \(error.localizedDescription)"))
+                self.vc?.setOperationState(.failed("NYX-VPN — No se pudo conectar Hybrid: \(error.localizedDescription)"))
             }
         }
     }
