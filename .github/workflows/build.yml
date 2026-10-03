@@ -47,6 +47,8 @@ jobs:
           ONLY_ACTIVE_ARCH=NO \
           ALWAYS_SEARCH_USER_PATHS=NO \
           BUILD_DIR=/tmp/davizin_build \
+          LIBRARY_SEARCH_PATHS=/tmp/idevice-ffi \
+          OTHER_LDFLAGS="-force_load /tmp/idevice-ffi/libidevice_ffi.a -framework Security -framework Network" \
           build 2>&1 | tee /tmp/build.log
         
         echo "=== Build completed. Checking for .app ==="

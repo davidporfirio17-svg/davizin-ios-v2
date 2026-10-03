@@ -424,8 +424,16 @@ final class NixelPairingSession {
                     switch transport {
                     case .reachable(let name):
                         self.update(.transportReachable(name), onState: onState)
-                        if NixelPairingRecordStore.shared.load(deviceID: name) != nil {
+                        do {
+                            let record = try NixelAirLiftFFI.preparePairingRecord(hostname: name)
+                            try NixelPairingRecordStore.shared.save(record, deviceID: name)
                             self.update(.pairingRecordFound(name), onState: onState)
+                        } catch {
+                            self.update(.failed("Transporte accesible, pero no se pudo preparar el registro RPairing: \(error.localizedDescription)"), onState: onState)
+                            return
+                        }
+                        if NixelPairingRecordStore.shared.load(deviceID: name) != nil {
+                            NyxelActivityLog.record("Pairing: registro RPairing preparado; autenticación aún pendiente")
                         }
                         self.update(.pairingRequired(name), onState: onState)
                     case .unreachable(let message):
