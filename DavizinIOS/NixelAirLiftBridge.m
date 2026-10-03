@@ -6,6 +6,7 @@
 #import <arpa/inet.h>
 #import <netinet/in.h>
 #import <sys/socket.h>
+#import <unistd.h>
 
 struct NyxelResolveContext {
     struct sockaddr_storage address;
@@ -78,6 +79,150 @@ int nyxel_pair_rppairing(const char *service_name, const char *reg_type, const c
     if (adapter) adapter_free(adapter);
     if (handshake) rsd_handshake_free(handshake);
     return 0;
+}
+
+static PairableHostHandle *nyxel_pairing_host_handle;
+static NSNetService *nyxel_pairing_host_service;
+static int nyxel_pairing_host_listener = -1;
+static dispatch_source_t nyxel_pairing_host_source;
+
+static void nyxel_pairing_post(NSString *name, NSDictionary *userInfo) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSNotificationCenter defaultCenter] postNotificationName:name object:nil userInfo:userInfo];
+    });
+}
+
+static void nyxel_pairing_pin_callback(const char *pin, void *context) {
+    (void)context;
+    NSString *value = pin ? [NSString stringWithUTF8String:pin] : @"";
+    nyxel_pairing_post(@"NyxelPairingPIN", @{ @"pin": value });
+}
+
+static void nyxel_pairing_accept_connection(int fd) {
+    PairableHostHandle *handle = nyxel_pairing_host_handle;
+    if (!handle) { close(fd); return; }
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        RpPairingFileHandle *pairing = NULL;
+        void *peer = NULL;
+        IdeviceFfiError *error = pairable_host_accept_fd(handle, fd, nyxel_pairing_pin_callback,
+                                                         NULL, &peer, &pairing);
+        close(fd);
+        if (error || !pairing) {
+            if (error) idevice_error_free(error);
+            nyxel_pairing_post(@"NyxelPairingHostFailed", @{ @"message": @"El handshake PairableHost fue rechazado." });
+            return;
+        }
+        unsigned char *bytes = NULL;
+        size_t length = 0;
+        IdeviceFfiError *serializeError = rp_pairing_file_to_bytes(pairing, &bytes, &length);
+        if (serializeError || !bytes || length == 0) {
+            if (serializeError) idevice_error_free(serializeError);
+            rp_pairing_file_free(pairing);
+            nyxel_pairing_post(@"NyxelPairingHostFailed", @{ @"message": @"No se pudo guardar el registro RPairing." });
+            return;
+        }
+        NSData *record = [NSData dataWithBytes:bytes length:length];
+        idevice_data_free(bytes, length);
+        rp_pairing_file_free(pairing);
+        nyxel_pairing_post(@"NyxelPairingCompleted", @{ @"record": record });
+    });
+}
+
+int nyxel_pairable_host_start(const char *name, const char *model) {
+    nyxel_pairable_host_stop();
+    if (!name || !model) return -1;
+
+    int listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) return -2;
+    int yes = 1;
+    setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+    struct sockaddr_in address = {0};
+    address.sin_len = sizeof(address);
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(0);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0 || listen(listener, 4) != 0) {
+        close(listener);
+        return -3;
+    }
+    socklen_t addressLength = sizeof(address);
+    if (getsockname(listener, (struct sockaddr *)&address, &addressLength) != 0) {
+        close(listener);
+        return -4;
+    }
+
+    char *serviceID = NULL;
+    unsigned char *txt = NULL;
+    size_t txtLength = 0;
+    IdeviceFfiError *error = pairable_host_prepare(name, model, false, &nyxel_pairing_host_handle,
+                                                     &serviceID, &txt, &txtLength, NULL);
+    if (error || !serviceID || !txt || txtLength == 0) {
+        if (error) idevice_error_free(error);
+        if (serviceID) idevice_string_free(serviceID);
+        if (txt) idevice_data_free(txt, txtLength);
+        pairable_host_free(nyxel_pairing_host_handle);
+        nyxel_pairing_host_handle = NULL;
+        close(listener);
+        return -5;
+    }
+
+    NSData *plistData = [NSData dataWithBytes:txt length:txtLength];
+    idevice_data_free(txt, txtLength);
+    NSDictionary *plist = [NSPropertyListSerialization propertyListWithData:plistData options:0 format:nil error:nil];
+    NSMutableDictionary *records = [NSMutableDictionary dictionary];
+    [plist enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL *stop) {
+        (void)stop;
+        if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
+            records[key] = [(NSString *)value dataUsingEncoding:NSUTF8StringEncoding];
+        }
+    }];
+    NSData *txtRecord = [NSNetService dataFromTXTRecordDictionary:records];
+    NSString *serviceName = [NSString stringWithUTF8String:serviceID];
+    idevice_string_free(serviceID);
+    if (!serviceName || !txtRecord) {
+        pairable_host_free(nyxel_pairing_host_handle);
+        nyxel_pairing_host_handle = NULL;
+        close(listener);
+        return -6;
+    }
+
+    nyxel_pairing_host_listener = listener;
+    nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@"local."
+                                                                   type:@"_remotepairing-pairable-host._tcp."
+                                                                   name:serviceName
+                                                                   port:ntohs(address.sin_port)];
+    nyxel_pairing_host_service.includesPeerToPeer = YES;
+    [nyxel_pairing_host_service setTXTRecordData:txtRecord];
+    [nyxel_pairing_host_service publish];
+
+    nyxel_pairing_host_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, (uintptr_t)listener, 0,
+                                                        dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
+    dispatch_source_set_event_handler(nyxel_pairing_host_source, ^{
+        int fd = accept(nyxel_pairing_host_listener, NULL, NULL);
+        if (fd >= 0) nyxel_pairing_accept_connection(fd);
+    });
+    dispatch_resume(nyxel_pairing_host_source);
+    nyxel_pairing_post(@"NyxelPairingHostReady", @{ @"name": serviceName });
+    return 0;
+}
+
+void nyxel_pairable_host_stop(void) {
+    if (nyxel_pairing_host_source) {
+        dispatch_source_cancel(nyxel_pairing_host_source);
+        nyxel_pairing_host_source = nil;
+    }
+    if (nyxel_pairing_host_service) {
+        [nyxel_pairing_host_service stop];
+        nyxel_pairing_host_service = nil;
+    }
+    if (nyxel_pairing_host_listener >= 0) {
+        close(nyxel_pairing_host_listener);
+        nyxel_pairing_host_listener = -1;
+    }
+    if (nyxel_pairing_host_handle) {
+        pairable_host_free(nyxel_pairing_host_handle);
+        nyxel_pairing_host_handle = NULL;
+    }
 }
 
 void nyxel_free_string(char *value) { if (value) free(value); }

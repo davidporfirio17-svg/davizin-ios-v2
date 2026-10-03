@@ -402,11 +402,11 @@ enum NixelPairingSessionState {
     var message: String {
         switch self {
         case .idle: return "Pairing sin iniciar"
-        case .searching: return "Buscando Remote Pairing…"
+        case .searching: return "Publicando host AirLift para que el iPad lo detecte…"
         case .serviceDetected(let name): return "Servicio detectado: \(name)"
         case .transportReachable(let name): return "Transporte accesible: \(name)"
         case .pairingRecordFound(let name): return "Registro local encontrado para \(name); autenticación pendiente"
-        case .pairingRequired(let name): return "Transporte accesible para \(name); pairing del sistema aún no confirmado"
+        case .pairingRequired(let name): return name.hasPrefix("PIN") ? name : "Esperando confirmación de pairing para \(name)…"
         case .paired(let name): return "Pairing autenticado: \(name)"
         case .developerModeRequired(let name): return "Developer Mode requerido para \(name)"
         case .ready(let name): return "Dispositivo listo para la siguiente fase: \(name)"
@@ -415,63 +415,58 @@ enum NixelPairingSessionState {
     }
 }
 
-/// Orquesta el tramo observable del flujo External: después del pairing manual
-/// de Developer Mode, descubre el transporte y conserva la confirmación real
-/// separada de cualquier registro local o conexión VPN.
-/// La autenticación real se deja detrás de un adaptador porque requiere el
-/// protocolo privado y el registro de pairing de la IPA de referencia.
+/// Orquesta el flujo de External: publica primero un PairableHost local para
+/// que el iPad lo descubra. El backend FFI acepta la conexión iniciada por iOS,
+/// entrega el PIN y devuelve el registro RPairing solo tras un handshake real.
 final class NixelPairingSession {
     static let shared = NixelPairingSession()
     private(set) var state: NixelPairingSessionState = .idle
     private var service: NixelRemotePairingService?
     private let authenticator: NixelPairingAuthenticator = NixelExternalPairingAuthenticator()
+    private var hostObservers: [NSObjectProtocol] = []
 
     private init() {}
 
     func begin(onState: @escaping (NixelPairingSessionState) -> Void) {
         stop()
         update(.searching, onState: onState)
-        NixelPairingProbe.shared.scan { [weak self] result in
-            guard let self else { return }
-            switch result {
-            case .servicesFound(let services):
-                guard let service = services.first else {
-                    self.update(.failed("No hay un servicio Remote Pairing utilizable."), onState: onState)
-                    return
+        let center = NotificationCenter.default
+        hostObservers = [
+            center.addObserver(forName: NSNotification.Name("NyxelPairingHostReady"), object: nil, queue: .main) { [weak self] note in
+                let name = note.userInfo?["name"] as? String ?? "2424"
+                self?.update(.serviceDetected("2424 (\(name))"), onState: onState)
+            },
+            center.addObserver(forName: NSNotification.Name("NyxelPairingPIN"), object: nil, queue: .main) { [weak self] note in
+                let pin = note.userInfo?["pin"] as? String ?? ""
+                self?.update(.pairingRequired("PIN recibido por AirLift: \(pin). Introdúcelo en el iPad."), onState: onState)
+            },
+            center.addObserver(forName: NSNotification.Name("NyxelPairingCompleted"), object: nil, queue: .main) { [weak self] note in
+                guard let self, let record = note.userInfo?["record"] as? Data else { return }
+                do {
+                    try NixelPairingRecordStore.shared.save(record, deviceID: "2424")
+                    self.update(.paired("2424"), onState: onState)
+                    self.update(.ready("2424"), onState: onState)
+                } catch {
+                    self.update(.failed("No se pudo guardar el registro RPairing: \(error.localizedDescription)"), onState: onState)
                 }
-                self.service = service
-                self.update(.serviceDetected(service.name), onState: onState)
-                NixelPairingProbe.shared.probeTransport(service: service) { [weak self] transport in
-                    guard let self else { return }
-                    switch transport {
-                    case .reachable(let name):
-                        self.update(.transportReachable(name), onState: onState)
-                        do {
-                            let record = try NixelAirLiftFFI.preparePairingRecord(hostname: name)
-                            try NixelPairingRecordStore.shared.save(record, deviceID: name)
-                            self.update(.pairingRecordFound(name), onState: onState)
-                        } catch {
-                            self.update(.failed("Transporte accesible, pero no se pudo preparar el registro RPairing: \(error.localizedDescription)"), onState: onState)
-                            return
-                        }
-                        if NixelPairingRecordStore.shared.load(deviceID: name) != nil {
-                            NyxelActivityLog.record("Pairing: registro RPairing preparado; autenticación aún pendiente")
-                        }
-                        self.update(.pairingRequired(name), onState: onState)
-                    case .unreachable(let message):
-                        self.update(.failed("Servicio detectado, pero transporte no accesible: \(message)"), onState: onState)
-                    }
-                }
-            case .noService:
-                self.update(.failed("No se detectó ningún servicio Remote Pairing."), onState: onState)
-            case .unavailable(let message):
-                self.update(.failed("Remote Pairing no disponible: \(message)"), onState: onState)
+            },
+            center.addObserver(forName: NSNotification.Name("NyxelPairingHostFailed"), object: nil, queue: .main) { [weak self] note in
+                self?.update(.failed(note.userInfo?["message"] as? String ?? "Falló el host PairableHost."), onState: onState)
             }
+        ]
+        let result = "2424".withCString { name in
+            "Mac17,7".withCString { model in nyxel_pairable_host_start(name, model) }
+        }
+        if result != 0 {
+            update(.failed("No se pudo publicar el host Remote Pairing (código \(result))."), onState: onState)
         }
     }
 
     func stop() {
         NixelPairingProbe.shared.stop()
+        hostObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        hostObservers.removeAll()
+        nyxel_pairable_host_stop()
         service = nil
         state = .idle
     }
