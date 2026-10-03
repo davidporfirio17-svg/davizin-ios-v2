@@ -70,6 +70,23 @@ struct NixelExploitAssessment {
     }
 }
 
+enum NixelExploitExecutionResult {
+    case completed(String)
+    case blocked(String)
+}
+
+protocol NixelExploitBackend {
+    func execute(completion: @escaping (NixelExploitExecutionResult) -> Void)
+}
+
+/// Backend nulo hasta integrar una implementación compatible con el
+/// dispositivo. Evita que la UI convierta una simulación en “Jailbreak”.
+final class NixelUnavailableExploitBackend: NixelExploitBackend {
+    func execute(completion: @escaping (NixelExploitExecutionResult) -> Void) {
+        completion(.blocked("Backend de exploit no instalado."))
+    }
+}
+
 /// Evalúa prerequisitos sin ejecutar código de exploit. El acceso al kernel
 /// solo podrá pasar a activo mediante un backend verificado que devuelva una
 /// señal explícita; no se infiere desde una carpeta, VPN o pairing.
@@ -91,6 +108,18 @@ enum NixelExploitCoordinator {
             environment: environment,
             message: "El backend de exploit todavía no está integrado; no se ejecutó ninguna operación."
         )
+    }
+
+    static func execute(
+        backend: NixelExploitBackend = NixelUnavailableExploitBackend(),
+        completion: @escaping (NixelExploitExecutionResult) -> Void
+    ) {
+        let assessment = assess()
+        if case .unsupported = assessment.phase {
+            completion(.blocked(assessment.message))
+            return
+        }
+        backend.execute(completion: completion)
     }
 }
 

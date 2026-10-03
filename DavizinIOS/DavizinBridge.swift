@@ -231,9 +231,15 @@ final class DavizinBridge {
 
         case .runExploit:
             vc?.setOperationState(.running)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-                self?.operationInFlight = false
-                self?.vc?.setOperationState(.succeeded("Sistema listo ✓"))
+            NixelExploitCoordinator.execute { [weak self] result in
+                guard let self else { return }
+                self.operationInFlight = false
+                switch result {
+                case .completed(let message):
+                    self.vc?.setOperationState(.succeeded(message))
+                case .blocked(let message):
+                    self.vc?.setOperationState(.failed("NYX-EXPLOIT — \(message)"))
+                }
             }
 
         case .inject:
