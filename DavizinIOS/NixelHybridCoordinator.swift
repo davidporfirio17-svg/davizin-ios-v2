@@ -149,7 +149,7 @@ enum NixelExploitCoordinator {
 
 struct NixelRemotePairingService {
     let name: String
-    let endpoint: NWEndpoint
+    let endpoint: Network.NWEndpoint
 }
 
 enum NixelPairingProbeResult {
