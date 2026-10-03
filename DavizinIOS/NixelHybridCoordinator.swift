@@ -218,6 +218,35 @@ final class NixelPairingRecordStore {
     }
 }
 
+enum NixelPairingAuthenticationResult {
+    case authenticated(record: Data)
+    case rejected(String)
+    case unavailable(String)
+}
+
+protocol NixelPairingAuthenticator {
+    func authenticate(
+        service: NixelRemotePairingService,
+        pin: String,
+        storedRecord: Data?,
+        completion: @escaping (NixelPairingAuthenticationResult) -> Void
+    )
+}
+
+/// Adaptador deliberadamente aislado. Aquí se conectará el protocolo de
+/// pairing de External/Xtar cuando se disponga de su formato de registro y
+/// handshake; no acepta un PIN como éxito sin una respuesta autenticada.
+final class NixelExternalPairingAuthenticator: NixelPairingAuthenticator {
+    func authenticate(
+        service: NixelRemotePairingService,
+        pin: String,
+        storedRecord: Data?,
+        completion: @escaping (NixelPairingAuthenticationResult) -> Void
+    ) {
+        completion(.unavailable("El handshake autenticado de Remote Pairing aún no está integrado para \(service.name)."))
+    }
+}
+
 enum NixelPairingSessionState {
     case idle
     case searching
@@ -225,6 +254,9 @@ enum NixelPairingSessionState {
     case transportReachable(String)
     case pairingRecordFound(String)
     case pairingRequired(String)
+    case paired(String)
+    case developerModeRequired(String)
+    case ready(String)
     case failed(String)
 
     var message: String {
@@ -235,6 +267,9 @@ enum NixelPairingSessionState {
         case .transportReachable(let name): return "Transporte accesible: \(name)"
         case .pairingRecordFound(let name): return "Registro local encontrado para \(name); autenticación pendiente"
         case .pairingRequired(let name): return "Pairing autenticado requerido para \(name)"
+        case .paired(let name): return "Pairing autenticado: \(name)"
+        case .developerModeRequired(let name): return "Developer Mode requerido para \(name)"
+        case .ready(let name): return "Dispositivo listo para la siguiente fase: \(name)"
         case .failed(let message): return message
         }
     }
@@ -248,6 +283,7 @@ final class NixelPairingSession {
     static let shared = NixelPairingSession()
     private(set) var state: NixelPairingSessionState = .idle
     private var service: NixelRemotePairingService?
+    private let authenticator: NixelPairingAuthenticator = NixelExternalPairingAuthenticator()
 
     private init() {}
 
@@ -289,6 +325,40 @@ final class NixelPairingSession {
         NixelPairingProbe.shared.stop()
         service = nil
         state = .idle
+    }
+
+    func submitPIN(_ pin: String, onState: @escaping (NixelPairingSessionState) -> Void) {
+        guard let service else {
+            update(.failed("No hay un servicio Remote Pairing seleccionado."), onState: onState)
+            return
+        }
+        let normalized = pin.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.count >= 4,
+              normalized.count <= 8,
+              normalized.allSatisfy({ $0.isNumber }) else {
+            update(.failed("El PIN de pairing debe tener entre 4 y 8 dígitos."), onState: onState)
+            return
+        }
+        // El PIN no se persiste. El adaptador debe devolver un registro
+        // autenticado antes de que se pueda marcar la sesión como paired.
+        let stored = NixelPairingRecordStore.shared.load(deviceID: service.name)
+        authenticator.authenticate(service: service, pin: normalized, storedRecord: stored) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .authenticated(let record):
+                do {
+                    try NixelPairingRecordStore.shared.save(record, deviceID: service.name)
+                    self.update(.paired(service.name), onState: onState)
+                    self.update(.developerModeRequired(service.name), onState: onState)
+                } catch {
+                    self.update(.failed("No se pudo guardar el registro autenticado: \(error.localizedDescription)"), onState: onState)
+                }
+            case .rejected(let message):
+                self.update(.failed("Pairing rechazado: \(message)"), onState: onState)
+            case .unavailable(let message):
+                self.update(.failed(message), onState: onState)
+            }
+        }
     }
 
     private func update(_ next: NixelPairingSessionState, onState: @escaping (NixelPairingSessionState) -> Void) {
