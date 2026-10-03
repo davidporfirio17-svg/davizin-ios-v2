@@ -3,15 +3,18 @@ import UIKit
 // MARK: - AppTheme — Nyxel External
 // Dark premium utility: carbón profundo, texto cálido y un solo acento cian.
 enum AppTheme {
-    static let background      = UIColor(red: 0.025, green: 0.035, blue: 0.055, alpha: 1.0)
-    static let backgroundRaise = UIColor(red: 0.055, green: 0.070, blue: 0.095, alpha: 1.0)
-    static let card            = backgroundRaise
-    static let hairline        = UIColor.white.withAlphaComponent(0.09)
-    static let hairlineStrong  = UIColor.white.withAlphaComponent(0.16)
+    private static func adaptive(dark: UIColor, light: UIColor) -> UIColor {
+        UIColor { traits in traits.userInterfaceStyle == .light ? light : dark }
+    }
+    static var background: UIColor { adaptive(dark: UIColor(red: 0.025, green: 0.035, blue: 0.055, alpha: 1.0), light: UIColor(red: 0.955, green: 0.965, blue: 0.980, alpha: 1.0)) }
+    static var backgroundRaise: UIColor { adaptive(dark: UIColor(red: 0.055, green: 0.070, blue: 0.095, alpha: 1.0), light: UIColor.white) }
+    static var card: UIColor { backgroundRaise }
+    static var hairline: UIColor { adaptive(dark: UIColor.white.withAlphaComponent(0.09), light: UIColor.black.withAlphaComponent(0.10)) }
+    static var hairlineStrong: UIColor { adaptive(dark: UIColor.white.withAlphaComponent(0.16), light: UIColor.black.withAlphaComponent(0.18)) }
 
-    static let primaryText     = UIColor(red: 0.955, green: 0.970, blue: 0.985, alpha: 1.0)
-    static let secondaryText   = UIColor(red: 0.800, green: 0.840, blue: 0.890, alpha: 0.72)
-    static let tertiaryText    = UIColor(red: 0.700, green: 0.760, blue: 0.830, alpha: 0.42)
+    static var primaryText: UIColor { adaptive(dark: UIColor(red: 0.955, green: 0.970, blue: 0.985, alpha: 1.0), light: UIColor(red: 0.075, green: 0.095, blue: 0.135, alpha: 1.0)) }
+    static var secondaryText: UIColor { adaptive(dark: UIColor(red: 0.800, green: 0.840, blue: 0.890, alpha: 0.72), light: UIColor(red: 0.220, green: 0.255, blue: 0.320, alpha: 0.78)) }
+    static var tertiaryText: UIColor { adaptive(dark: UIColor(red: 0.700, green: 0.760, blue: 0.830, alpha: 0.42), light: UIColor(red: 0.300, green: 0.340, blue: 0.420, alpha: 0.60)) }
 
     static let success         = UIColor(red: 0.420, green: 0.820, blue: 0.690, alpha: 1.0)
     static let failure         = UIColor(red: 0.980, green: 0.360, blue: 0.400, alpha: 1.0)
@@ -22,8 +25,8 @@ enum AppTheme {
     static var accentHot: UIColor { NyxelAppearanceStore.accentHot }
     static var accentDim: UIColor { NyxelAppearanceStore.accentDim }
 
-    static let control         = card
-    static let separator       = hairline
+    static var control: UIColor { card }
+    static var separator: UIColor { hairline }
 
     static let cardCornerRadius:    CGFloat = 20.0
     static let controlCornerRadius: CGFloat = 14.0

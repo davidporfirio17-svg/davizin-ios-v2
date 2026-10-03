@@ -34,7 +34,7 @@ final class ViewController: UIViewController {
     private var operationView: OperationView?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
-        .lightContent
+        traitCollection.userInterfaceStyle == .light ? .darkContent : .lightContent
     }
 
     /// Usa este factory cuando presentes el UI desde otro controlador.
@@ -240,6 +240,7 @@ final class ViewController: UIViewController {
         super.viewDidLoad()
         modalPresentationStyle = .fullScreen
         modalPresentationCapturesStatusBarAppearance = true
+        overrideUserInterfaceStyle = NyxelAppearanceStore.uiStyle
         configureBaseUI()
         NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
@@ -483,6 +484,7 @@ final class ViewController: UIViewController {
         screen.delegate = self
         screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds, countryCode: activeCountryCode)
         screen.onAppearanceChanged = { [weak self] in
+            self?.overrideUserInterfaceStyle = NyxelAppearanceStore.uiStyle
             self?.showProfile(animated: true)
         }
         screen.onRefreshRequested = { [weak self, weak screen] in

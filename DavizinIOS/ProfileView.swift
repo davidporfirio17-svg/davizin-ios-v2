@@ -116,6 +116,7 @@ final class ProfileView: UIView {
     private let historyLabel = UILabel()
     private let deviceLabel = UILabel()
     private let rankProgressLabel = UILabel()
+    private let themeControl = UISegmentedControl(items: ["Auto", "Claro", "Oscuro"])
     private let appearanceControl = UISegmentedControl(items: ["Cian", "Fuego", "Violeta"])
     private let biometricSwitch = UISwitch()
     private let activationVoiceSwitch = UISwitch()
@@ -159,6 +160,7 @@ final class ProfileView: UIView {
         let next = rankTiers.first(where: { $0.minCount > count })?.minCount
         rankProgressLabel.text = next.map { "Progreso de rango: \(count)/\($0)" } ?? "Progreso de rango: máximo alcanzado"
         deviceLabel.text = "NYXEL EXTERNAL\n\(KeyValidator.getDeviceModel()) • \(NyxelSupportPolicy.currentSystemDescription)"
+        themeControl.selectedSegmentIndex = NyxelAppearanceStore.colorMode.rawValue
         appearanceControl.selectedSegmentIndex = NyxelAppearanceStore.theme.rawValue
         biometricSwitch.isOn = UserDefaults.standard.bool(forKey: "nyxel.biometric.enabled")
         activationVoiceSwitch.isOn = SoundService.shared.activationVoiceEnabled
@@ -242,10 +244,9 @@ final class ProfileView: UIView {
         deviceLabel.numberOfLines = 0
         rankProgressLabel.font = AppTheme.monoFont(10)
         rankProgressLabel.textColor = AppTheme.accentHot
-        appearanceControl.selectedSegmentIndex = NyxelAppearanceStore.theme.rawValue
-        appearanceControl.selectedSegmentTintColor = AppTheme.accent
-        appearanceControl.setTitleTextAttributes([.foregroundColor: AppTheme.background], for: .selected)
-        appearanceControl.setTitleTextAttributes([.foregroundColor: AppTheme.secondaryText], for: .normal)
+        configureSegmentedControl(themeControl)
+        configureSegmentedControl(appearanceControl)
+        themeControl.addTarget(self, action: #selector(themeChanged), for: .valueChanged)
         appearanceControl.addTarget(self, action: #selector(appearanceChanged), for: .valueChanged)
         biometricSwitch.onTintColor = AppTheme.accent
         biometricSwitch.addTarget(self, action: #selector(biometricChanged), for: .valueChanged)
@@ -271,9 +272,15 @@ final class ProfileView: UIView {
         activationVoiceRow.axis = .horizontal
         activationVoiceRow.alignment = .center
         activationVoiceRow.distribution = .equalSpacing
+        let themeRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Tema de la interfaz"), themeControl])
+        themeRow.axis = .vertical
+        themeRow.spacing = 8
+        let accentRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Color de acento"), appearanceControl])
+        accentRow.axis = .vertical
+        accentRow.spacing = 8
 
         let accountSection = ProfileDisclosureSection(title: "CUENTA", views: [keyRow, countryRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel])
-        let appearanceSection = ProfileDisclosureSection(title: "APARIENCIA", views: [appearanceControl])
+        let appearanceSection = ProfileDisclosureSection(title: "APARIENCIA", views: [themeRow, accentRow])
         let securitySection = ProfileDisclosureSection(title: "SEGURIDAD", views: [biometricRow])
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
@@ -335,6 +342,18 @@ final class ProfileView: UIView {
         let theme = NyxelAppearanceStore.Theme(rawValue: appearanceControl.selectedSegmentIndex) ?? .cyan
         NyxelAppearanceStore.setTheme(theme)
         onAppearanceChanged?()
+    }
+
+    @objc private func themeChanged() {
+        let mode = NyxelAppearanceStore.ColorMode(rawValue: themeControl.selectedSegmentIndex) ?? .automatic
+        NyxelAppearanceStore.setColorMode(mode)
+        onAppearanceChanged?()
+    }
+
+    private func configureSegmentedControl(_ control: UISegmentedControl) {
+        control.selectedSegmentTintColor = AppTheme.accent
+        control.setTitleTextAttributes([.foregroundColor: AppTheme.background], for: .selected)
+        control.setTitleTextAttributes([.foregroundColor: AppTheme.secondaryText], for: .normal)
     }
 
     @objc private func biometricChanged() {
