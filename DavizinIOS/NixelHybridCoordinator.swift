@@ -13,6 +13,7 @@ enum NixelCheckState: String {
 struct NixelHybridDiagnostics {
     let deviceModel: String
     let systemVersion: String
+    let jailbreakIndicator: String
     let tunnelStatus: String
     let tunnelConfigured: Bool
     let tunnelPluginPresent: Bool
@@ -22,7 +23,29 @@ struct NixelHybridDiagnostics {
     var summary: String {
         let configured = tunnelConfigured ? "configurado" : "sin configurar"
         let plugin = tunnelPluginPresent ? "presente" : "ausente"
-        return "Dispositivo local: \(deviceModel) · iOS/iPadOS \(systemVersion) · Túnel: \(tunnelStatus) (\(configured), extensión \(plugin)) · Pairing: \(pairing.rawValue) · Developer Mode: \(developerMode.rawValue)"
+        return "Dispositivo local: \(deviceModel) · iOS/iPadOS \(systemVersion) · Jailbreak: \(jailbreakIndicator) · Túnel: \(tunnelStatus) (\(configured), extensión \(plugin)) · Pairing: \(pairing.rawValue) · Developer Mode: \(developerMode.rawValue)"
+    }
+}
+
+enum NixelJailbreakEnvironment {
+    static func indicator() -> String {
+        let fm = FileManager.default
+        let rootlessPaths = [
+            "/var/jb",
+            "/private/var/jb",
+            "/var/containers/Bundle/jb"
+        ]
+        if let path = rootlessPaths.first(where: { fm.fileExists(atPath: $0) }) {
+            return "indicio rootless visible (\(path)); falta confirmar estado"
+        }
+        let rootfulPaths = [
+            "/usr/libexec/sshd",
+            "/Library/MobileSubstrate/DynamicLibraries"
+        ]
+        if let path = rootfulPaths.first(where: { fm.fileExists(atPath: $0) }) {
+            return "indicio rootful visible (\(path)); falta confirmar estado"
+        }
+        return "sin indicios visibles desde la app"
     }
 }
 
@@ -380,6 +403,7 @@ enum NixelHybridCoordinator {
         return NixelHybridDiagnostics(
             deviceModel: device.localizedModel,
             systemVersion: device.systemVersion,
+            jailbreakIndicator: NixelJailbreakEnvironment.indicator(),
             tunnelStatus: NixelVPNManager.statusText(vpn.status),
             tunnelConfigured: vpn.isConfigured,
             tunnelPluginPresent: vpn.tunnelPluginPresent,
