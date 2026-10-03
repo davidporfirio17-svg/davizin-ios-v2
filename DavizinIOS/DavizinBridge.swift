@@ -87,15 +87,26 @@ final class DavizinBridge {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     if let notice = notice, !notice.isEmpty {
                         self?.vc?.showNotice(notice) {
-                            self?.vc?.showGameSelectionScreen()
+                            self?.continueAfterLogin()
                         }
                     } else {
-                        self?.vc?.showGameSelectionScreen()
+                        self?.continueAfterLogin()
                     }
                 }
             } else {
                 self?.vc?.setLoginStatus(message ?? "Key invalida", success: false)
             }
+        }
+    }
+
+    private func continueAfterLogin() {
+        if NyxelCleanupFlow.hasPendingWork, let game = NyxelCleanupFlow.game {
+            selectedGame = game
+            let savedModeID = UserDefaults.standard.string(forKey: "dz_last_mode")
+            let mode = selectedMode ?? savedModeID.flatMap { DavizinModeCatalog.mode(id: $0) }
+            vc?.showCleanupRecoveryScreen(for: game, mode: mode)
+        } else {
+            vc?.showGameSelectionScreen()
         }
     }
 
@@ -144,6 +155,20 @@ final class DavizinBridge {
     private func handleOperation(_ operation: DavizinOperationKind) {
         guard !operationInFlight else {
             vc?.setOperationState(.failed("NYX-006 — Ya hay una operación en curso."))
+            return
+        }
+        if operation == .inject && NyxelCleanupFlow.hasPendingWork {
+            vc?.setOperationState(.failed("Limpia sesión sí o sí antes de volver a inyectar."))
+            return
+        }
+        if operation == .clean {
+            guard NyxelCleanupFlow.stage == .needsCleaning else {
+                vc?.setOperationState(.failed("No hay una limpieza pendiente que pueda confirmarse."))
+                return
+            }
+            if let pendingGame = NyxelCleanupFlow.game { selectedGame = pendingGame }
+            operationInFlight = true
+            executeAuthorizedOperation(.clean)
             return
         }
         guard !sessionKey.isEmpty else {
@@ -198,6 +223,7 @@ final class DavizinBridge {
                 DispatchQueue.main.async {
                     self.hapticFeedback(success: result.success)
                     self.operationInFlight = false
+                    if result.success { NyxelCleanupFlow.markCleaningSucceeded(for: game) }
                     self.vc?.setOperationState(
                         result.success
                             ? .succeeded(result.message)

@@ -60,6 +60,28 @@ final class ViewController: UIViewController {
         showOperation(animated: true)
     }
 
+    func showCleanupRecoveryScreen(for game: DavizinGame, mode: DavizinMode? = nil) {
+        selectedGame = game
+        if let mode { selectedMode = mode }
+        currentStage = .operation
+        animatedBackgroundView.isHidden = false
+        animatedBackgroundView.startAnimating()
+        setBottomNavigation(visible: false, selected: .modes)
+        headerView.title = "Recuperación obligatoria"
+        headerView.showsBackButton = false
+        headerView.showsAvatarButton = false
+
+        let screen = OperationView()
+        screen.delegate = self
+        screen.selectedGame = game
+        screen.selectedMode = mode ?? selectedMode
+        screen.setCleanupRecoveryMode()
+        screen.onOpenGame = { [weak self] in self?.openGame(game) }
+        operationView = screen
+        display(screen, animated: true)
+        screen.applyCleanupStage(NyxelCleanupFlow.stage)
+    }
+
     func setLoginChecking(_ checking: Bool) {
         loginView?.setChecking(checking)
     }
@@ -221,7 +243,14 @@ final class ViewController: UIViewController {
         configureBaseUI()
         NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
-        showLogin(animated: false)
+        NyxelCleanupFlow.prepareForRelaunch()
+        if NyxelCleanupFlow.hasPendingWork, let game = NyxelCleanupFlow.game {
+            let modeID = UserDefaults.standard.string(forKey: "dz_last_mode")
+            let mode = modeID.flatMap { DavizinModeCatalog.mode(id: $0) }
+            showCleanupRecoveryScreen(for: game, mode: mode)
+        } else {
+            showLogin(animated: false)
+        }
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }
@@ -229,11 +258,17 @@ final class ViewController: UIViewController {
     @objc private func appDidEnterBackground() { backgroundedAt = Date() }
 
     @objc private func appWillEnterForeground() {
-        guard let backgroundedAt, Date().timeIntervalSince(backgroundedAt) >= inactivityLockInterval else { return }
-        activeKey = nil
-        activeRemainingSeconds = 0
-        NyxelActivityLog.record("Sesión bloqueada por inactividad")
-        showLogin(animated: true)
+        NyxelCleanupFlow.markReturnedToNyxel()
+        if let backgroundedAt, Date().timeIntervalSince(backgroundedAt) >= inactivityLockInterval {
+            activeKey = nil
+            activeRemainingSeconds = 0
+            NyxelActivityLog.record("Sesión bloqueada por inactividad")
+            showLogin(animated: true)
+            return
+        }
+        if NyxelCleanupFlow.hasPendingWork, let game = NyxelCleanupFlow.game {
+            showCleanupRecoveryScreen(for: game)
+        }
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -436,6 +471,9 @@ final class ViewController: UIViewController {
         }
         operationView = screen
         display(screen, animated: animated)
+        if NyxelCleanupFlow.hasPendingWork {
+            screen.applyCleanupStage(NyxelCleanupFlow.stage)
+        }
     }
 
     /// Perfil: accesible desde el avatar del header en cualquier pantalla (excepto login).
@@ -474,6 +512,24 @@ final class ViewController: UIViewController {
 
 	/// Abre Free Fire (MAX o normal) usando su esquema de URL.
 	private func openGame(_ game: DavizinGame) {
+		let beginOpening = { [weak self] in
+			DispatchQueue.main.async { self?.performOpenGame(game) }
+		}
+		if NyxelCleanupFlow.stage == .readyToOpen {
+			NyxelCleanupFlow.requestReminderPermission { [weak self] allowed in
+					guard !allowed else { beginOpening(); return }
+					DispatchQueue.main.async {
+						self?.showNotice("Activa las notificaciones de Nyxel si quieres recibir el recordatorio. Si no, vuelve manualmente después de 5 segundos y pulsa LIMPIAR SESIÓN SÍ O SÍ.") {
+							beginOpening()
+						}
+					}
+			}
+		} else {
+			beginOpening()
+		}
+	}
+
+	private func performOpenGame(_ game: DavizinGame) {
 		operationView?.setOpeningGame(true)
 		let urls: [URL]
 		switch game {
@@ -503,9 +559,20 @@ final class ViewController: UIViewController {
 
 				UIApplication.shared.open(urls[index], options: [:]) { success in
 					if success {
+						let completingCycle = NyxelCleanupFlow.stage == .readyToReopen
+						NyxelCleanupFlow.markGameOpened()
 						NyxelActivityLog.record("\(game.rawValue) abierto")
 						DispatchQueue.main.async {
-							self.operationView?.showGameOpenResult(success: true)
+							if completingCycle {
+								if self.activeKey != nil && self.activeRemainingSeconds > 0 {
+									self.showOperation(animated: false)
+								} else {
+									self.showLogin(animated: true)
+								}
+							} else {
+								self.operationView?.showGameOpenResult(success: true)
+								self.operationView?.applyCleanupStage(NyxelCleanupFlow.stage)
+							}
 						}
 						return
 					}
