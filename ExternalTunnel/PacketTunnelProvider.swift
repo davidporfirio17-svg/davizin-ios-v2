@@ -8,11 +8,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private let peerAddress = "10.7.0.1"
 
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
-        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: peerAddress)
-        let ipv4 = NEIPv4Settings(addresses: [interfaceAddress], subnetMasks: ["255.255.255.255"])
-        // Solo se anuncia la ruta local del túnel. No se secuestra el tráfico
-        // general del teléfono ni se deja el dispositivo sin internet.
-        ipv4.includedRoutes = [NEIPv4Route(destinationAddress: interfaceAddress, subnetMask: "255.255.255.255")]
+        let configured = (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration as? [String: Any]
+        let iface = Self.address(from: configured?["TunnelIfaceIP"] as? String) ?? interfaceAddress
+        let peer = Self.address(from: configured?["TunnelPeerIP"] as? String) ?? peerAddress
+
+        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: peer)
+        let ipv4 = NEIPv4Settings(addresses: [iface], subnetMasks: ["255.255.255.255"])
+        // El destino debe ser el peer del túnel. La ruta anterior apuntaba a
+        // la propia interfaz y no podía alcanzar ningún servicio AirLift/RSD.
+        ipv4.includedRoutes = [NEIPv4Route(destinationAddress: peer, subnetMask: "255.255.255.255")]
         settings.ipv4Settings = ipv4
         settings.dnsSettings = NEDNSSettings(servers: ["1.1.1.1"])
         setTunnelNetworkSettings(settings) { error in
@@ -22,6 +26,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             }
             completionHandler(nil)
         }
+    }
+
+    private static func address(from value: String?) -> String? {
+        guard let value, !value.isEmpty else { return nil }
+        return value.split(separator: "/", maxSplits: 1).first.map(String.init)
     }
 
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
