@@ -277,10 +277,10 @@ final class ProfileView: UIView {
         }
 
         socialHeader.translatesAutoresizingMaskIntoConstraints = false
-        socialHeader.backgroundColor = UIColor.white.withAlphaComponent(0.025)
-        socialHeader.layer.cornerRadius = 18
+        socialHeader.backgroundColor = AppTheme.backgroundRaise
+        socialHeader.layer.cornerRadius = 24
         socialHeader.layer.borderWidth = 1
-        socialHeader.layer.borderColor = AppTheme.hairline.cgColor
+        socialHeader.layer.borderColor = AppTheme.accent.withAlphaComponent(0.28).cgColor
         socialHeader.clipsToBounds = true
 
         coverView.translatesAutoresizingMaskIntoConstraints = false
@@ -467,22 +467,24 @@ final class ProfileView: UIView {
         refreshButton.addTarget(self, action: #selector(refreshTapped), for: .touchUpInside)
         logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
 
+        nameLabel.textAlignment = .center
+        usernameLabel.textAlignment = .center
         NSLayoutConstraint.activate([
-            socialHeader.heightAnchor.constraint(equalToConstant: 330),
+            socialHeader.heightAnchor.constraint(equalToConstant: 382),
             coverView.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor),
             coverView.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor),
             coverView.topAnchor.constraint(equalTo: socialHeader.topAnchor),
-            coverView.heightAnchor.constraint(equalToConstant: 175),
+            coverView.heightAnchor.constraint(equalToConstant: 205),
             avatarCircle.widthAnchor.constraint(equalToConstant: 118), avatarCircle.heightAnchor.constraint(equalToConstant: 118),
-            avatarCircle.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
-            avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 112),
+            avatarCircle.centerXAnchor.constraint(equalTo: socialHeader.centerXAnchor),
+            avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 136),
             avatarImageView.leadingAnchor.constraint(equalTo: avatarCircle.leadingAnchor), avatarImageView.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor),
             avatarImageView.topAnchor.constraint(equalTo: avatarCircle.topAnchor), avatarImageView.bottomAnchor.constraint(equalTo: avatarCircle.bottomAnchor),
-            nameLabel.leadingAnchor.constraint(equalTo: avatarCircle.trailingAnchor, constant: 16),
-            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: editProfileButton.leadingAnchor, constant: -12),
-            nameLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 188),
-            usernameLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            usernameLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
+            nameLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
+            nameLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
+            nameLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 258),
+            usernameLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
+            usernameLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
             usernameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
             editProfileButton.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -16),
             editProfileButton.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 132),
@@ -500,9 +502,9 @@ final class ProfileView: UIView {
             rankLabel.trailingAnchor.constraint(equalTo: rankBadge.trailingAnchor, constant: -10), rankLabel.centerYAnchor.constraint(equalTo: rankBadge.centerYAnchor),
             rankBadge.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
             rankBadge.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 7),
-            descriptionLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
+            descriptionLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 22),
             descriptionLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
-            descriptionLabel.topAnchor.constraint(equalTo: rankBadge.bottomAnchor, constant: 16),
+            descriptionLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 12),
             descriptionLabel.bottomAnchor.constraint(lessThanOrEqualTo: socialHeader.bottomAnchor, constant: -16),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor), scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor), scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
