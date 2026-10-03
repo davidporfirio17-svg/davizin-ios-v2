@@ -485,6 +485,7 @@ final class ViewController: UIViewController {
         profileView = screen
         display(screen, animated: animated)
         loadRemoteProfile(into: screen)
+        presentProfileOnboardingIfNeeded()
     }
 
     private func profileRequest(path: String, method: String = "GET", contentType: String? = nil) -> URLRequest? {
@@ -560,16 +561,19 @@ final class ViewController: UIViewController {
             let username = first["username"] as? String ?? "@usuario"
             let name = first["displayName"] as? String ?? "Sin nombre"
             let bio = first["description"] as? String ?? "Sin biografía"
-            let country = first["countryCode"] as? String ?? "No indicado"
+            let showCountry = UserDefaults.standard.object(forKey: "nyxel.privacy.country") as? Bool ?? true
+            let country = showCountry ? (first["countryCode"] as? String ?? "No indicado") : "Oculto"
             let mode = first["mostUsedMode"] as? String ?? "Sin datos"
             let usage = first["usage"] as? [String: Any] ?? [:]
-            let head = usage["head"] as? Int ?? 0
-            let neck = usage["neck"] as? Int ?? 0
-            let chest = usage["chest"] as? Int ?? 0
+            let canShowStats = UserDefaults.standard.object(forKey: "nyxel.privacy.stats") as? Bool ?? true
+            let head = canShowStats ? (usage["head"] as? Int ?? 0) : 0
+            let neck = canShowStats ? (usage["neck"] as? Int ?? 0) : 0
+            let chest = canShowStats ? (usage["chest"] as? Int ?? 0) : 0
             let last = (first["lastSeenAt"] as? NSNumber)?.doubleValue ?? 0
             let date = last > 0 ? Date(timeIntervalSince1970: last / 1000) : nil
             let formatter = DateFormatter(); formatter.dateFormat = "dd/MM/yyyy HH:mm"
-            let lastText = date.map { formatter.string(from: $0) } ?? "Sin conexión registrada"
+            let showLastSeen = UserDefaults.standard.object(forKey: "nyxel.privacy.lastSeen") as? Bool ?? true
+            let lastText = showLastSeen ? (date.map { formatter.string(from: $0) } ?? "Sin conexión registrada") : "Oculta"
             let text = "\(username)\n\(name)\n\n\(bio)\n\nPaís: \(country)\nÚltima conexión: \(lastText)\nModo más usado: \(mode)\nHead: \(head)  •  Cuello: \(neck)  •  Pecho: \(chest)"
             DispatchQueue.main.async { screen?.showPublicSearchResult(text) }
         }.resume()
@@ -581,6 +585,17 @@ final class ViewController: UIViewController {
             guard let data, let image = UIImage(data: data) else { return }
             DispatchQueue.main.async { screen?.setProfileImage(image, target: target) }
         }.resume()
+    }
+
+    private func presentProfileOnboardingIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: "nyxel.profile.onboarding.complete"), presentedViewController == nil else { return }
+        let alert = UIAlertController(title: "Configura tu perfil", message: "Añade una foto, portada, nombre de usuario y biografía. El usuario se fija después de guardarlo por primera vez.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Ahora no", style: .cancel) { _ in UserDefaults.standard.set(true, forKey: "nyxel.profile.onboarding.complete") })
+        alert.addAction(UIAlertAction(title: "Editar perfil", style: .default) { [weak self] _ in
+            UserDefaults.standard.set(true, forKey: "nyxel.profile.onboarding.complete")
+            if let screen = self?.profileView { self?.presentProfileEditor(for: screen) }
+        })
+        present(alert, animated: true)
     }
 
     private func uploadProfileImage(_ image: UIImage, target: ProfileMediaTarget) {

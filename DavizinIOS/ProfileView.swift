@@ -143,6 +143,9 @@ final class ProfileView: UIView {
     private let neckMetricLabel = UILabel()
     private let chestMetricLabel = UILabel()
     private let mostUsedModeLabel = UILabel()
+    private let showCountrySwitch = UISwitch()
+    private let showLastSeenSwitch = UISwitch()
+    private let showStatsSwitch = UISwitch()
     private var tabViews: [UIView] = []
     private let editProfileButton = UIButton(type: .system)
     private let avatarEditButton = UIButton(type: .system)
@@ -360,6 +363,11 @@ final class ProfileView: UIView {
         publicSearchResultLabel.textColor = AppTheme.secondaryText
         publicSearchResultLabel.font = AppTheme.monoFont(11)
         publicSearchResultLabel.numberOfLines = 0
+        publicSearchResultLabel.backgroundColor = AppTheme.backgroundRaise
+        publicSearchResultLabel.layer.cornerRadius = 12
+        publicSearchResultLabel.layer.borderWidth = 1
+        publicSearchResultLabel.layer.borderColor = AppTheme.hairline.cgColor
+        publicSearchResultLabel.isHidden = false
         let searchRow = UIStackView(arrangedSubviews: [publicSearchField, publicSearchButton])
         searchRow.axis = .horizontal
         searchRow.spacing = 8
@@ -435,7 +443,12 @@ final class ProfileView: UIView {
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
         let historyActivitySection = ProfileDisclosureSection(title: "HISTORIAL TÉCNICO", views: [historyLabel, activityLabel], expanded: false)
-        let settingsSection = ProfileDisclosureSection(title: "CUENTA Y CONFIGURACIÓN", views: [accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, historyActivitySection], expanded: false)
+        [showCountrySwitch, showLastSeenSwitch, showStatsSwitch].forEach { $0.onTintColor = AppTheme.accent; $0.addTarget(self, action: #selector(privacyChanged), for: .valueChanged) }
+        showCountrySwitch.isOn = UserDefaults.standard.object(forKey: "nyxel.privacy.country") as? Bool ?? true
+        showLastSeenSwitch.isOn = UserDefaults.standard.object(forKey: "nyxel.privacy.lastSeen") as? Bool ?? true
+        showStatsSwitch.isOn = UserDefaults.standard.object(forKey: "nyxel.privacy.stats") as? Bool ?? true
+        let privacySection = ProfileDisclosureSection(title: "PRIVACIDAD", views: [privacyRow("Mostrar país", showCountrySwitch), privacyRow("Mostrar última conexión", showLastSeenSwitch), privacyRow("Mostrar estadísticas", showStatsSwitch)], expanded: false)
+        let settingsSection = ProfileDisclosureSection(title: "CUENTA Y CONFIGURACIÓN", views: [accountSection, privacySection, appearanceSection, securitySection, audioSection, diagnosticSection, historyActivitySection], expanded: false)
         let stack = UIStackView(arrangedSubviews: [socialHeader, profileTabs, aboutSection, activitySection, settingsSection, refreshButton, logoutButton])
         tabViews = [aboutSection, activitySection, settingsSection]
         tabViews.enumerated().forEach { $0.element.isHidden = $0.offset != 0 }
@@ -542,6 +555,12 @@ final class ProfileView: UIView {
         return stack
     }
 
+    private func privacyRow(_ title: String, _ control: UISwitch) -> UIView {
+        let label = UILabel(); label.text = title; label.font = .systemFont(ofSize: 13, weight: .medium); label.textColor = AppTheme.secondaryText
+        let row = UIStackView(arrangedSubviews: [label, control]); row.axis = .horizontal; row.alignment = .center; row.distribution = .equalSpacing
+        return row
+    }
+
     private func configureEditButton(_ button: UIButton, title: String?, imageName: String) {
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setImage(UIImage(systemName: imageName), for: .normal)
@@ -577,10 +596,11 @@ final class ProfileView: UIView {
     }
 
     func setRemoteStats(head: Int, neck: Int, chest: Int, mostUsedMode: String) {
-        headMetricLabel.text = "\(head)"
-        neckMetricLabel.text = "\(neck)"
-        chestMetricLabel.text = "\(chest)"
-        mostUsedModeLabel.text = mostUsedMode.isEmpty ? "Sin datos todavía" : mostUsedMode
+        let hasActivity = head + neck + chest > 0 || !mostUsedMode.isEmpty
+        headMetricLabel.text = hasActivity ? "\(head)" : "—"
+        neckMetricLabel.text = hasActivity ? "\(neck)" : "—"
+        chestMetricLabel.text = hasActivity ? "\(chest)" : "—"
+        mostUsedModeLabel.text = mostUsedMode.isEmpty ? "Todavía no hay actividad" : mostUsedMode
     }
 
     func updateProfile(name: String, username: String, description: String) {
@@ -622,6 +642,11 @@ final class ProfileView: UIView {
     }
     @objc private func profileTabChanged() {
         tabViews.enumerated().forEach { $0.element.isHidden = $0.offset != profileTabs.selectedSegmentIndex }
+    }
+    @objc private func privacyChanged() {
+        UserDefaults.standard.set(showCountrySwitch.isOn, forKey: "nyxel.privacy.country")
+        UserDefaults.standard.set(showLastSeenSwitch.isOn, forKey: "nyxel.privacy.lastSeen")
+        UserDefaults.standard.set(showStatsSwitch.isOn, forKey: "nyxel.privacy.stats")
     }
     @objc private func editAvatarTapped() { onRequestMedia?(.avatar) }
     @objc private func editCoverTapped() { onRequestMedia?(.cover) }
