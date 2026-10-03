@@ -11,7 +11,6 @@ extern "C" {
 
 typedef struct IdeviceFfiError IdeviceFfiError;
 typedef struct PairableHostHandle PairableHostHandle;
-typedef struct RpPairingFileHandle RpPairingFileHandle;
 typedef void (*PairableHostPinCb)(const char *pin, void *context);
 typedef socklen_t idevice_socklen_t;
 typedef struct sockaddr idevice_sockaddr;
@@ -43,12 +42,8 @@ IdeviceFfiError *pairable_host_accept_fd(
     PairableHostPinCb pin_cb,
     void *context,
     void **out_peer_device,
-    RpPairingFileHandle **out_pairing_file);
+    void **out_pairing_file);
 void pairable_host_free(PairableHostHandle *handle);
-void rp_pairing_file_free(RpPairingFileHandle *handle);
-IdeviceFfiError *rp_pairing_file_to_bytes(RpPairingFileHandle *handle,
-                                          unsigned char **out_data,
-                                          size_t *out_len);
 void idevice_error_free(IdeviceFfiError *error);
 
 IdeviceFfiError *tunnel_create_rppairing(

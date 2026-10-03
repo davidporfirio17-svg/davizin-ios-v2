@@ -102,7 +102,7 @@ static void nyxel_pairing_accept_connection(int fd) {
     PairableHostHandle *handle = nyxel_pairing_host_handle;
     if (!handle) { close(fd); return; }
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        RpPairingFileHandle *pairing = NULL;
+        void *pairing = NULL;
         void *peer = NULL;
         IdeviceFfiError *error = pairable_host_accept_fd(handle, fd, nyxel_pairing_pin_callback,
                                                          NULL, &peer, &pairing);
