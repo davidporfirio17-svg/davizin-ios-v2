@@ -190,6 +190,15 @@ enum NyxelCleanupFlow {
         cancelReminder()
     }
 
+    /// Un cierre completo de Nyxel debe iniciar una sesión nueva desde la pantalla de la key.
+    /// El flujo de recuperación solo se conserva mientras la app permanece activa o vuelve
+    /// del segundo plano sin haber sido terminada.
+    static func resetForFreshLaunch() {
+        storedStage = .idle
+        storedGame = nil
+        cancelReminder()
+    }
+
     static func markCleaningSucceeded(for game: DavizinGame) {
         guard stage == .needsCleaning, storedGame == game else { return }
         storedStage = .readyToReopen

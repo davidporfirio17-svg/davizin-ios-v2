@@ -243,14 +243,8 @@ final class ViewController: UIViewController {
         configureBaseUI()
         NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
-        NyxelCleanupFlow.prepareForRelaunch()
-        if NyxelCleanupFlow.hasPendingWork, let game = NyxelCleanupFlow.game {
-            let modeID = UserDefaults.standard.string(forKey: "dz_last_mode")
-            let mode = modeID.flatMap { DavizinModeCatalog.mode(id: $0) }
-            showCleanupRecoveryScreen(for: game, mode: mode)
-        } else {
-            showLogin(animated: false)
-        }
+        NyxelCleanupFlow.resetForFreshLaunch()
+        showLogin(animated: false)
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }
