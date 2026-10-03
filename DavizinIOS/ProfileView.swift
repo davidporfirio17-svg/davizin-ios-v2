@@ -127,10 +127,13 @@ final class ProfileView: UIView {
     private let coverView = UIView()
     private let coverGradient = CAGradientLayer()
     private let coverImageView = UIImageView()
+    private let coverBrandLabel = UILabel()
+    private let coverStatusLabel = UILabel()
     private let avatarCircle = UIView()
     private let avatarImageView = UIImageView()
     private let nameLabel = UILabel()
     private let usernameLabel = UILabel()
+    private let profileMetaLabel = UILabel()
     private let descriptionLabel = UILabel()
     private let aboutUsernameLabel = UILabel()
     private let aboutBioLabel = UILabel()
@@ -206,6 +209,9 @@ final class ProfileView: UIView {
         aboutUsernameLabel.text = usernameLabel.text ?? "@nyxel_user"
         aboutBioLabel.text = descriptionLabel.text ?? "Sin descripción todavía."
         aboutCountryLabel.text = countryName(for: activeCountryCode)
+        let presence = activeKey != nil && activeRemainingSeconds > 0 ? "ACTIVO" : "SIN SESIÓN"
+        profileMetaLabel.text = "●  \(presence)   ·   \(countryName(for: activeCountryCode))"
+        profileMetaLabel.textColor = presence == "ACTIVO" ? AppTheme.success : AppTheme.tertiaryText
         accountStatusLabel.text = activeKey == nil ? "Sin validar" : (activeRemainingSeconds > 0 ? "Activa" : "Expirada")
         accountStatusLabel.textColor = activeRemainingSeconds > 0 ? AppTheme.success : AppTheme.failure
         expirationValueLabel.text = formattedRemaining(activeRemainingSeconds)
@@ -266,6 +272,9 @@ final class ProfileView: UIView {
         usernameLabel.textColor = AppTheme.accent
         usernameLabel.adjustsFontSizeToFitWidth = true
         usernameLabel.minimumScaleFactor = 0.75
+        profileMetaLabel.font = AppTheme.monoFont(10)
+        profileMetaLabel.textColor = AppTheme.tertiaryText
+        profileMetaLabel.textAlignment = .center
         descriptionLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.description") ?? "Perfil de prueba de Nyxel External. Aquí podrás mostrar tu identidad y actividad."
         descriptionLabel.font = .systemFont(ofSize: 16, weight: .medium)
         descriptionLabel.textColor = AppTheme.secondaryText
@@ -288,18 +297,32 @@ final class ProfileView: UIView {
         coverView.layer.cornerRadius = 17
         coverView.clipsToBounds = true
         coverGradient.colors = [
-            AppTheme.accent.withAlphaComponent(0.78).cgColor,
-            AppTheme.accentHot.withAlphaComponent(0.35).cgColor,
-            AppTheme.background.cgColor
+            UIColor.black.withAlphaComponent(0.05).cgColor,
+            AppTheme.accent.withAlphaComponent(0.12).cgColor,
+            AppTheme.background.withAlphaComponent(0.94).cgColor
         ]
         coverGradient.startPoint = CGPoint(x: 0, y: 0)
         coverGradient.endPoint = CGPoint(x: 1, y: 1)
-        coverView.layer.insertSublayer(coverGradient, at: 0)
         coverImageView.image = ProfileMediaStore.load("nyxel-profile-cover.jpg")
         coverImageView.contentMode = .scaleAspectFill
         coverImageView.clipsToBounds = true
         coverImageView.translatesAutoresizingMaskIntoConstraints = false
         coverView.addSubview(coverImageView)
+        coverView.layer.addSublayer(coverGradient)
+        coverBrandLabel.text = "NYXEL  //  PLAYER PROFILE"
+        coverBrandLabel.font = AppTheme.monoFont(10)
+        coverBrandLabel.textColor = UIColor.white.withAlphaComponent(0.86)
+        coverBrandLabel.translatesAutoresizingMaskIntoConstraints = false
+        coverView.addSubview(coverBrandLabel)
+        coverStatusLabel.text = "●  ACTIVO"
+        coverStatusLabel.font = .systemFont(ofSize: 10, weight: .bold)
+        coverStatusLabel.textColor = AppTheme.success
+        coverStatusLabel.backgroundColor = UIColor.black.withAlphaComponent(0.42)
+        coverStatusLabel.layer.cornerRadius = 10
+        coverStatusLabel.clipsToBounds = true
+        coverStatusLabel.textAlignment = .center
+        coverStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        coverView.addSubview(coverStatusLabel)
         NSLayoutConstraint.activate([
             coverImageView.leadingAnchor.constraint(equalTo: coverView.leadingAnchor),
             coverImageView.trailingAnchor.constraint(equalTo: coverView.trailingAnchor),
@@ -310,6 +333,7 @@ final class ProfileView: UIView {
         socialHeader.addSubview(avatarCircle)
         socialHeader.addSubview(nameLabel)
         socialHeader.addSubview(usernameLabel)
+        socialHeader.addSubview(profileMetaLabel)
         socialHeader.addSubview(rankBadge)
         socialHeader.addSubview(descriptionLabel)
         configureEditButton(editProfileButton, title: "EDITAR PERFIL", imageName: "pencil")
@@ -475,6 +499,12 @@ final class ProfileView: UIView {
             coverView.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor),
             coverView.topAnchor.constraint(equalTo: socialHeader.topAnchor),
             coverView.heightAnchor.constraint(equalToConstant: 205),
+            coverBrandLabel.leadingAnchor.constraint(equalTo: coverView.leadingAnchor, constant: 16),
+            coverBrandLabel.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 16),
+            coverStatusLabel.trailingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: -16),
+            coverStatusLabel.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 12),
+            coverStatusLabel.widthAnchor.constraint(equalToConstant: 82),
+            coverStatusLabel.heightAnchor.constraint(equalToConstant: 24),
             avatarCircle.widthAnchor.constraint(equalToConstant: 118), avatarCircle.heightAnchor.constraint(equalToConstant: 118),
             avatarCircle.centerXAnchor.constraint(equalTo: socialHeader.centerXAnchor),
             avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 136),
@@ -486,6 +516,9 @@ final class ProfileView: UIView {
             usernameLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
             usernameLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
             usernameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
+            profileMetaLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
+            profileMetaLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
+            profileMetaLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 8),
             editProfileButton.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -16),
             editProfileButton.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 132),
             editProfileButton.widthAnchor.constraint(equalToConstant: 112),
@@ -504,7 +537,7 @@ final class ProfileView: UIView {
             rankBadge.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 7),
             descriptionLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 22),
             descriptionLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
-            descriptionLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 12),
+            descriptionLabel.topAnchor.constraint(equalTo: profileMetaLabel.bottomAnchor, constant: 10),
             descriptionLabel.bottomAnchor.constraint(lessThanOrEqualTo: socialHeader.bottomAnchor, constant: -16),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor), scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor), scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
