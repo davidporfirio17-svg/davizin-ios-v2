@@ -49,6 +49,51 @@ enum NixelJailbreakEnvironment {
     }
 }
 
+enum NixelExploitPhase: String {
+    case compatibilityCheck = "Comprobando compatibilidad"
+    case developerModeRequired = "Developer Mode requerido"
+    case kernelAccessPending = "Acceso al kernel pendiente"
+    case kernelAccessActive = "Acceso al kernel verificado"
+    case exploitReady = "Exploit compatible"
+    case exploitUnavailable = "Exploit no integrado"
+    case unsupported = "Sistema no verificado"
+}
+
+struct NixelExploitAssessment {
+    let phase: NixelExploitPhase
+    let system: String
+    let environment: String
+    let message: String
+
+    var summary: String {
+        "Exploit: \(phase.rawValue) · \(system) · \(environment) · \(message)"
+    }
+}
+
+/// Evalúa prerequisitos sin ejecutar código de exploit. El acceso al kernel
+/// solo podrá pasar a activo mediante un backend verificado que devuelva una
+/// señal explícita; no se infiere desde una carpeta, VPN o pairing.
+enum NixelExploitCoordinator {
+    static func assess() -> NixelExploitAssessment {
+        let system = NyxelSupportPolicy.currentSystemDescription
+        let environment = NixelJailbreakEnvironment.indicator()
+        guard NyxelSupportPolicy.isCurrentSystemSupported else {
+            return NixelExploitAssessment(
+                phase: .unsupported,
+                system: system,
+                environment: environment,
+                message: "La versión/build no está en la matriz verificada de Nyxel."
+            )
+        }
+        return NixelExploitAssessment(
+            phase: .exploitUnavailable,
+            system: system,
+            environment: environment,
+            message: "El backend de exploit todavía no está integrado; no se ejecutó ninguna operación."
+        )
+    }
+}
+
 struct NixelRemotePairingService {
     let name: String
     let endpoint: NWEndpoint
@@ -415,6 +460,7 @@ enum NixelHybridCoordinator {
     static func start(completion: @escaping (Result<Void, Error>) -> Void) {
         let before = diagnostics()
         NyxelActivityLog.record("Hybrid diagnóstico: \(before.summary)")
+        NyxelActivityLog.record(NixelExploitCoordinator.assess().summary)
         NixelVPNManager.shared.start { result in
             switch result {
             case .success:
