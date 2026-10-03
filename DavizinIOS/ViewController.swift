@@ -1,5 +1,4 @@
 import UIKit
-import PhotosUI
 
 final class ViewController: UIViewController {
     /// Actívalo en false cuando conectes tus propios callbacks de aplicación.
@@ -31,8 +30,6 @@ final class ViewController: UIViewController {
     private var gameSelectionView: GameSelectionView?
     private var missionMapView: MissionMapView?
     private var profileView: ProfileView?
-    private var profileMediaTarget: ProfileMediaTarget?
-    private let profileAPIBaseURL = "https://nyxel-profile-api.davidporfirio17.workers.dev"
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
 
@@ -61,6 +58,28 @@ final class ViewController: UIViewController {
 
     func showOperationScreen() {
         showOperation(animated: true)
+    }
+
+    func showCleanupRecoveryScreen(for game: DavizinGame, mode: DavizinMode? = nil) {
+        selectedGame = game
+        if let mode { selectedMode = mode }
+        currentStage = .operation
+        animatedBackgroundView.isHidden = false
+        animatedBackgroundView.startAnimating()
+        setBottomNavigation(visible: false, selected: .modes)
+        headerView.title = "Recuperación obligatoria"
+        headerView.showsBackButton = false
+        headerView.showsAvatarButton = false
+
+        let screen = OperationView()
+        screen.delegate = self
+        screen.selectedGame = game
+        screen.selectedMode = mode ?? selectedMode
+        screen.setCleanupRecoveryMode()
+        screen.onOpenGame = { [weak self] in self?.openGame(game) }
+        operationView = screen
+        display(screen, animated: true)
+        screen.applyCleanupStage(NyxelCleanupFlow.stage)
     }
 
     func setLoginChecking(_ checking: Bool) {
@@ -224,7 +243,14 @@ final class ViewController: UIViewController {
         configureBaseUI()
         NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
-        showLogin(animated: false)
+        NyxelCleanupFlow.prepareForRelaunch()
+        if NyxelCleanupFlow.hasPendingWork, let game = NyxelCleanupFlow.game {
+            let modeID = UserDefaults.standard.string(forKey: "dz_last_mode")
+            let mode = modeID.flatMap { DavizinModeCatalog.mode(id: $0) }
+            showCleanupRecoveryScreen(for: game, mode: mode)
+        } else {
+            showLogin(animated: false)
+        }
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }
@@ -232,11 +258,17 @@ final class ViewController: UIViewController {
     @objc private func appDidEnterBackground() { backgroundedAt = Date() }
 
     @objc private func appWillEnterForeground() {
-        guard let backgroundedAt, Date().timeIntervalSince(backgroundedAt) >= inactivityLockInterval else { return }
-        activeKey = nil
-        activeRemainingSeconds = 0
-        NyxelActivityLog.record("Sesión bloqueada por inactividad")
-        showLogin(animated: true)
+        NyxelCleanupFlow.markReturnedToNyxel()
+        if let backgroundedAt, Date().timeIntervalSince(backgroundedAt) >= inactivityLockInterval {
+            activeKey = nil
+            activeRemainingSeconds = 0
+            NyxelActivityLog.record("Sesión bloqueada por inactividad")
+            showLogin(animated: true)
+            return
+        }
+        if NyxelCleanupFlow.hasPendingWork, let game = NyxelCleanupFlow.game {
+            showCleanupRecoveryScreen(for: game)
+        }
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -417,7 +449,6 @@ final class ViewController: UIViewController {
             showModeSelection(animated: animated)
             return
         }
-        recordProfileActivity(for: selectedMode)
         currentStage = .operation
 		headerView.title = "Control / \(selectedMode.displayName)"
 		headerView.showsBackButton = true
@@ -440,6 +471,9 @@ final class ViewController: UIViewController {
         }
         operationView = screen
         display(screen, animated: animated)
+        if NyxelCleanupFlow.hasPendingWork {
+            screen.applyCleanupStage(NyxelCleanupFlow.stage)
+        }
     }
 
     /// Perfil: accesible desde el avatar del header en cualquier pantalla (excepto login).
@@ -456,16 +490,6 @@ final class ViewController: UIViewController {
         screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds, countryCode: activeCountryCode)
         screen.onAppearanceChanged = { [weak self] in
             self?.showProfile(animated: true)
-        }
-        screen.onEditProfileRequested = { [weak self, weak screen] in
-            guard let screen else { return }
-            self?.presentProfileEditor(for: screen)
-        }
-        screen.onRequestMedia = { [weak self] target in
-            self?.presentProfileMediaPicker(target: target)
-        }
-        screen.onSearchRequested = { [weak self, weak screen] query in
-            self?.searchPublicProfile(query, in: screen)
         }
         screen.onRefreshRequested = { [weak self, weak screen] in
             guard let self, let key = self.activeKey, !key.isEmpty else { return }
@@ -484,176 +508,28 @@ final class ViewController: UIViewController {
         screen.refresh()
         profileView = screen
         display(screen, animated: animated)
-        loadRemoteProfile(into: screen)
-        presentProfileOnboardingIfNeeded()
-    }
-
-    private func profileRequest(path: String, method: String = "GET", contentType: String? = nil) -> URLRequest? {
-        guard let url = URL(string: profileAPIBaseURL + path) else { return nil }
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.timeoutInterval = 20
-        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        if let contentType { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
-        if let session = KeyValidator.currentSessionToken, !session.isEmpty {
-            request.setValue(session, forHTTPHeaderField: "X-DZ-Session")
-        }
-        return request
-    }
-
-    private func recordProfileActivity(for mode: DavizinMode) {
-        guard var request = profileRequest(path: "/profile/activity", method: "POST", contentType: "application/json") else { return }
-        let lower = mode.displayName.lowercased()
-        let category = lower.contains("head") ? "head" : (lower.contains("cuello") || lower.contains("neck") ? "neck" : (lower.contains("pecho") || lower.contains("chest") ? "chest" : ""))
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["mode": mode.displayName, "category": category])
-        URLSession.shared.dataTask(with: request).resume()
-    }
-
-    private func syncRemoteProfile(_ screen: ProfileView) {
-        let draft = screen.profileDraft
-        guard var request = profileRequest(path: "/profile/me", method: "PUT", contentType: "application/json") else { return }
-        let payload: [String: String] = ["username": draft.username, "displayName": draft.name, "description": draft.description, "countryCode": KeyValidator.lastCountryCode ?? ""]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
-        URLSession.shared.dataTask(with: request) { [weak screen] data, _, _ in
-            guard let data, let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let profile = root["profile"] as? [String: Any] else { return }
-            DispatchQueue.main.async {
-                screen?.setUsernameLocked(profile["usernameLocked"] as? Bool ?? true)
-            }
-        }.resume()
-    }
-
-    private func loadRemoteProfile(into screen: ProfileView) {
-        guard let request = profileRequest(path: "/profile/me") else { return }
-        URLSession.shared.dataTask(with: request) { [weak self, weak screen] data, _, _ in
-            guard let data, let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let profile = root["profile"] as? [String: Any], let screen else { return }
-            let name = profile["displayName"] as? String ?? "NYXEL EXTERNAL"
-            let username = profile["username"] as? String ?? "@nyxel_user"
-            let description = profile["description"] as? String ?? ""
-            let usernameLocked = profile["usernameLocked"] as? Bool ?? true
-            let avatarURL = profile["avatarUrl"] as? String
-            let coverURL = profile["coverUrl"] as? String
-            let usage = profile["usage"] as? [String: Any] ?? [:]
-            let head = usage["head"] as? Int ?? 0
-            let neck = usage["neck"] as? Int ?? 0
-            let chest = usage["chest"] as? Int ?? 0
-            let mostUsedMode = profile["mostUsedMode"] as? String ?? ""
-            DispatchQueue.main.async {
-                screen.setUsernameLocked(usernameLocked)
-                screen.updateProfile(name: name, username: username, description: description)
-                screen.setRemoteStats(head: head, neck: neck, chest: chest, mostUsedMode: mostUsedMode)
-            }
-            self?.downloadProfileImage(avatarURL, target: .avatar, into: screen)
-            self?.downloadProfileImage(coverURL, target: .cover, into: screen)
-        }.resume()
-    }
-
-    private func searchPublicProfile(_ query: String, in screen: ProfileView?) {
-        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        guard let request = profileRequest(path: "/profiles/search?q=\(encoded)") else { return }
-        URLSession.shared.dataTask(with: request) { [weak screen] data, _, _ in
-            guard let data, let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let profiles = root["profiles"] as? [[String: Any]], let first = profiles.first else {
-                DispatchQueue.main.async { screen?.showPublicSearchError("No se encontró ese usuario.") }
-                return
-            }
-            let username = first["username"] as? String ?? "@usuario"
-            let name = first["displayName"] as? String ?? "Sin nombre"
-            let bio = first["description"] as? String ?? "Sin biografía"
-            let showCountry = UserDefaults.standard.object(forKey: "nyxel.privacy.country") as? Bool ?? true
-            let country = showCountry ? (first["countryCode"] as? String ?? "No indicado") : "Oculto"
-            let mode = first["mostUsedMode"] as? String ?? "Sin datos"
-            let usage = first["usage"] as? [String: Any] ?? [:]
-            let canShowStats = UserDefaults.standard.object(forKey: "nyxel.privacy.stats") as? Bool ?? true
-            let head = canShowStats ? (usage["head"] as? Int ?? 0) : 0
-            let neck = canShowStats ? (usage["neck"] as? Int ?? 0) : 0
-            let chest = canShowStats ? (usage["chest"] as? Int ?? 0) : 0
-            let last = (first["lastSeenAt"] as? NSNumber)?.doubleValue ?? 0
-            let date = last > 0 ? Date(timeIntervalSince1970: last / 1000) : nil
-            let formatter = DateFormatter(); formatter.dateFormat = "dd/MM/yyyy HH:mm"
-            let showLastSeen = UserDefaults.standard.object(forKey: "nyxel.privacy.lastSeen") as? Bool ?? true
-            let lastText = showLastSeen ? (date.map { formatter.string(from: $0) } ?? "Sin conexión registrada") : "Oculta"
-            let text = "\(username)\n\(name)\n\n\(bio)\n\nPaís: \(country)\nÚltima conexión: \(lastText)\nModo más usado: \(mode)\nHead: \(head)  •  Cuello: \(neck)  •  Pecho: \(chest)"
-            DispatchQueue.main.async { screen?.showPublicSearchResult(text) }
-        }.resume()
-    }
-
-    private func downloadProfileImage(_ string: String?, target: ProfileMediaTarget, into screen: ProfileView) {
-        guard let string, let url = URL(string: string) else { return }
-        URLSession.shared.dataTask(with: url) { [weak screen] data, _, _ in
-            guard let data, let image = UIImage(data: data) else { return }
-            DispatchQueue.main.async { screen?.setProfileImage(image, target: target) }
-        }.resume()
-    }
-
-    private func presentProfileOnboardingIfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: "nyxel.profile.onboarding.complete"), presentedViewController == nil else { return }
-        let alert = UIAlertController(title: "Configura tu perfil", message: "Añade una foto, portada, nombre de usuario y biografía. El usuario se fija después de guardarlo por primera vez.", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Ahora no", style: .cancel) { _ in UserDefaults.standard.set(true, forKey: "nyxel.profile.onboarding.complete") })
-        alert.addAction(UIAlertAction(title: "Editar perfil", style: .default) { [weak self] _ in
-            UserDefaults.standard.set(true, forKey: "nyxel.profile.onboarding.complete")
-            if let screen = self?.profileView { self?.presentProfileEditor(for: screen) }
-        })
-        present(alert, animated: true)
-    }
-
-    private func uploadProfileImage(_ image: UIImage, target: ProfileMediaTarget) {
-        let path = target == .avatar ? "/profile/avatar" : "/profile/cover"
-        guard var request = profileRequest(path: path, method: "POST", contentType: "image/jpeg"),
-              let data = image.jpegData(compressionQuality: 0.88) else { return }
-        request.httpBody = data
-        URLSession.shared.dataTask(with: request).resume()
-    }
-
-    private func presentProfileEditor(for screen: ProfileView) {
-        let draft = screen.profileDraft
-        let message = screen.isUsernameLocked ? "Personaliza cómo te verán tus clientes. El usuario ya está fijado; solo un administrador puede cambiarlo." : "Personaliza cómo te verán tus clientes. AVISO: el nombre de usuario solo se puede guardar una vez y después ya no podrás cambiarlo."
-        let alert = UIAlertController(title: "Editar perfil", message: message, preferredStyle: .alert)
-        alert.addTextField { field in
-            field.placeholder = "Nombre"
-            field.text = draft.name
-            field.clearButtonMode = .whileEditing
-        }
-        alert.addTextField { field in
-            field.placeholder = screen.isUsernameLocked ? "Usuario bloqueado" : "Usuario (se bloquea al guardar)"
-            field.text = draft.username
-            field.autocapitalizationType = .none
-            field.clearButtonMode = .whileEditing
-            field.isEnabled = !screen.isUsernameLocked
-        }
-        alert.addTextField { field in
-            field.placeholder = "Descripción"
-            field.text = draft.description
-            field.clearButtonMode = .whileEditing
-        }
-        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Guardar", style: .default) { [weak self, weak screen, weak alert] _ in
-            let fields = alert?.textFields ?? []
-            let name = fields.count > 0 ? (fields[0].text ?? "") : ""
-            let username = fields.count > 1 ? (fields[1].text ?? "") : ""
-            let description = fields.count > 2 ? (fields[2].text ?? "") : ""
-            screen?.updateProfile(name: name, username: username, description: description)
-            if let screen { self?.syncRemoteProfile(screen) }
-            NyxelActivityLog.record("Perfil actualizado")
-            self?.view.setNeedsLayout()
-        })
-        present(alert, animated: true)
-    }
-
-    private func presentProfileMediaPicker(target: ProfileMediaTarget) {
-        var configuration = PHPickerConfiguration(photoLibrary: .shared())
-        configuration.filter = .images
-        configuration.selectionLimit = 1
-        configuration.preferredAssetRepresentationMode = .current
-        let picker = PHPickerViewController(configuration: configuration)
-        picker.delegate = self
-        profileMediaTarget = target
-        present(picker, animated: true)
     }
 
 	/// Abre Free Fire (MAX o normal) usando su esquema de URL.
 	private func openGame(_ game: DavizinGame) {
+		let beginOpening = { [weak self] in
+			DispatchQueue.main.async { self?.performOpenGame(game) }
+		}
+		if NyxelCleanupFlow.stage == .readyToOpen {
+			NyxelCleanupFlow.requestReminderPermission { [weak self] allowed in
+					guard !allowed else { beginOpening(); return }
+					DispatchQueue.main.async {
+						self?.showNotice("Activa las notificaciones de Nyxel si quieres recibir el recordatorio. Si no, vuelve manualmente después de 5 segundos y pulsa LIMPIAR SESIÓN SÍ O SÍ.") {
+							beginOpening()
+						}
+					}
+			}
+		} else {
+			beginOpening()
+		}
+	}
+
+	private func performOpenGame(_ game: DavizinGame) {
 		operationView?.setOpeningGame(true)
 		let urls: [URL]
 		switch game {
@@ -683,9 +559,20 @@ final class ViewController: UIViewController {
 
 				UIApplication.shared.open(urls[index], options: [:]) { success in
 					if success {
+						let completingCycle = NyxelCleanupFlow.stage == .readyToReopen
+						NyxelCleanupFlow.markGameOpened()
 						NyxelActivityLog.record("\(game.rawValue) abierto")
 						DispatchQueue.main.async {
-							self.operationView?.showGameOpenResult(success: true)
+							if completingCycle {
+								if self.activeKey != nil && self.activeRemainingSeconds > 0 {
+									self.showOperation(animated: false)
+								} else {
+									self.showLogin(animated: true)
+								}
+							} else {
+								self.operationView?.showGameOpenResult(success: true)
+								self.operationView?.applyCleanupStage(NyxelCleanupFlow.stage)
+							}
 						}
 						return
 					}
@@ -828,26 +715,6 @@ extension ViewController: ProfileViewDelegate {
     func profileViewDidTapLogout(_ view: ProfileView) {
         setAccountSession(key: nil, remainingSeconds: 0)
         showLogin(animated: true)
-    }
-}
-
-extension ViewController: PHPickerViewControllerDelegate {
-    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-        dismiss(animated: true)
-        guard let result = results.first, let target = profileMediaTarget else {
-            profileMediaTarget = nil
-            return
-        }
-        profileMediaTarget = nil
-        guard result.itemProvider.canLoadObject(ofClass: UIImage.self) else { return }
-        result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
-            guard let image = object as? UIImage else { return }
-            DispatchQueue.main.async {
-                self?.profileView?.setProfileImage(image, target: target)
-                self?.uploadProfileImage(image, target: target)
-                NyxelActivityLog.record(target == .avatar ? "Foto de perfil actualizada" : "Portada actualizada")
-            }
-        }
     }
 }
 
