@@ -107,7 +107,7 @@
 			productReference=PROD;
 			productType="com.apple.product-type.application";
 		};
-		TUN = {isa=PBXNativeTarget;buildConfigurationList=CFGL_E;buildPhases=(PH_ES,PH_ER,PH_EF);buildRules=();dependencies=();name=ExternalTunnel;productName=ExternalTunnel;productReference=EXTP;productType="com.apple.product-type.network-extension";};
+		TUN = {isa=PBXNativeTarget;buildConfigurationList=CFGL_E;buildPhases=(PH_ES,PH_ER,PH_EF);buildRules=();dependencies=();name=ExternalTunnel;productName=ExternalTunnel;productReference=EXTP;productType="com.apple.product-type.app-extension";};
 /* PBXProject */
 		PROJ = {
 			isa=PBXProject;
