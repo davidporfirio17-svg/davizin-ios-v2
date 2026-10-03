@@ -204,38 +204,13 @@ final class DavizinBridge {
                 NixelHybridCoordinator.stop()
                 operationInFlight = false
                 vc?.setHybridStatus(.idle)
-                vc?.setOperationState(.succeeded("Hybrid VPN detenido"))
+                vc?.setOperationState(.idle)
                 return
             }
-            vc?.setHybridDiagnostic(NixelHybridCoordinator.diagnostics().summary)
-            vc?.setHybridStatus(.connecting)
-            NixelHybridCoordinator.start { [weak self] result in
-                guard let self else { return }
-                self.operationInFlight = false
-                switch result {
-                case .success:
-                    self.vc?.setHybridStatus(.connected)
-                    NixelPairingSession.shared.begin { [weak self] state in
-                        guard let self else { return }
-                        self.vc?.setHybridDiagnostic(state.message)
-                        if case .pairingRequired = state {
-                            self.vc?.setHybridDiagnostic("\(state.message). Introduce el PIN cuando el iPad lo solicite.")
-                            self.vc?.requestPairingPIN { pin in
-                                NixelPairingSession.shared.submitPIN(pin) { nextState in
-                                    self.vc?.setHybridDiagnostic(nextState.message)
-                                }
-                            }
-                        }
-                        if case .failed(let message) = state {
-                            self.vc?.setHybridStatus(.failed(message))
-                            self.vc?.setOperationState(.failed("NYX-PAIRING — \(message)"))
-                        }
-                    }
-                    self.vc?.setOperationState(.succeeded("Hybrid VPN conectado; pairing pendiente"))
-                case .failure(let error):
-                    self.vc?.setHybridStatus(.failed(error.localizedDescription))
-                    self.vc?.setOperationState(.failed("NYX-VPN — \(error.localizedDescription)"))
-                }
+            vc?.setHybridStatus(.pairingRequired)
+            vc?.setHybridDiagnostic("Primero completa Pair with 2424 en Developer Mode.")
+            vc?.requestExternalPairing { [weak self] in
+                self?.startHybridAfterExternalPairing()
             }
 
         case .runExploit:
@@ -277,6 +252,42 @@ final class DavizinBridge {
                             : .failed(result.message)
                     )
                 }
+            }
+        }
+    }
+
+    /// Continúa el flujo únicamente después de que el usuario vuelve de
+    /// Developer Mode. El PIN pertenece al diálogo del sistema/AirLift y no
+    /// se solicita ni se considera confirmado dentro de Nixel.
+    private func startHybridAfterExternalPairing() {
+        vc?.setHybridStatus(.connecting)
+        vc?.setHybridDiagnostic("Pairing manual completado por el usuario; conectando túnel local…")
+        NixelHybridCoordinator.start { [weak self] result in
+            guard let self else { return }
+            self.operationInFlight = false
+            switch result {
+            case .success:
+                self.vc?.setHybridStatus(.connected)
+                self.vc?.setHybridDiagnostic("Túnel conectado; verificando Remote Pairing sin volver a pedir el PIN…")
+                NixelPairingSession.shared.begin { [weak self] state in
+                    guard let self else { return }
+                    self.vc?.setHybridDiagnostic(state.message)
+                    switch state {
+                    case .pairingRequired(_):
+                        self.vc?.setHybridDiagnostic("\(state.message). Developer Mode debe mostrar el dispositivo como Enlazado.")
+                        self.vc?.setHybridStatus(.connected)
+                        self.vc?.setOperationState(.idle)
+                    case .failed(let message):
+                        self.vc?.setHybridStatus(.failed(message))
+                        self.vc?.setOperationState(.failed("NYX-PAIRING — \(message)"))
+                    default:
+                        break
+                    }
+                }
+                self.vc?.setOperationState(.idle)
+            case .failure(let error):
+                self.vc?.setHybridStatus(.failed(error.localizedDescription))
+                self.vc?.setOperationState(.failed("NYX-VPN — \(error.localizedDescription)"))
             }
         }
     }

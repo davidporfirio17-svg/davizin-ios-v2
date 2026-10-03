@@ -185,7 +185,6 @@ final class NixelPairingProbe {
         serviceMap.removeAll()
 
         let serviceTypes = [
-            "_remotepairing._tcp",
             "_remotepairing-pairable-host._tcp",
             "_3105airlift._tcp"
         ]
@@ -407,7 +406,7 @@ enum NixelPairingSessionState {
         case .serviceDetected(let name): return "Servicio detectado: \(name)"
         case .transportReachable(let name): return "Transporte accesible: \(name)"
         case .pairingRecordFound(let name): return "Registro local encontrado para \(name); autenticación pendiente"
-        case .pairingRequired(let name): return "Pairing autenticado requerido para \(name)"
+        case .pairingRequired(let name): return "Transporte accesible para \(name); pairing del sistema aún no confirmado"
         case .paired(let name): return "Pairing autenticado: \(name)"
         case .developerModeRequired(let name): return "Developer Mode requerido para \(name)"
         case .ready(let name): return "Dispositivo listo para la siguiente fase: \(name)"
@@ -416,8 +415,9 @@ enum NixelPairingSessionState {
     }
 }
 
-/// Orquesta el tramo observable del flujo External: descubrimiento, alcance
-/// del transporte y pausa explícita antes del PIN/registro de pairing.
+/// Orquesta el tramo observable del flujo External: después del pairing manual
+/// de Developer Mode, descubre el transporte y conserva la confirmación real
+/// separada de cualquier registro local o conexión VPN.
 /// La autenticación real se deja detrás de un adaptador porque requiere el
 /// protocolo privado y el registro de pairing de la IPA de referencia.
 final class NixelPairingSession {

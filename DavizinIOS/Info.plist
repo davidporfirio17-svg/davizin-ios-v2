@@ -59,7 +59,6 @@
 	<string>Nyxel External usa un túnel local para coordinar el modo Hybrid con el dispositivo.</string>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_remotepairing._tcp</string>
 		<string>_remotepairing-pairable-host._tcp</string>
 		<string>_3105airlift._tcp</string>
 	</array>

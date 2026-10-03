@@ -10,7 +10,9 @@ final class OperationView: UIView {
     enum HybridStatus {
         case idle
         case connecting
+        case pairingRequired
         case connected
+        case ready
         case failed(String)
     }
 
@@ -106,10 +108,20 @@ final class OperationView: UIView {
             hybridButton.setLoading(true, title: "CONECTANDO HYBRID VPN...")
             hybridStatusLabel.text = "Conectando túnel local; no es un jailbreak todavía."
             hybridStatusLabel.textColor = AppTheme.warm
+        case .pairingRequired:
+            hybridButton.setLoading(false)
+            hybridButton.setTitle("CONTINUAR HYBRID", for: .normal)
+            hybridStatusLabel.text = "Pairing manual pendiente en Developer Mode · Pair with 2424"
+            hybridStatusLabel.textColor = AppTheme.warm
         case .connected:
             hybridButton.setLoading(false)
             hybridButton.setTitle("DETENER HYBRID VPN", for: .normal)
-            hybridStatusLabel.text = "VPN local conectada · pairing/diagnóstico pendiente"
+            hybridStatusLabel.text = "Túnel local conectado · pairing en verificación"
+            hybridStatusLabel.textColor = AppTheme.warm
+        case .ready:
+            hybridButton.setLoading(false)
+            hybridButton.setTitle("DETENER HYBRID VPN", for: .normal)
+            hybridStatusLabel.text = "Túnel conectado · pairing validado por el transporte"
             hybridStatusLabel.textColor = AppTheme.success
         case .failed(let message):
             hybridButton.setLoading(false)
