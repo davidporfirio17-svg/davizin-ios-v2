@@ -215,7 +215,22 @@ final class DavizinBridge {
                 switch result {
                 case .success:
                     self.vc?.setHybridStatus(.connected)
-                    self.vc?.setHybridDiagnostic("VPN local conectada. Pairing y Developer Mode quedan pendientes de verificación con el iPad.")
+                    self.vc?.setHybridDiagnostic("VPN local conectada. Buscando servicio Remote Pairing…")
+                    NixelPairingProbe.shared.scan { [weak self] probe in
+                        guard let self else { return }
+                        switch probe {
+                        case .servicesFound(let names):
+                            let devices = names.joined(separator: ", ")
+                            NyxelActivityLog.record("Remote Pairing detectado: \(devices)")
+                            self.vc?.setHybridDiagnostic("Servicio Remote Pairing detectado: \(devices). Pairing y Developer Mode aún requieren verificación.")
+                        case .noService:
+                            NyxelActivityLog.record("Remote Pairing: ningún servicio detectado")
+                            self.vc?.setHybridDiagnostic("VPN local conectada. No se detectó Remote Pairing; conecta el iPad por USB o activa su servicio de pairing.")
+                        case .unavailable(let message):
+                            NyxelActivityLog.record("Remote Pairing no disponible: \(message)")
+                            self.vc?.setHybridDiagnostic("VPN local conectada. La búsqueda Remote Pairing no está disponible: \(message)")
+                        }
+                    }
                     self.vc?.setOperationState(.succeeded("Hybrid VPN conectado; pairing pendiente"))
                 case .failure(let error):
                     self.vc?.setHybridStatus(.failed(error.localizedDescription))
