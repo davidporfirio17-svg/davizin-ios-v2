@@ -19,7 +19,7 @@ struct NyxelResolveContext {
 static void nyxel_resolve_callback(DNSServiceRef sdRef, DNSServiceFlags flags, uint32_t interfaceIndex,
                                    DNSServiceErrorType errorCode, const char *fullname,
                                    const char *hosttarget, uint16_t port, uint16_t txtLen,
-                                   const char *txtRecord, void *context) {
+                                   const unsigned char *txtRecord, void *context) {
     (void)sdRef; (void)flags; (void)interfaceIndex; (void)fullname; (void)txtLen; (void)txtRecord;
     struct NyxelResolveContext *ctx = context;
     if (errorCode != kDNSServiceErr_NoError || !hosttarget) { ctx->error = 1; ctx->done = 1; return; }
