@@ -57,6 +57,11 @@
 	<string>Nyxel External usa Face ID para proteger la operación cuando activas esta opción.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Nyxel External usa un túnel local para coordinar el modo Hybrid con el dispositivo.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_remotepairing._tcp</string>
+		<string>_remotepairing-pairable-host._tcp</string>
+	</array>
 	<key>MinimumOSVersion</key>
 	<string>16.0</string>
 	<key>LSApplicationQueriesSchemes</key>

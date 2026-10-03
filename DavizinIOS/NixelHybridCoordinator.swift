@@ -23,22 +23,33 @@ struct NixelHybridDiagnostics {
     }
 }
 
+struct NixelRemotePairingService {
+    let name: String
+    let endpoint: NWEndpoint
+}
+
 enum NixelPairingProbeResult {
-    case servicesFound([String])
+    case servicesFound([NixelRemotePairingService])
     case noService
     case unavailable(String)
 }
 
-/// Busca los anuncios Bonjour usados por Remote Pairing.
-/// Esta sonda detecta presencia en la red local, pero no intenta emparejar,
-/// pedir PIN ni afirmar que el dispositivo esté jailbroken.
+enum NixelPairingTransportResult {
+    case reachable(String)
+    case unreachable(String)
+}
+
+/// Busca los anuncios Bonjour usados por Remote Pairing y comprueba el
+/// alcance TCP del servicio. No solicita PIN, no guarda credenciales y no
+/// afirma que el dispositivo esté emparejado o jailbroken.
 final class NixelPairingProbe {
     static let shared = NixelPairingProbe()
 
     private var browsers: [NWBrowser] = []
+    private var connection: NWConnection?
     private var timeoutWorkItem: DispatchWorkItem?
     private var completion: ((NixelPairingProbeResult) -> Void)?
-    private var serviceNames = Set<String>()
+    private var serviceMap: [String: NixelRemotePairingService] = [:]
     private let queue = DispatchQueue.main
 
     private init() {}
@@ -46,7 +57,7 @@ final class NixelPairingProbe {
     func scan(timeout: TimeInterval = 8.0, completion: @escaping (NixelPairingProbeResult) -> Void) {
         stop()
         self.completion = completion
-        serviceNames.removeAll()
+        serviceMap.removeAll()
 
         let serviceTypes = [
             "_remotepairing._tcp",
@@ -58,11 +69,11 @@ final class NixelPairingProbe {
                 guard let self else { return }
                 for result in results {
                     if case let .service(name, _, _, _) = result.endpoint {
-                        self.serviceNames.insert(name)
+                        self.serviceMap[name] = NixelRemotePairingService(name: name, endpoint: result.endpoint)
                     }
                 }
-                if !self.serviceNames.isEmpty {
-                    self.finish(.servicesFound(self.serviceNames.sorted()))
+                if !self.serviceMap.isEmpty {
+                    self.finish(.servicesFound(Array(self.serviceMap.values).sorted { $0.name < $1.name }))
                 }
             }
             browser.stateChangedHandler = { [weak self] state in
@@ -80,7 +91,7 @@ final class NixelPairingProbe {
 
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.completion != nil else { return }
-            if self.serviceNames.isEmpty {
+            if self.serviceMap.isEmpty {
                 self.finish(.noService)
             }
         }
@@ -88,13 +99,49 @@ final class NixelPairingProbe {
         queue.asyncAfter(deadline: .now() + timeout, execute: work)
     }
 
+    func probeTransport(
+        service: NixelRemotePairingService,
+        timeout: TimeInterval = 5.0,
+        completion: @escaping (NixelPairingTransportResult) -> Void
+    ) {
+        connection?.cancel()
+        let connection = NWConnection(to: service.endpoint, using: .tcp)
+        self.connection = connection
+        var completed = false
+        func finish(_ result: NixelPairingTransportResult) {
+            guard !completed else { return }
+            completed = true
+            connection.cancel()
+            self.connection = nil
+            completion(result)
+        }
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                finish(.reachable(service.name))
+            case .failed(let error):
+                finish(.unreachable("\(service.name): \(error.localizedDescription)"))
+            case .cancelled:
+                finish(.unreachable("\(service.name): conexión cancelada"))
+            default:
+                break
+            }
+        }
+        connection.start(queue: queue)
+        queue.asyncAfter(deadline: .now() + timeout) {
+            finish(.unreachable("\(service.name): tiempo de conexión agotado"))
+        }
+    }
+
     func stop() {
         timeoutWorkItem?.cancel()
         timeoutWorkItem = nil
         browsers.forEach { $0.cancel() }
         browsers.removeAll()
+        connection?.cancel()
+        connection = nil
         completion = nil
-        serviceNames.removeAll()
+        serviceMap.removeAll()
     }
 
     private func finish(_ result: NixelPairingProbeResult) {
