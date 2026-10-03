@@ -82,6 +82,10 @@ final class ViewController: UIViewController {
         }
     }
 
+    func setHybridStatus(_ status: OperationView.HybridStatus) {
+        operationView?.setHybridStatus(status)
+    }
+
     /// Actualiza el contador de tiempo restante en el header.
     func setCountdownText(_ text: String) {
         headerView.countdownText = text
@@ -568,6 +572,8 @@ final class ViewController: UIViewController {
         switch operation {
         case .runExploit:
             state = .running
+        case .hybridVPN:
+            state = .running
         case .inject:
             state = .injecting
         case .clean:
@@ -581,6 +587,8 @@ final class ViewController: UIViewController {
             switch operation {
             case .runExploit:
                 message = "Run complete"
+            case .hybridVPN:
+                message = "Hybrid VPN preparado (simulación)"
             case .inject:
                 message = "Configuración inyectada (simulación)"
             case .clean:

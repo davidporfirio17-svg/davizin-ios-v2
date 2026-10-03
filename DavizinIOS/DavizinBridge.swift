@@ -198,6 +198,29 @@ final class DavizinBridge {
     private func executeAuthorizedOperation(_ operation: DavizinOperationKind) {
         switch operation {
 
+        case .hybridVPN:
+            vc?.setOperationState(.running)
+            if NixelHybridCoordinator.isActive {
+                NixelHybridCoordinator.stop()
+                operationInFlight = false
+                vc?.setHybridStatus(.idle)
+                vc?.setOperationState(.succeeded("Hybrid VPN detenido"))
+                return
+            }
+            vc?.setHybridStatus(.connecting)
+            NixelHybridCoordinator.start { [weak self] result in
+                guard let self else { return }
+                self.operationInFlight = false
+                switch result {
+                case .success:
+                    self.vc?.setHybridStatus(.connected)
+                    self.vc?.setOperationState(.succeeded("Hybrid VPN conectado; pairing pendiente"))
+                case .failure(let error):
+                    self.vc?.setHybridStatus(.failed(error.localizedDescription))
+                    self.vc?.setOperationState(.failed("NYX-VPN — \(error.localizedDescription)"))
+                }
+            }
+
         case .runExploit:
             vc?.setOperationState(.running)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in

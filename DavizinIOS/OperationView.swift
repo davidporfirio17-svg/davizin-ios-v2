@@ -7,6 +7,13 @@ protocol OperationViewDelegate: AnyObject {
 final class OperationView: UIView {
     weak var delegate: OperationViewDelegate?
 
+    enum HybridStatus {
+        case idle
+        case connecting
+        case connected
+        case failed(String)
+    }
+
     private let cardView = DavizinCardView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
@@ -20,6 +27,7 @@ final class OperationView: UIView {
 
     // Estado 1 (antes de inyectar): solo estos dos son visibles.
     private let runButton = DavizinButton(title: "PREPARAR ENTORNO", style: .secondary)
+    private let hybridButton = DavizinButton(title: "PREPARAR JAILBREAK / HYBRID VPN", style: .secondary)
     private let injectButton = DavizinButton(title: "MANTÉN PARA INYECTAR", style: .primary)
 
     // Estado 2 (despues de inyectar con exito): solo estos dos son visibles.
@@ -30,6 +38,7 @@ final class OperationView: UIView {
     private let statusDot = UIView()
     private let statusLabel = UILabel()
     private let statusRow = UIStackView()
+    private let hybridStatusLabel = UILabel()
     private let stackView = UIStackView()
 
     // Hold-to-confirm: anillo de progreso sobre injectButton
@@ -85,6 +94,29 @@ final class OperationView: UIView {
 
     func setPreflight(_ lines: [String]) {
         checklistLabel.text = "VERIFICACIÓN\n" + lines.joined(separator: "\n")
+    }
+
+    func setHybridStatus(_ status: HybridStatus) {
+        switch status {
+        case .idle:
+            hybridButton.setTitle("PREPARAR JAILBREAK / HYBRID VPN", for: .normal)
+            hybridStatusLabel.text = "Túnel local sin preparar"
+            hybridStatusLabel.textColor = AppTheme.secondaryText
+        case .connecting:
+            hybridButton.setLoading(true, title: "CONECTANDO HYBRID VPN...")
+            hybridStatusLabel.text = "Conectando túnel local; no es un jailbreak todavía."
+            hybridStatusLabel.textColor = AppTheme.warm
+        case .connected:
+            hybridButton.setLoading(false)
+            hybridButton.setTitle("DETENER HYBRID VPN", for: .normal)
+            hybridStatusLabel.text = "VPN local conectada · pairing/diagnóstico pendiente"
+            hybridStatusLabel.textColor = AppTheme.success
+        case .failed(let message):
+            hybridButton.setLoading(false)
+            hybridButton.setTitle("REINTENTAR JAILBREAK / HYBRID VPN", for: .normal)
+            hybridStatusLabel.text = "VPN no disponible: \(message)"
+            hybridStatusLabel.textColor = AppTheme.failure
+        }
     }
 
     override init(frame: CGRect) {
@@ -163,6 +195,7 @@ final class OperationView: UIView {
 
         let enabled = !state.isBusy
         runButton.isEnabled = enabled
+        hybridButton.isEnabled = enabled
         injectButton.isEnabled = enabled
         cleanButton.isEnabled = enabled
         openGameButton.isEnabled = enabled
@@ -213,7 +246,7 @@ final class OperationView: UIView {
         checklistLabel.font = AppTheme.monoFont(10)
         checklistLabel.textColor = AppTheme.secondaryText
         checklistLabel.numberOfLines = 0
-        checklistLabel.text = "VERIFICACIÓN\n✓ Sesión activa\n✓ Modo remoto seleccionado"
+        checklistLabel.text = "VERIFICACIÓN\n✓ Sesión activa\n✓ Modo remoto seleccionado\n• Hybrid VPN: estado no comprobado"
 
         noticeTitleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         noticeTitleLabel.numberOfLines = 0
@@ -258,6 +291,8 @@ final class OperationView: UIView {
 
         runButton.accessibilityIdentifier = "operation.runExploit"
         runButton.accessibilityLabel = "Preparar entorno"
+        hybridButton.accessibilityIdentifier = "operation.hybridVPN"
+        hybridButton.accessibilityLabel = "Preparar Jailbreak y Hybrid VPN"
         injectButton.accessibilityIdentifier = "operation.inject"
         injectButton.accessibilityLabel = "Mantener presionado para activar la configuración"
         cleanButton.accessibilityIdentifier = "operation.clean"
@@ -266,6 +301,7 @@ final class OperationView: UIView {
         openGameButton.accessibilityLabel = "Abrir juego"
 
         runButton.addTarget(self, action: #selector(runTapped), for: .touchUpInside)
+        hybridButton.addTarget(self, action: #selector(hybridTapped), for: .touchUpInside)
         cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
         openGameButton.addTarget(self, action: #selector(openGameTapped), for: .touchUpInside)
 
@@ -304,6 +340,8 @@ final class OperationView: UIView {
         stackView.addArrangedSubview(checklistLabel)
         stackView.addArrangedSubview(noticeCard)
         stackView.addArrangedSubview(runButton)
+        stackView.addArrangedSubview(hybridButton)
+        stackView.addArrangedSubview(hybridStatusLabel)
         stackView.addArrangedSubview(injectButton)
         stackView.addArrangedSubview(successCard)
         stackView.addArrangedSubview(cleanButton)
@@ -323,12 +361,17 @@ final class OperationView: UIView {
             cardView.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 600.0 : AppTheme.contentMaximumWidth),
             stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 380.0 : 240.0),
             runButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
+            hybridButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             injectButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             cleanButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             openGameButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
         ])
 
         showPreInjectButtons(animated: false)
+        hybridStatusLabel.font = AppTheme.captionFont()
+        hybridStatusLabel.textAlignment = .center
+        hybridStatusLabel.numberOfLines = 0
+        setHybridStatus(.idle)
     }
 
     // MARK: - Maquina de estados de botones
@@ -466,6 +509,10 @@ final class OperationView: UIView {
 
     @objc private func runTapped() {
         delegate?.operationView(self, didTap: .runExploit)
+    }
+
+    @objc private func hybridTapped() {
+        delegate?.operationView(self, didTap: .hybridVPN)
     }
 
     @objc private func cleanTapped() {
