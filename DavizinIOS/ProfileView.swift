@@ -124,6 +124,10 @@ final class ProfileView: UIView {
     var onSearchRequested: ((String) -> Void)?
 
     private let socialHeader = UIView()
+    private let sceneBackgroundView = UIImageView()
+    private let sceneShade = CAGradientLayer()
+    private let commandTitleLabel = UILabel()
+    private let commandSubtitleLabel = UILabel()
     private let coverView = UIView()
     private let coverGradient = CAGradientLayer()
     private let coverImageView = UIImageView()
@@ -237,6 +241,31 @@ final class ProfileView: UIView {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
+        sceneBackgroundView.image = ProfileMediaStore.load("nyxel-profile-cover.jpg")
+        sceneBackgroundView.contentMode = .scaleAspectFill
+        sceneBackgroundView.clipsToBounds = true
+        sceneBackgroundView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(sceneBackgroundView)
+        sceneShade.colors = [
+            UIColor.black.withAlphaComponent(0.32).cgColor,
+            AppTheme.background.withAlphaComponent(0.72).cgColor,
+            AppTheme.background.withAlphaComponent(0.98).cgColor
+        ]
+        sceneShade.startPoint = CGPoint(x: 0.5, y: 0)
+        sceneShade.endPoint = CGPoint(x: 0.5, y: 1)
+        sceneBackgroundView.layer.addSublayer(sceneShade)
+
+        commandTitleLabel.text = "PLAYER // COMMAND CENTER"
+        commandTitleLabel.font = AppTheme.monoFont(11)
+        commandTitleLabel.textColor = AppTheme.accent
+        commandTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        commandSubtitleLabel.text = "NYXEL EXTERNAL  ·  CONTROL DE SESIÓN"
+        commandSubtitleLabel.font = AppTheme.monoFont(9)
+        commandSubtitleLabel.textColor = UIColor.white.withAlphaComponent(0.62)
+        commandSubtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(commandTitleLabel)
+        addSubview(commandSubtitleLabel)
+
         avatarCircle.backgroundColor = AppTheme.card
         avatarCircle.layer.cornerRadius = 59
         avatarCircle.layer.borderWidth = 2
@@ -286,15 +315,15 @@ final class ProfileView: UIView {
         }
 
         socialHeader.translatesAutoresizingMaskIntoConstraints = false
-        socialHeader.backgroundColor = AppTheme.backgroundRaise
-        socialHeader.layer.cornerRadius = 24
+        socialHeader.backgroundColor = UIColor.black.withAlphaComponent(0.28)
+        socialHeader.layer.cornerRadius = 8
         socialHeader.layer.borderWidth = 1
-        socialHeader.layer.borderColor = AppTheme.accent.withAlphaComponent(0.28).cgColor
+        socialHeader.layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
         socialHeader.clipsToBounds = true
 
         coverView.translatesAutoresizingMaskIntoConstraints = false
         coverView.backgroundColor = AppTheme.backgroundRaise
-        coverView.layer.cornerRadius = 17
+        coverView.layer.cornerRadius = 0
         coverView.clipsToBounds = true
         coverGradient.colors = [
             UIColor.black.withAlphaComponent(0.05).cgColor,
@@ -330,7 +359,7 @@ final class ProfileView: UIView {
             coverImageView.bottomAnchor.constraint(equalTo: coverView.bottomAnchor)
         ])
         socialHeader.addSubview(coverView)
-        coverView.isHidden = true
+        coverView.isHidden = false
         socialHeader.addSubview(avatarCircle)
         socialHeader.addSubview(nameLabel)
         socialHeader.addSubview(usernameLabel)
@@ -340,7 +369,7 @@ final class ProfileView: UIView {
         configureEditButton(editProfileButton, title: "EDITAR PERFIL", imageName: "pencil")
         configureEditButton(avatarEditButton, title: nil, imageName: "camera.fill")
         configureEditButton(coverEditButton, title: nil, imageName: "photo.fill")
-        coverEditButton.isHidden = true
+        coverEditButton.isHidden = false
         socialHeader.addSubview(editProfileButton)
         socialHeader.addSubview(avatarEditButton)
         socialHeader.addSubview(coverEditButton)
@@ -455,6 +484,10 @@ final class ProfileView: UIView {
 
         let card = DavizinCardView()
         card.useTransparentAppearance()
+        card.contentInsets = .zero
+        card.layer.cornerRadius = 0
+        card.layer.shadowOpacity = 0
+        card.layer.borderWidth = 0
         let biometricRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Face ID / Touch ID antes de inyectar"), biometricSwitch])
         biometricRow.axis = .horizontal
         biometricRow.alignment = .center
@@ -498,25 +531,33 @@ final class ProfileView: UIView {
         nameLabel.textAlignment = .left
         usernameLabel.textAlignment = .left
         NSLayoutConstraint.activate([
-            socialHeader.heightAnchor.constraint(equalToConstant: 228),
+            sceneBackgroundView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            sceneBackgroundView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            sceneBackgroundView.topAnchor.constraint(equalTo: topAnchor),
+            sceneBackgroundView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            commandTitleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 22),
+            commandTitleLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 12),
+            commandSubtitleLabel.leadingAnchor.constraint(equalTo: commandTitleLabel.leadingAnchor),
+            commandSubtitleLabel.topAnchor.constraint(equalTo: commandTitleLabel.bottomAnchor, constant: 4),
+            socialHeader.heightAnchor.constraint(equalToConstant: 390),
             coverView.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor),
             coverView.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor),
             coverView.topAnchor.constraint(equalTo: socialHeader.topAnchor),
-            coverView.heightAnchor.constraint(equalToConstant: 0),
+            coverView.heightAnchor.constraint(equalTo: socialHeader.heightAnchor),
             coverBrandLabel.leadingAnchor.constraint(equalTo: coverView.leadingAnchor, constant: 16),
             coverBrandLabel.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 16),
             coverStatusLabel.trailingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: -16),
             coverStatusLabel.topAnchor.constraint(equalTo: coverView.topAnchor, constant: 12),
             coverStatusLabel.widthAnchor.constraint(equalToConstant: 82),
             coverStatusLabel.heightAnchor.constraint(equalToConstant: 24),
-            avatarCircle.widthAnchor.constraint(equalToConstant: 92), avatarCircle.heightAnchor.constraint(equalToConstant: 92),
-            avatarCircle.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 20),
-            avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 28),
+            avatarCircle.widthAnchor.constraint(equalToConstant: 112), avatarCircle.heightAnchor.constraint(equalToConstant: 112),
+            avatarCircle.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 24),
+            avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 92),
             avatarImageView.leadingAnchor.constraint(equalTo: avatarCircle.leadingAnchor), avatarImageView.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor),
             avatarImageView.topAnchor.constraint(equalTo: avatarCircle.topAnchor), avatarImageView.bottomAnchor.constraint(equalTo: avatarCircle.bottomAnchor),
             nameLabel.leadingAnchor.constraint(equalTo: avatarCircle.trailingAnchor, constant: 16),
             nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: editProfileButton.leadingAnchor, constant: -12),
-            nameLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 37),
+            nameLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 112),
             usernameLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
             usernameLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
             usernameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
@@ -524,7 +565,7 @@ final class ProfileView: UIView {
             profileMetaLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
             profileMetaLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 8),
             editProfileButton.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -16),
-            editProfileButton.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 20),
+            editProfileButton.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 18),
             editProfileButton.widthAnchor.constraint(equalToConstant: 112),
             editProfileButton.heightAnchor.constraint(equalToConstant: 32),
             avatarEditButton.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor, constant: -4),
@@ -541,10 +582,10 @@ final class ProfileView: UIView {
             rankBadge.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 7),
             descriptionLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 22),
             descriptionLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
-            descriptionLabel.topAnchor.constraint(equalTo: profileMetaLabel.bottomAnchor, constant: 10),
+            descriptionLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 270),
             descriptionLabel.bottomAnchor.constraint(lessThanOrEqualTo: socialHeader.bottomAnchor, constant: -16),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor), scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: topAnchor), scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            scrollView.topAnchor.constraint(equalTo: commandSubtitleLabel.bottomAnchor, constant: 18), scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
             card.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor), card.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 22),
             card.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -22),
             card.leadingAnchor.constraint(greaterThanOrEqualTo: scrollView.leadingAnchor, constant: 22), card.trailingAnchor.constraint(lessThanOrEqualTo: scrollView.trailingAnchor, constant: -22),
@@ -667,6 +708,7 @@ final class ProfileView: UIView {
             ProfileMediaStore.save(image, as: "nyxel-profile-avatar.jpg")
         case .cover:
             coverImageView.image = image
+            sceneBackgroundView.image = image
             ProfileMediaStore.save(image, as: "nyxel-profile-cover.jpg")
         }
         setNeedsLayout()
@@ -758,6 +800,7 @@ final class ProfileView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        sceneShade.frame = sceneBackgroundView.bounds
         coverGradient.frame = coverView.bounds
         let rect = avatarImageView.bounds.insetBy(dx: 5, dy: 5)
         let path = UIBezierPath(ovalIn: rect).cgPath
