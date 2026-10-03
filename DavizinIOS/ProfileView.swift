@@ -99,9 +99,14 @@ final class ProfileView: UIView {
     var onRefreshRequested: (() -> Void)?
     var onAppearanceChanged: (() -> Void)?
 
+    private let socialHeader = UIView()
+    private let coverView = UIView()
+    private let coverGradient = CAGradientLayer()
     private let avatarCircle = UIView()
     private let avatarImageView = UIImageView()
     private let nameLabel = UILabel()
+    private let usernameLabel = UILabel()
+    private let descriptionLabel = UILabel()
     private let rankBadge = UIView()
     private let rankLabel = UILabel()
     private let keyValueLabel = UILabel()
@@ -178,7 +183,7 @@ final class ProfileView: UIView {
         translatesAutoresizingMaskIntoConstraints = false
 
         avatarCircle.backgroundColor = AppTheme.card
-        avatarCircle.layer.cornerRadius = 31
+        avatarCircle.layer.cornerRadius = 46
         avatarCircle.layer.borderWidth = 2
         avatarCircle.layer.borderColor = AppTheme.accent.cgColor
         avatarCircle.layer.shadowColor = AppTheme.accent.cgColor
@@ -205,18 +210,48 @@ final class ProfileView: UIView {
         nameLabel.text = "NYXEL EXTERNAL"
         nameLabel.font = AppTheme.titleFont(19)
         nameLabel.textColor = AppTheme.primaryText
+        usernameLabel.text = UserDefaults.standard.string(forKey: "nyxel.profile.username") ?? "@nyxel_user"
+        usernameLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        usernameLabel.textColor = AppTheme.accent
+        usernameLabel.adjustsFontSizeToFitWidth = true
+        usernameLabel.minimumScaleFactor = 0.75
+        descriptionLabel.text = "Perfil de prueba de Nyxel External. Aquí podrás mostrar tu identidad y actividad."
+        descriptionLabel.font = .systemFont(ofSize: 12, weight: .regular)
+        descriptionLabel.textColor = AppTheme.secondaryText
+        descriptionLabel.numberOfLines = 0
+
+        socialHeader.translatesAutoresizingMaskIntoConstraints = false
+        socialHeader.backgroundColor = UIColor.white.withAlphaComponent(0.025)
+        socialHeader.layer.cornerRadius = 18
+        socialHeader.layer.borderWidth = 1
+        socialHeader.layer.borderColor = AppTheme.hairline.cgColor
+        socialHeader.clipsToBounds = true
+
+        coverView.translatesAutoresizingMaskIntoConstraints = false
+        coverView.backgroundColor = AppTheme.backgroundRaise
+        coverView.layer.cornerRadius = 17
+        coverView.clipsToBounds = true
+        coverGradient.colors = [
+            AppTheme.accent.withAlphaComponent(0.78).cgColor,
+            AppTheme.accentHot.withAlphaComponent(0.35).cgColor,
+            AppTheme.background.cgColor
+        ]
+        coverGradient.startPoint = CGPoint(x: 0, y: 0)
+        coverGradient.endPoint = CGPoint(x: 1, y: 1)
+        coverView.layer.insertSublayer(coverGradient, at: 0)
+        socialHeader.addSubview(coverView)
+        socialHeader.addSubview(avatarCircle)
+        socialHeader.addSubview(nameLabel)
+        socialHeader.addSubview(usernameLabel)
+        socialHeader.addSubview(rankBadge)
+        socialHeader.addSubview(descriptionLabel)
+
         rankLabel.font = .systemFont(ofSize: 10, weight: .semibold)
         rankLabel.translatesAutoresizingMaskIntoConstraints = false
         rankBadge.layer.cornerRadius = 100
         rankBadge.layer.borderWidth = 1
         rankBadge.translatesAutoresizingMaskIntoConstraints = false
         rankBadge.addSubview(rankLabel)
-
-        let nameStack = UIStackView(arrangedSubviews: [nameLabel, rankBadge])
-        nameStack.axis = .vertical; nameStack.alignment = .leading; nameStack.spacing = 6
-        let heroStack = UIStackView(arrangedSubviews: [avatarCircle, nameStack])
-        heroStack.axis = .horizontal; heroStack.alignment = .center; heroStack.spacing = 16
-        heroStack.translatesAutoresizingMaskIntoConstraints = false
 
         let keyRow = makeRow(label: "Key", valueLabel: keyValueLabel)
         let countryRow = makeRow(label: "País", valueLabel: countryValueLabel)
@@ -278,9 +313,9 @@ final class ProfileView: UIView {
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
         let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [historyLabel, activityLabel], expanded: false)
-        let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, logoutButton])
+        let stack = UIStackView(arrangedSubviews: [socialHeader, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, logoutButton])
         stack.axis = .vertical; stack.spacing = 15
-        stack.setCustomSpacing(22, after: heroStack)
+        stack.setCustomSpacing(22, after: socialHeader)
         stack.translatesAutoresizingMaskIntoConstraints = false
         card.translatesAutoresizingMaskIntoConstraints = false
         card.addContent(stack)
@@ -295,11 +330,30 @@ final class ProfileView: UIView {
         logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
-            avatarCircle.widthAnchor.constraint(equalToConstant: 62), avatarCircle.heightAnchor.constraint(equalToConstant: 62),
+            socialHeader.heightAnchor.constraint(equalToConstant: 258),
+            coverView.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor),
+            coverView.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor),
+            coverView.topAnchor.constraint(equalTo: socialHeader.topAnchor),
+            coverView.heightAnchor.constraint(equalToConstant: 136),
+            avatarCircle.widthAnchor.constraint(equalToConstant: 92), avatarCircle.heightAnchor.constraint(equalToConstant: 92),
+            avatarCircle.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
+            avatarCircle.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 91),
             avatarImageView.leadingAnchor.constraint(equalTo: avatarCircle.leadingAnchor), avatarImageView.trailingAnchor.constraint(equalTo: avatarCircle.trailingAnchor),
             avatarImageView.topAnchor.constraint(equalTo: avatarCircle.topAnchor), avatarImageView.bottomAnchor.constraint(equalTo: avatarCircle.bottomAnchor),
+            nameLabel.leadingAnchor.constraint(equalTo: avatarCircle.trailingAnchor, constant: 16),
+            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: socialHeader.trailingAnchor, constant: -16),
+            nameLabel.topAnchor.constraint(equalTo: socialHeader.topAnchor, constant: 145),
+            usernameLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            usernameLabel.trailingAnchor.constraint(equalTo: nameLabel.trailingAnchor),
+            usernameLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
             rankBadge.heightAnchor.constraint(equalToConstant: 22), rankLabel.leadingAnchor.constraint(equalTo: rankBadge.leadingAnchor, constant: 10),
             rankLabel.trailingAnchor.constraint(equalTo: rankBadge.trailingAnchor, constant: -10), rankLabel.centerYAnchor.constraint(equalTo: rankBadge.centerYAnchor),
+            rankBadge.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
+            rankBadge.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 7),
+            descriptionLabel.leadingAnchor.constraint(equalTo: socialHeader.leadingAnchor, constant: 18),
+            descriptionLabel.trailingAnchor.constraint(equalTo: socialHeader.trailingAnchor, constant: -18),
+            descriptionLabel.topAnchor.constraint(equalTo: rankBadge.bottomAnchor, constant: 13),
+            descriptionLabel.bottomAnchor.constraint(lessThanOrEqualTo: socialHeader.bottomAnchor, constant: -16),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor), scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor), scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
             card.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor), card.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 22),
@@ -386,6 +440,7 @@ final class ProfileView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        coverGradient.frame = coverView.bounds
         let rect = avatarImageView.bounds.insetBy(dx: 5, dy: 5)
         let path = UIBezierPath(ovalIn: rect).cgPath
         progressTrack.frame = avatarImageView.bounds; progressRing.frame = avatarImageView.bounds
