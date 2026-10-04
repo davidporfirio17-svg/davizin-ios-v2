@@ -12,31 +12,37 @@ typedef xpc_obj_t (*xpc_string_create_fn)(const char *);
 typedef void *(*cm_query_create_fn)(void);
 typedef void  (*cm_query_set_u64_fn)(void *, uint64_t);
 typedef void  (*cm_query_set_xpc_fn)(void *, xpc_obj_t);
+typedef void  (*cm_query_set_part_fn)(void *, uint64_t);
+typedef void  (*cm_query_set_domain_fn)(void *, const char *);
 typedef void *(*cm_query_single_fn)(void *);
 typedef void *(*cm_query_err_fn)(void *);
 typedef void  (*cm_query_free_fn)(void *);
 typedef const char *(*cm_path_fn)(void *);
 typedef char *(*cm_token_fn)(void *);
+typedef int   (*cm_activate_ext_fn)(void *);
 typedef void  (*cm_free_fn)(void *);
 typedef int   (*cm_posix_fn)(void *);
 typedef const char *(*cm_msg_fn)(void *);
 typedef int64_t (*sb_consume_fn)(const char *);
 
 typedef struct {
-    cm_query_create_fn  create;
-    cm_query_set_u64_fn setClass;
-    cm_query_set_xpc_fn setIds;
-    cm_query_set_u64_fn setFlags;
-    cm_query_single_fn  getSingle;
-    cm_query_err_fn     getErr;
-    cm_query_free_fn    freeQ;
-    cm_path_fn          getPath;
-    cm_token_fn         getToken;
-    cm_free_fn          freeObj;
-    cm_posix_fn         posix;
-    cm_msg_fn           msg;
-    xpc_string_create_fn xpcStr;
-    sb_consume_fn        sbConsume;
+    cm_query_create_fn     create;
+    cm_query_set_u64_fn    setClass;
+    cm_query_set_xpc_fn    setIds;
+    cm_query_set_u64_fn    setFlags;
+    cm_query_set_part_fn   setPart;
+    cm_query_set_domain_fn setDomain;
+    cm_query_single_fn     getSingle;
+    cm_query_err_fn        getErr;
+    cm_query_free_fn       freeQ;
+    cm_path_fn             getPath;
+    cm_token_fn            getToken;
+    cm_activate_ext_fn     activateExt;
+    cm_free_fn             freeObj;
+    cm_posix_fn            posix;
+    cm_msg_fn              msg;
+    xpc_string_create_fn   xpcStr;
+    sb_consume_fn          sbConsume;
 } API;
 
 static API *getAPI(void) {
@@ -51,20 +57,23 @@ static API *getAPI(void) {
         if (!sh) sh = RTLD_DEFAULT;
 
 #define G(lib,field,sym) api.field = (__typeof(api.field))dlsym(lib,sym)
-        G(h,  create,    "container_query_create");
-        G(h,  setClass,  "container_query_set_class");
-        G(h,  setIds,    "container_query_set_identifiers");
-        G(h,  setFlags,  "container_query_operation_set_flags");
-        G(h,  getSingle, "container_query_get_single_result");
-        G(h,  getErr,    "container_query_get_last_error");
-        G(h,  freeQ,     "container_query_free");
-        G(h,  getPath,   "container_object_get_path");
-        G(h,  getToken,  "container_copy_sandbox_token");
-        G(h,  freeObj,   "container_object_free");
-        G(h,  posix,     "container_error_get_posix_errno");
-        G(h,  msg,       "container_error_get_message");
-        G(xh, xpcStr,    "xpc_string_create");
-        G(sh, sbConsume, "sandbox_extension_consume");
+        G(h,  create,       "container_query_create");
+        G(h,  setClass,     "container_query_set_class");
+        G(h,  setIds,       "container_query_set_identifiers");
+        G(h,  setFlags,     "container_query_operation_set_flags");
+        G(h,  setPart,      "container_query_operation_set_part");
+        G(h,  setDomain,    "container_query_operation_set_part_domain");
+        G(h,  getSingle,    "container_query_get_single_result");
+        G(h,  getErr,       "container_query_get_last_error");
+        G(h,  freeQ,        "container_query_free");
+        G(h,  getPath,      "container_object_get_path");
+        G(h,  getToken,     "container_copy_sandbox_token");
+        G(h,  activateExt,  "container_object_sandbox_extension_activate");
+        G(h,  freeObj,      "container_object_free");
+        G(h,  posix,        "container_error_get_posix_errno");
+        G(h,  msg,          "container_error_get_message");
+        G(xh, xpcStr,       "xpc_string_create");
+        G(sh, sbConsume,    "sandbox_extension_consume");
 #undef G
     });
     return &api;
@@ -113,8 +122,9 @@ static void DavizinMCMLog(NSString *message) {
 }
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
-    static const uint64_t kClass = 2;
-    static const uint64_t kFlags = 0x900000000ULL;
+    static const uint64_t kClass = 0x6;
+    static const uint64_t kPart = 0x3;
+    static const uint64_t kFlags = 0x7;
 
     NSString *sid = getSigningID();
     if (![sid isEqualToString:@"com.apple.mobile.MobileHouseArrest"]) {
@@ -132,10 +142,12 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     if (!query) { if (outErr) *outErr = @"query NULL"; return nil; }
 
     api->setClass(query, kClass);
-    if (api->xpcStr) {
+    if (api->xpcStr && api->setIds) {
         xpc_obj_t xid = api->xpcStr(bundleID.UTF8String);
         if (xid) api->setIds(query, xid);
     }
+    if (api->setPart) api->setPart(query, kPart);
+    if (api->setDomain) api->setDomain(query, "");
     api->setFlags(query, kFlags);
 
     void *obj = api->getSingle(query);
@@ -152,6 +164,7 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     NSString *path = raw ? @(raw) : nil;
     if (!path || !path.isAbsolutePath) {
         if (outErr) *outErr = @"Path inválido";
+        if (api->freeObj) api->freeObj(obj);
         api->freeQ(query);
         return nil;
     }
@@ -159,17 +172,14 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     if ([path hasPrefix:@"/var/"])
         path = [@"/private" stringByAppendingString:path];
 
-    int64_t consumeResult = -99;
-    BOOL hadToken = NO;
-    if (api->getToken) {
-        char *tok = api->getToken(obj);
-        hadToken = (tok && tok[0]);
-        if (hadToken && api->sbConsume) consumeResult = api->sbConsume(tok);
-        if (tok) free(tok);
+    int activateResult = -99;
+    if (api->activateExt) {
+        activateResult = api->activateExt(obj);
     }
-    DavizinMCMLog([NSString stringWithFormat:@"MCM %@: token=%@ consume=%lld",
-                   bundleID, hadToken ? @"sí" : @"no", (long long)consumeResult]);
+    DavizinMCMLog([NSString stringWithFormat:@"MCM %@: class=0x6 part=0x3 activate=%d",
+                   bundleID, activateResult]);
 
+    if (api->freeObj) api->freeObj(obj);
     api->freeQ(query);
     return path;
 }
