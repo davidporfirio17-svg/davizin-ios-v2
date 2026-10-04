@@ -6,6 +6,7 @@
 #import <arpa/inet.h>
 #import <netinet/in.h>
 #import <sys/socket.h>
+#import <sys/select.h>
 #import <unistd.h>
 
 struct NyxelResolveContext {
@@ -270,3 +271,159 @@ void nyxel_pairable_host_stop(void) {
 }
 
 void nyxel_free_string(char *value) { if (value) free(value); }
+
+#pragma mark - Fase 2: House Arrest / AFC por el túnel RSD
+
+struct NyxelBrowseContext {
+    char serviceName[256];
+    char regType[256];
+    int done;
+    int found;
+};
+
+static void nyxel_browse_callback(DNSServiceRef sdRef, DNSServiceFlags flags, uint32_t interfaceIndex,
+                                  DNSServiceErrorType errorCode, const char *serviceName,
+                                  const char *regtype, const char *replyDomain, void *context) {
+    (void)sdRef; (void)interfaceIndex; (void)replyDomain;
+    struct NyxelBrowseContext *ctx = context;
+    if (errorCode != kDNSServiceErr_NoError) { ctx->done = 1; return; }
+    if (!(flags & kDNSServiceFlagsAdd)) return;
+    snprintf(ctx->serviceName, sizeof(ctx->serviceName), "%s", serviceName ?: "");
+    snprintf(ctx->regType, sizeof(ctx->regType), "%s", regtype ?: "");
+    ctx->found = 1;
+    ctx->done = 1;
+}
+
+/// Tras el emparejamiento (fase 1), iOS anuncia "_remotepairing._tcp" por su
+/// cuenta. Lo descubrimos y resolvemos reutilizando nyxel_resolve().
+static int nyxel_discover_remotepairing(struct sockaddr_storage *address, socklen_t *length,
+                                        double timeoutSeconds) {
+    struct NyxelBrowseContext ctx = {0};
+    DNSServiceRef ref = NULL;
+    DNSServiceErrorType e = DNSServiceBrowse(&ref, 0, 0, "_remotepairing._tcp", "local.",
+                                             nyxel_browse_callback, &ctx);
+    if (e != kDNSServiceErr_NoError || !ref) return -1;
+    int fd = DNSServiceRefSockFD(ref);
+    NSTimeInterval deadline = [NSDate timeIntervalSinceReferenceDate] + timeoutSeconds;
+    while (!ctx.done && [NSDate timeIntervalSinceReferenceDate] < deadline) {
+        fd_set fds; FD_ZERO(&fds); FD_SET(fd, &fds);
+        struct timeval tv = {0, 200000};
+        if (select(fd + 1, &fds, NULL, NULL, &tv) > 0) {
+            if (DNSServiceProcessResult(ref) != kDNSServiceErr_NoError) break;
+        }
+    }
+    DNSServiceRefDeallocate(ref);
+    if (!ctx.found) return -2;
+    return nyxel_resolve(ctx.serviceName, ctx.regType, address, length);
+}
+
+int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t record_len,
+                               const char *bundle_id, const char *relative_path,
+                               int write_mode,
+                               const unsigned char *in_data, size_t in_len,
+                               unsigned char **out_data, size_t *out_len,
+                               double discover_timeout_seconds,
+                               char **error_message) {
+    if (error_message) *error_message = NULL;
+    if (!pairing_record || record_len == 0 || !bundle_id || !relative_path) {
+        if (error_message) *error_message = strdup("Parámetros inválidos.");
+        return -1;
+    }
+
+    char normalizedPath[1024];
+    if (relative_path[0] == '/') {
+        snprintf(normalizedPath, sizeof(normalizedPath), "%s", relative_path);
+    } else {
+        snprintf(normalizedPath, sizeof(normalizedPath), "/%s", relative_path);
+    }
+
+    struct sockaddr_storage address = {0};
+    socklen_t addressLength = 0;
+    if (nyxel_discover_remotepairing(&address, &addressLength, discover_timeout_seconds) != 0) {
+        if (error_message) *error_message = strdup("No se encontró \"_remotepairing._tcp\" del dispositivo. ¿Sigue emparejado en Modo desarrollador?");
+        return -2;
+    }
+
+    void *pairingFile = NULL;
+    IdeviceFfiError *err = rp_pairing_file_from_bytes(pairing_record, record_len, &pairingFile);
+    if (err || !pairingFile) {
+        if (error_message) *error_message = strdup("Registro de pairing inválido o corrupto.");
+        if (err) idevice_error_free(err);
+        return -3;
+    }
+
+    void *adapter = NULL;
+    void *handshake = NULL;
+    err = tunnel_create_rppairing((const struct sockaddr *)&address, addressLength, "Nyxel",
+                                  pairingFile, NULL, NULL, &adapter, &handshake);
+    rp_pairing_file_free(pairingFile);
+    if (err) {
+        if (error_message) *error_message = strdup("No se pudo abrir el túnel RSD. Puede requerir re-emparejar.");
+        idevice_error_free(err);
+        return -4;
+    }
+
+    int result = -99;
+    HouseArrestClientHandle *houseArrest = NULL;
+    AfcClientHandle *afc = NULL;
+    AfcFileHandle *file = NULL;
+
+    err = house_arrest_client_connect_rsd(adapter, handshake, &houseArrest);
+    if (err) {
+        if (error_message) *error_message = strdup("House Arrest no disponible por este túnel RSD en esta versión de iOS.");
+        idevice_error_free(err);
+        result = -5;
+        goto cleanup;
+    }
+
+    err = house_arrest_vend_container(houseArrest, bundle_id, &afc);
+    houseArrest = NULL; // vend_container toma posesión del handle
+    if (err) {
+        if (error_message) *error_message = strdup("No se pudo acceder al contenedor de esa app.");
+        idevice_error_free(err);
+        result = -6;
+        goto cleanup;
+    }
+
+    err = afc_file_open(afc, normalizedPath, write_mode ? NyxelAfcWrOnly : NyxelAfcRdOnly, &file);
+    if (err) {
+        if (error_message) *error_message = strdup("No se pudo abrir el archivo remoto.");
+        idevice_error_free(err);
+        result = -7;
+        goto cleanup;
+    }
+
+    if (write_mode) {
+        err = afc_file_write(file, in_data, in_len);
+        if (err) {
+            if (error_message) *error_message = strdup("Falló la escritura remota.");
+            idevice_error_free(err);
+            result = -8;
+            goto cleanup;
+        }
+    } else {
+        unsigned char *bytes = NULL;
+        size_t length = 0;
+        err = afc_file_read_entire(file, &bytes, &length);
+        if (err) {
+            if (error_message) *error_message = strdup("Falló la lectura remota.");
+            idevice_error_free(err);
+            result = -9;
+            goto cleanup;
+        }
+        if (out_data) *out_data = bytes; else idevice_data_free(bytes, length);
+        if (out_len) *out_len = length;
+    }
+
+    result = 0;
+
+cleanup:
+    if (file) afc_file_close(file);
+    if (afc) afc_client_free(afc);
+    if (houseArrest) house_arrest_client_free(houseArrest);
+    if (adapter) adapter_free(adapter);
+    if (handshake) rsd_handshake_free(handshake);
+    return result;
+}
+
+void nyxel_free_data(unsigned char *data, size_t len) { idevice_data_free(data, len); }

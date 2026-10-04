@@ -90,6 +90,35 @@ class InjectorService {
         }
     }
 
+    /// Escribe en el contenedor del juego. Si hay un registro de pairing
+    /// AirLift guardado, usa ese canal (permisos elevados vía house_arrest/AFC);
+    /// si no, cae al acceso directo de siempre. `relPath` es relativo al
+    /// contenedor (p. ej. "Documents/.../avatar/assetindexer.xxx").
+    private static func writeToContainer(_ data: Data, relPath: String, container: String, bundleID: String) -> Swift.Error? {
+        if NixelAirLiftFileChannel.isAvailable {
+            switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
+            case .success: return nil
+            case .failure(let error):
+                NyxelActivityLog.record("AirLift write falló (\(relPath)): \(error.message); usando método directo")
+            }
+        }
+        do {
+            try data.write(to: URL(fileURLWithPath: container + "/" + relPath), options: .atomic)
+            return nil
+        } catch {
+            return error
+        }
+    }
+
+    private static func readFromContainer(relPath: String, container: String, bundleID: String) -> Data? {
+        if NixelAirLiftFileChannel.isAvailable {
+            if case .success(let data) = NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
+                return data
+            }
+        }
+        return try? Data(contentsOf: URL(fileURLWithPath: container + "/" + relPath))
+    }
+
     /// Comprueba si el bundle está instalado y accesible en el sistema verificado.
     /// Esta función solo informa el estado; no modifica archivos ni intenta inyectar.
     static func isBundleAvailable(for game: DavizinGame) -> Bool {
@@ -243,12 +272,13 @@ class InjectorService {
         try? fm.createDirectory(atPath: destDir,
                                 withIntermediateDirectories: true)
 
+        let backupRel = disguisedBackupPath(for: activeRel)
         let originalFileExists = fm.fileExists(atPath: destPath)
         if originalFileExists && !fm.fileExists(atPath: backupPath) {
-            do {
-                let original = try Data(contentsOf: URL(fileURLWithPath: destPath))
-                try original.write(to: URL(fileURLWithPath: backupPath))
-            } catch {
+            guard let original = readFromContainer(relPath: activeRel, container: container, bundleID: bundleID) else {
+                return InjectorResult(success: false, message: "Error haciendo backup: no se pudo leer el archivo original.")
+            }
+            if let error = writeToContainer(original, relPath: backupRel, container: container, bundleID: bundleID) {
                 return InjectorResult(success: false,
                     message: "Error haciendo backup: \(error.localizedDescription)")
             }
@@ -265,13 +295,11 @@ class InjectorService {
         UserDefaults.standard.set(false, forKey: restoreCompletedKey(for: game))
         NyxelCleanupFlow.markInjectionWriteStarted(for: game)
 
-        do {
-            try finalData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
-            try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        } catch {
-                return InjectorResult(success: false,
-                    message: "Error al inyectar: \(error.localizedDescription)")
+        if let error = writeToContainer(finalData, relPath: activeRel, container: container, bundleID: bundleID) {
+            return InjectorResult(success: false,
+                message: "Error al inyectar: \(error.localizedDescription)")
         }
+        try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
 
         NyxelCleanupFlow.markInjectionSucceeded(for: game)
 
@@ -293,10 +321,15 @@ class InjectorService {
         let destPath   = container + "/" + activeRel
         let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
 
+        let backupRel = disguisedBackupPath(for: activeRel)
         if fm.fileExists(atPath: backupPath) {
             do {
-                let backupData = try Data(contentsOf: URL(fileURLWithPath: backupPath))
-                try backupData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
+                guard let backupData = readFromContainer(relPath: backupRel, container: container, bundleID: bundleID) else {
+                    throw NSError(domain: "Nyxel", code: -1, userInfo: [NSLocalizedDescriptionKey: "no se pudo leer el respaldo"])
+                }
+                if let error = writeToContainer(backupData, relPath: activeRel, container: container, bundleID: bundleID) {
+                    throw error
+                }
                 UserDefaults.standard.set(true, forKey: restoreCompletedKey(for: game))
                 try fm.removeItem(atPath: backupPath)
                 try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)

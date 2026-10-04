@@ -23,7 +23,7 @@ jobs:
           --release \
           --target aarch64-apple-ios \
           --no-default-features \
-          --features tunnel_tcp_stack,ring
+          --features tunnel_tcp_stack,ring,house_arrest
         test -f Vendor/idevice/target/aarch64-apple-ios/release/libidevice_ffi.a
         test -f Vendor/idevice/ffi/idevice.h
         mkdir -p /tmp/idevice-ffi

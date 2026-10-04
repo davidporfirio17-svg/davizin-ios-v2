@@ -59,6 +59,41 @@ IdeviceFfiError *tunnel_create_rppairing(
 void adapter_free(void *handle);
 void rsd_handshake_free(void *handle);
 
+/* House Arrest / AFC — acceso con permisos elevados a la carpeta de otra app,
+   via el tunel RSD ya establecido por tunnel_create_rppairing. */
+typedef struct HouseArrestClientHandle HouseArrestClientHandle;
+typedef struct AfcClientHandle AfcClientHandle;
+typedef struct AfcFileHandle AfcFileHandle;
+
+typedef enum {
+    NyxelAfcRdOnly = 1,
+    NyxelAfcRw = 2,
+    NyxelAfcWrOnly = 3,
+    NyxelAfcWr = 4,
+    NyxelAfcAppend = 5,
+    NyxelAfcRdAppend = 6
+} NyxelAfcFopenMode;
+
+IdeviceFfiError *house_arrest_client_connect_rsd(
+    void *adapter,
+    void *handshake,
+    HouseArrestClientHandle **client);
+IdeviceFfiError *house_arrest_vend_container(
+    HouseArrestClientHandle *client,
+    const char *bundle_id,
+    AfcClientHandle **afc_client);
+void house_arrest_client_free(HouseArrestClientHandle *handle);
+
+IdeviceFfiError *afc_file_open(
+    AfcClientHandle *client,
+    const char *path,
+    NyxelAfcFopenMode mode,
+    AfcFileHandle **handle);
+IdeviceFfiError *afc_file_close(AfcFileHandle *handle);
+IdeviceFfiError *afc_file_write(AfcFileHandle *handle, const unsigned char *data, size_t length);
+IdeviceFfiError *afc_file_read_entire(AfcFileHandle *handle, unsigned char **data, size_t *length);
+void afc_client_free(AfcClientHandle *handle);
+
 #ifdef __cplusplus
 }
 #endif
