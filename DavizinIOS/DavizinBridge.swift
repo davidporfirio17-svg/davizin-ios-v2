@@ -258,7 +258,7 @@ final class DavizinBridge {
     /// publica AirLift, espera que Developer Mode complete el pairing y solo
     /// después inicia el túnel que depende del registro RPairing.
     private func startHybridAfterExternalPairing() {
-        vc?.setHybridStatus(.pairingRequired("2424 AirLift Pairing"))
+        vc?.setHybridStatus(.pairingRequired)
         vc?.setHybridDiagnostic("Publicando AirLift; completa el pairing desde Developer Mode…")
         NixelPairingSession.shared.begin { [weak self] state in
             guard let self else { return }
