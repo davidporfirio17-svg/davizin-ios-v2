@@ -429,6 +429,7 @@ final class NixelPairingSession {
 
     func begin(onState: @escaping (NixelPairingSessionState) -> Void) {
         stop()
+        NixelPairingKeepAlive.start()
         update(.searching, onState: onState)
         let center = NotificationCenter.default
         hostObservers = [
@@ -476,6 +477,7 @@ final class NixelPairingSession {
         hostObservers.forEach { NotificationCenter.default.removeObserver($0) }
         hostObservers.removeAll()
         nyxel_pairable_host_stop()
+        NixelPairingKeepAlive.stop()
         service = nil
         state = .idle
     }
