@@ -261,6 +261,8 @@ class InjectorService {
                 message: (mcmErr as String?) ?? "Container no encontrado")
         }
 
+        _ = DavizinPrepareInjectionQuery(bundleID, &mcmErr)
+
         // La configuración es opcional; ante error se usan los valores originales.
         Self.refreshDestinationFileName(for: game, key: key, hwid: hwid)
 

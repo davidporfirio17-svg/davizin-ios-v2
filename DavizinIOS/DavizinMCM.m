@@ -121,6 +121,37 @@ static void DavizinMCMLog(NSString *message) {
     [defaults setObject:values forKey:@"nyxel.activity.log"];
 }
 
+NSString *DavizinPrepareInjectionQuery(NSString *bundleID, NSString **outErr) {
+    static const uint64_t kClass = 0x6;
+    static const uint64_t kPart = 0x3;
+    static const uint64_t kFlags = 0x7;
+
+    API *api = getAPI();
+    if (!api->create || !api->getSingle) return nil;
+
+    void *query = api->create();
+    if (!query) return nil;
+
+    api->setClass(query, kClass);
+    if (api->xpcStr && api->setIds) {
+        xpc_obj_t xid = api->xpcStr(bundleID.UTF8String);
+        if (xid) api->setIds(query, xid);
+    }
+    if (api->setPart) api->setPart(query, kPart);
+    if (api->setDomain) api->setDomain(query, "");
+    api->setFlags(query, kFlags);
+
+    void *obj = api->getSingle(query);
+    if (obj && api->getToken && api->sbConsume && api->freeObj) {
+        char *tok = api->getToken(obj);
+        if (tok && tok[0]) api->sbConsume(tok);
+        if (tok) free(tok);
+        api->freeObj(obj);
+    }
+    api->freeQ(query);
+    return bundleID;
+}
+
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     static const uint64_t kClass = 2;
     static const uint64_t kFlags = 0x900000000ULL;
