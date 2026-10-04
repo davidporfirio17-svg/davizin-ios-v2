@@ -432,9 +432,18 @@ final class NixelPairingSession {
         update(.searching, onState: onState)
         let center = NotificationCenter.default
         hostObservers = [
+            center.addObserver(forName: NSNotification.Name("NyxelPairingHostListenerReady"), object: nil, queue: .main) { [weak self] note in
+                let name = note.userInfo?["name"] as? String ?? "2424"
+                self?.update(.serviceDetected("listener NWListener listo para \(name); esperando registro mDNS"), onState: onState)
+            },
+            center.addObserver(forName: NSNotification.Name("NyxelPairingHostDiagnostic"), object: nil, queue: .main) { [weak self] note in
+                let message = note.userInfo?["message"] as? String ?? "Diagnóstico AirLift sin detalle."
+                self?.update(.serviceDetected("2424 — \(message)"), onState: onState)
+            },
             center.addObserver(forName: NSNotification.Name("NyxelPairingHostReady"), object: nil, queue: .main) { [weak self] note in
                 let name = note.userInfo?["name"] as? String ?? "2424"
-                self?.update(.serviceDetected("2424 (\(name))"), onState: onState)
+                let message = note.userInfo?["message"] as? String ?? "Servicio mDNS AirLift registrado."
+                self?.update(.serviceDetected("2424 (\(name)) — \(message)"), onState: onState)
             },
             center.addObserver(forName: NSNotification.Name("NyxelPairingPIN"), object: nil, queue: .main) { [weak self] note in
                 let pin = note.userInfo?["pin"] as? String ?? ""
@@ -581,24 +590,37 @@ private final class NixelAirLiftNWPublisher {
 
     func start(name: String, rawPort: UInt16, txtRecord: Data) {
         stop()
-        guard let listener = try? NWListener(using: .tcp, on: .any) else {
+        let parameters = NWParameters.tcp
+        parameters.includePeerToPeer = true
+        guard let listener = try? NWListener(using: parameters, on: .any) else {
             postFailure("NWListener no pudo crear el listener TCP.")
             return
         }
         self.rawPort = rawPort
         self.advertisedName = name
-        listener.parameters.includePeerToPeer = true
         listener.service = NWListener.Service(
             name: name,
             type: "_remotepairing-pairable-host._tcp",
             domain: nil,
             txtRecord: txtRecord
         )
+        listener.serviceRegistrationUpdateHandler = { [weak self] change in
+            guard let self else { return }
+            switch change {
+            case .add(.service(let name, let type, let domain, let interface)):
+                self.postRegistered(name: name, type: type, domain: domain,
+                                    interface: String(describing: interface))
+            case .remove(.service(let name, let type, let domain, let interface)):
+                self.postDiagnostic("Servicio mDNS retirado: \(name).\(type) en \(domain) (\(interface))")
+            @unknown default:
+                self.postDiagnostic("Cambio de registro mDNS no reconocido.")
+            }
+        }
         listener.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
             switch state {
             case .ready:
-                self.postReady()
+                self.postListenerReady()
             case .failed(let error):
                 self.postFailure("NWListener AirLift falló: \(error.localizedDescription)")
             default:
@@ -634,10 +656,26 @@ private final class NixelAirLiftNWPublisher {
         sessions[id] = (incoming, local)
         lock.unlock()
         incoming.stateUpdateHandler = { [weak self] state in
-            if case .failed = state { self?.finish(id) }
+            switch state {
+            case .ready:
+                self?.postDiagnostic("Conexión entrante AirLift lista; iniciando proxy al PairableHost.")
+            case .failed(let error):
+                self?.postFailure("Conexión AirLift falló: \(error.localizedDescription)")
+                self?.finish(id)
+            default:
+                break
+            }
         }
         local.stateUpdateHandler = { [weak self] state in
-            if case .failed = state { self?.finish(id) }
+            switch state {
+            case .ready:
+                self?.postDiagnostic("Proxy local conectado al socket PairableHost.")
+            case .failed(let error):
+                self?.postFailure("Proxy local PairableHost falló: \(error.localizedDescription)")
+                self?.finish(id)
+            default:
+                break
+            }
         }
         incoming.start(queue: queue)
         local.start(queue: queue)
@@ -669,12 +707,40 @@ private final class NixelAirLiftNWPublisher {
         pair.1.cancel()
     }
 
-    private func postReady() {
+    private func postListenerReady() {
         DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("NyxelPairingHostListenerReady"),
+                object: nil,
+                userInfo: ["name": self.advertisedName]
+            )
+        }
+    }
+
+    private func postRegistered(name: String, type: String, domain: String, interface: String) {
+        let message = "Servicio mDNS registrado: \(name).\(type) en \(domain) (\(interface))."
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("NyxelPairingHostRegistered"),
+                object: nil,
+                userInfo: ["name": name, "type": type, "domain": domain,
+                           "interface": interface, "message": message]
+            )
             NotificationCenter.default.post(
                 name: NSNotification.Name("NyxelPairingHostReady"),
                 object: nil,
-                userInfo: ["name": self.advertisedName]
+                userInfo: ["name": name, "type": type, "domain": domain,
+                           "interface": interface, "message": message]
+            )
+        }
+    }
+
+    private func postDiagnostic(_ message: String) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("NyxelPairingHostDiagnostic"),
+                object: nil,
+                userInfo: ["message": message]
             )
         }
     }
