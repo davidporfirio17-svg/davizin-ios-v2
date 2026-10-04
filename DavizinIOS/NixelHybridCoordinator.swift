@@ -583,6 +583,7 @@ private final class NixelAirLiftNWPublisher {
     static let shared = NixelAirLiftNWPublisher()
     private let queue = DispatchQueue(label: "com.apple.mobile.MobileHouseArrest.airlift.listener")
     private var listener: NWListener?
+    private var probeListener: NWListener?
     private var rawPort: UInt16 = 0
     private var advertisedName = ""
     private var sessions: [UUID: (NWConnection, NWConnection)] = [:]
@@ -616,6 +617,27 @@ private final class NixelAirLiftNWPublisher {
                 self.postDiagnostic("Cambio de registro mDNS no reconocido.")
             }
         }
+        let probeListener = try? NWListener(using: parameters, on: .any)
+        probeListener?.service = NWListener.Service(
+            name: "2424AirLiftProbe",
+            type: "_3105airlift._tcp",
+            domain: nil,
+            txtRecord: nil
+        )
+        probeListener?.serviceRegistrationUpdateHandler = { [weak self] change in
+            if case .add(.service(let name, let type, let domain, let interface)) = change {
+                self?.postDiagnostic("Probe AirLift registrado: \(name).\(type) en \(domain) (\(interface)).")
+            }
+        }
+        probeListener?.stateUpdateHandler = { [weak self] state in
+            if case .failed(let error) = state {
+                self?.postDiagnostic("Probe AirLift no disponible: \(error.localizedDescription)")
+            }
+        }
+        probeListener?.newConnectionHandler = { [weak self] connection in
+            self?.postDiagnostic("Conexión recibida en el probe AirLift.")
+            connection.cancel()
+        }
         listener.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
             switch state {
@@ -631,12 +653,16 @@ private final class NixelAirLiftNWPublisher {
             self?.proxy(connection)
         }
         self.listener = listener
+        self.probeListener = probeListener
         listener.start(queue: queue)
+        probeListener?.start(queue: queue)
     }
 
     func stop() {
         listener?.cancel()
         listener = nil
+        probeListener?.cancel()
+        probeListener = nil
         lock.lock()
         let active = sessions.values.flatMap { [$0.0, $0.1] }
         sessions.removeAll()
@@ -724,13 +750,15 @@ private final class NixelAirLiftNWPublisher {
                 name: NSNotification.Name("NyxelPairingHostRegistered"),
                 object: nil,
                 userInfo: ["name": name, "type": type, "domain": domain,
-                           "interface": interface, "message": message]
+                           "interface": interface, "visibleName": self.advertisedName,
+                           "message": message]
             )
             NotificationCenter.default.post(
                 name: NSNotification.Name("NyxelPairingHostReady"),
                 object: nil,
-                userInfo: ["name": name, "type": type, "domain": domain,
-                           "interface": interface, "message": message]
+                userInfo: ["name": self.advertisedName, "instance": name,
+                           "type": type, "domain": domain, "interface": interface,
+                           "message": "External visible: \(self.advertisedName). \(message)"]
             )
         }
     }
