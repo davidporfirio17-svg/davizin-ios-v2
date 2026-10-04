@@ -93,6 +93,18 @@ static NSString *getSigningID(void) {
     return result;
 }
 
+static void DavizinMCMLog(NSString *message) {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSArray<NSString *> *existing = [defaults stringArrayForKey:@"nyxel.activity.log"] ?: @[];
+    NSDateFormatter *formatter = [NSDateFormatter new];
+    formatter.dateFormat = @"HH:mm";
+    NSString *entry = [NSString stringWithFormat:@"%@  %@", [formatter stringFromDate:[NSDate date]], message];
+    NSMutableArray<NSString *> *values = [NSMutableArray arrayWithObject:entry];
+    [values addObjectsFromArray:existing];
+    if (values.count > 6) [values removeObjectsInRange:NSMakeRange(6, values.count - 6)];
+    [defaults setObject:values forKey:@"nyxel.activity.log"];
+}
+
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     static const uint64_t kClass = 2;
     static const uint64_t kFlags = 0x900000000ULL;
@@ -140,11 +152,16 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     if ([path hasPrefix:@"/var/"])
         path = [@"/private" stringByAppendingString:path];
 
+    int64_t consumeResult = -99;
+    BOOL hadToken = NO;
     if (api->getToken) {
         char *tok = api->getToken(obj);
-        if (tok && tok[0] && api->sbConsume) api->sbConsume(tok);
+        hadToken = (tok && tok[0]);
+        if (hadToken && api->sbConsume) consumeResult = api->sbConsume(tok);
         if (tok) free(tok);
     }
+    DavizinMCMLog([NSString stringWithFormat:@"MCM %@: token=%@ consume=%lld",
+                   bundleID, hadToken ? @"sí" : @"no", (long long)consumeResult]);
 
     api->freeQ(query);
     return path;
