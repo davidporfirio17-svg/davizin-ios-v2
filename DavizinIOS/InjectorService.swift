@@ -94,11 +94,19 @@ class InjectorService {
     /// AirLift guardado, usa ese canal (permisos elevados vía house_arrest/AFC);
     /// si no, cae al acceso directo de siempre. `relPath` es relativo al
     /// contenedor (p. ej. "Documents/.../avatar/assetindexer.xxx").
+    private struct ContainerWriteError: LocalizedError {
+        let airliftNote: String
+        let directError: Swift.Error
+        var errorDescription: String? { "\(directError.localizedDescription) [\(airliftNote)]" }
+    }
+
     private static func writeToContainer(_ data: Data, relPath: String, container: String, bundleID: String) -> Swift.Error? {
+        var airliftNote = "AirLift: sin registro de pairing guardado"
         if NixelAirLiftFileChannel.isAvailable {
             switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
             case .success: return nil
             case .failure(let error):
+                airliftNote = "AirLift falló: \(error.message)"
                 NyxelActivityLog.record("AirLift write falló (\(relPath)): \(error.message); usando método directo")
             }
         }
@@ -106,7 +114,7 @@ class InjectorService {
             try data.write(to: URL(fileURLWithPath: container + "/" + relPath), options: .atomic)
             return nil
         } catch {
-            return error
+            return ContainerWriteError(airliftNote: airliftNote, directError: error)
         }
     }
 
