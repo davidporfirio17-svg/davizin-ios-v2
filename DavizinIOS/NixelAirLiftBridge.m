@@ -85,8 +85,12 @@ static PairableHostHandle *nyxel_pairing_host_handle;
 static NSNetService *nyxel_pairing_host_service;
 static NSNetService *nyxel_airlift_probe_service;
 static int nyxel_pairing_host_listener = -1;
+static uint16_t nyxel_pairing_host_local_port;
 static dispatch_source_t nyxel_pairing_host_source;
 static void nyxel_pairing_post(NSString *name, NSDictionary *userInfo);
+extern void nyxel_nw_listener_start(const char *service_name, uint16_t raw_port,
+                                    const unsigned char *txt, size_t txt_len);
+extern void nyxel_nw_listener_stop(void);
 
 @interface NyxelPairingNetServiceDelegate : NSObject <NSNetServiceDelegate>
 @end
@@ -145,6 +149,14 @@ static void nyxel_pairing_accept_connection(int fd) {
         rp_pairing_file_free(pairing);
         nyxel_pairing_post(@"NyxelPairingCompleted", @{ @"record": record });
     });
+}
+
+void nyxel_pairable_host_accept_local_fd(int fd) {
+    nyxel_pairing_accept_connection(fd);
+}
+
+uint16_t nyxel_pairable_host_local_port(void) {
+    return nyxel_pairing_host_local_port;
 }
 
 int nyxel_pairable_host_start(const char *name, const char *model) {
@@ -215,39 +227,9 @@ int nyxel_pairable_host_start(const char *name, const char *model) {
         return -7;
     }
     nyxel_pairing_host_listener = listener;
-
-    // External's AirLiftPairingController is main-actor driven.  NSNetService
-    // must be created, scheduled, and published on the same run loop; creating
-    // it from the caller's worker queue can surface only the opaque
-    // NSNetServicesErrorDomain/-72000 error on iOS.
-    void (^publishBonjour)(void) = ^{
-        nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@""
-                                                                       type:@"_remotepairing-pairable-host._tcp."
-                                                                       name:serviceName
-                                                                       port:publishedPort];
-        nyxel_pairing_host_delegate = [NyxelPairingNetServiceDelegate new];
-        nyxel_pairing_host_service.delegate = nyxel_pairing_host_delegate;
-        nyxel_pairing_host_service.includesPeerToPeer = YES;
-        [nyxel_pairing_host_service setTXTRecordData:txtRecord];
-        [nyxel_pairing_host_service scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
-        [nyxel_pairing_host_service publish];
-
-        // External also publishes this lightweight probe service.  It is not
-        // the pairing protocol itself, but helps iPadOS identify AirLift and
-        // diagnose discovery independently of Pair-Setup.
-        nyxel_airlift_probe_service = [[NSNetService alloc] initWithDomain:@""
-                                                                       type:@"_3105airlift._tcp."
-                                                                       name:@"2424AirLiftProbe"
-                                                                       port:publishedPort];
-        nyxel_airlift_probe_service.includesPeerToPeer = YES;
-        [nyxel_airlift_probe_service scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
-        [nyxel_airlift_probe_service publish];
-    };
-    if ([NSThread isMainThread]) {
-        publishBonjour();
-    } else {
-        dispatch_sync(dispatch_get_main_queue(), publishBonjour);
-    }
+    nyxel_pairing_host_local_port = publishedPort;
+    nyxel_nw_listener_start([serviceName UTF8String], publishedPort,
+                             txtRecord.bytes, txtRecord.length);
 
     nyxel_pairing_host_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, (uintptr_t)listener, 0,
                                                         dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
@@ -260,6 +242,7 @@ int nyxel_pairable_host_start(const char *name, const char *model) {
 }
 
 void nyxel_pairable_host_stop(void) {
+    nyxel_nw_listener_stop();
     if (nyxel_pairing_host_source) {
         dispatch_source_cancel(nyxel_pairing_host_source);
         nyxel_pairing_host_source = nil;
@@ -279,6 +262,7 @@ void nyxel_pairable_host_stop(void) {
         close(nyxel_pairing_host_listener);
         nyxel_pairing_host_listener = -1;
     }
+    nyxel_pairing_host_local_port = 0;
     if (nyxel_pairing_host_handle) {
         pairable_host_free(nyxel_pairing_host_handle);
         nyxel_pairing_host_handle = NULL;

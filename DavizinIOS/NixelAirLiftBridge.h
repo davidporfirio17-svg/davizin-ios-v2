@@ -2,6 +2,7 @@
 #define NYXEL_AIRLIFT_BRIDGE_H
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -11,6 +12,8 @@ int nyxel_pair_rppairing(const char *service_name, const char *reg_type, const c
 void nyxel_free_string(char *value);
 int nyxel_pairable_host_start(const char *name, const char *model);
 void nyxel_pairable_host_stop(void);
+void nyxel_pairable_host_accept_local_fd(int fd);
+uint16_t nyxel_pairable_host_local_port(void);
 #ifdef __cplusplus
 }
 #endif

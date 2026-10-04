@@ -565,3 +565,141 @@ enum NixelHybridCoordinator {
         NixelVPNManager.shared.isActive
     }
 }
+
+
+// External publishes AirLift through Network.framework's NWListener.Service,
+// not NSNetService. Accepted NWConnections are proxied to the local
+// PairableHost socket consumed by the Rust FFI.
+private final class NixelAirLiftNWPublisher {
+    static let shared = NixelAirLiftNWPublisher()
+    private let queue = DispatchQueue(label: "com.apple.mobile.MobileHouseArrest.airlift.listener")
+    private var listener: NWListener?
+    private var rawPort: UInt16 = 0
+    private var advertisedName = ""
+    private var sessions: [UUID: (NWConnection, NWConnection)] = [:]
+    private let lock = NSLock()
+
+    func start(name: String, rawPort: UInt16, txtRecord: Data) {
+        stop()
+        guard let listener = try? NWListener(using: .tcp, on: .any) else {
+            postFailure("NWListener no pudo crear el listener TCP.")
+            return
+        }
+        self.rawPort = rawPort
+        self.advertisedName = name
+        listener.parameters.includePeerToPeer = true
+        listener.service = NWListener.Service(
+            name: name,
+            type: "_remotepairing-pairable-host._tcp",
+            domain: nil,
+            txtRecord: txtRecord
+        )
+        listener.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
+            switch state {
+            case .ready:
+                self.postReady()
+            case .failed(let error):
+                self.postFailure("NWListener AirLift falló: \(error.localizedDescription)")
+            default:
+                break
+            }
+        }
+        listener.newConnectionHandler = { [weak self] connection in
+            self?.proxy(connection)
+        }
+        self.listener = listener
+        listener.start(queue: queue)
+    }
+
+    func stop() {
+        listener?.cancel()
+        listener = nil
+        lock.lock()
+        let active = sessions.values.flatMap { [$0.0, $0.1] }
+        sessions.removeAll()
+        lock.unlock()
+        active.forEach { $0.cancel() }
+        rawPort = 0
+    }
+
+    private func proxy(_ incoming: NWConnection) {
+        guard rawPort != 0, let port = NWEndpoint.Port(rawValue: rawPort) else {
+            incoming.cancel()
+            return
+        }
+        let local = NWConnection(host: NWEndpoint.Host("127.0.0.1"), port: port, using: .tcp)
+        let id = UUID()
+        lock.lock()
+        sessions[id] = (incoming, local)
+        lock.unlock()
+        incoming.stateUpdateHandler = { [weak self] state in
+            if case .failed = state { self?.finish(id) }
+        }
+        local.stateUpdateHandler = { [weak self] state in
+            if case .failed = state { self?.finish(id) }
+        }
+        incoming.start(queue: queue)
+        local.start(queue: queue)
+        pump(incoming, to: local, id: id)
+        pump(local, to: incoming, id: id)
+    }
+
+    private func pump(_ source: NWConnection, to destination: NWConnection, id: UUID) {
+        source.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+            guard let self else { return }
+            if let data, !data.isEmpty {
+                destination.send(content: data, completion: .contentProcessed { sendError in
+                    if sendError != nil { self.finish(id) }
+                })
+            }
+            if isComplete || error != nil {
+                self.finish(id)
+            } else {
+                self.pump(source, to: destination, id: id)
+            }
+        }
+    }
+
+    private func finish(_ id: UUID) {
+        lock.lock()
+        guard let pair = sessions.removeValue(forKey: id) else { lock.unlock(); return }
+        lock.unlock()
+        pair.0.cancel()
+        pair.1.cancel()
+    }
+
+    private func postReady() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("NyxelPairingHostReady"),
+                object: nil,
+                userInfo: ["name": self.advertisedName]
+            )
+        }
+    }
+
+    private func postFailure(_ message: String) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("NyxelPairingHostFailed"),
+                object: nil,
+                userInfo: ["message": message]
+            )
+        }
+    }
+}
+
+@_cdecl("nyxel_nw_listener_start")
+private func nyxel_nw_listener_start(_ serviceName: UnsafePointer<CChar>?, _ rawPort: UInt16,
+                                     _ txt: UnsafePointer<UInt8>?, _ txtLen: Int) {
+    guard let serviceName, let txt, txtLen > 0 else { return }
+    let name = String(cString: serviceName)
+    let data = Data(bytes: txt, count: txtLen)
+    NixelAirLiftNWPublisher.shared.start(name: name, rawPort: rawPort, txtRecord: data)
+}
+
+@_cdecl("nyxel_nw_listener_stop")
+private func nyxel_nw_listener_stop() {
+    NixelAirLiftNWPublisher.shared.stop()
+}
