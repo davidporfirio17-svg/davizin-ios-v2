@@ -32,7 +32,7 @@ jobs:
 
     - name: Build
       run: |
-        set -o pipefail
+        set +e
         xcodebuild \
           -project DavizinIOS.xcodeproj \
           -scheme DavizinIOS \
@@ -49,13 +49,24 @@ jobs:
           BUILD_DIR=/tmp/davizin_build \
           LIBRARY_SEARCH_PATHS=/tmp/idevice-ffi \
           OTHER_LDFLAGS="-force_load /tmp/idevice-ffi/libidevice_ffi.a -framework Security -framework Network" \
-          build 2>&1 | tee /tmp/build.log
-        
+          build > /tmp/build.log 2>&1
+        status=$?
+        set -e
+
         echo "=== Build completed. Checking for .app ==="
         find /tmp/davizin_build -name "*.app" -type d 2>/dev/null || echo "No .app found"
-        
+
         echo "=== Checking for errors in log ==="
         grep -i "error:" /tmp/build.log | head -20 || echo "No errors found"
+
+        if [ "$status" -ne 0 ]; then
+          echo "=== Build FAILED (status $status); emitting annotations ==="
+          grep -iE "error:|fatal error|undefined symbol|ld: " /tmp/build.log | sort -u | head -30 | while IFS= read -r line; do
+            escaped=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')
+            echo "::error::${escaped}"
+          done
+          exit "$status"
+        fi
 
     - name: Create IPA
       run: |
