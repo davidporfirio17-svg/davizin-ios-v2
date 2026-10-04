@@ -403,7 +403,7 @@ enum NixelPairingSessionState {
         switch self {
         case .idle: return "Pairing sin iniciar"
         case .searching: return "Publicando host AirLift para que el iPad lo detecte…"
-        case .serviceDetected(let name): return "Servicio detectado: \(name)"
+        case .serviceDetected(let name): return "Host local publicado: \(name); esperando que el iPad lo detecte…"
         case .transportReachable(let name): return "Transporte accesible: \(name)"
         case .pairingRecordFound(let name): return "Registro local encontrado para \(name); autenticación pendiente"
         case .pairingRequired(let name): return name.hasPrefix("PIN") ? name : "Esperando confirmación de pairing para \(name)…"

@@ -85,6 +85,24 @@ static PairableHostHandle *nyxel_pairing_host_handle;
 static NSNetService *nyxel_pairing_host_service;
 static int nyxel_pairing_host_listener = -1;
 static dispatch_source_t nyxel_pairing_host_source;
+static void nyxel_pairing_post(NSString *name, NSDictionary *userInfo);
+
+@interface NyxelPairingNetServiceDelegate : NSObject <NSNetServiceDelegate>
+@end
+
+@implementation NyxelPairingNetServiceDelegate
+- (void)netServiceDidPublish:(NSNetService *)sender {
+    nyxel_pairing_post(@"NyxelPairingHostReady", @{ @"name": sender.name ?: @"2424" });
+}
+
+- (void)netService:(NSNetService *)sender didNotPublish:(NSDictionary<NSString *,NSNumber *> *)errorDict {
+    (void)sender;
+    NSString *message = [NSString stringWithFormat:@"Bonjour no pudo publicar el host PairableHost (%@).", errorDict ?: @{}];
+    nyxel_pairing_post(@"NyxelPairingHostFailed", @{ @"message": message });
+}
+@end
+
+static NyxelPairingNetServiceDelegate *nyxel_pairing_host_delegate;
 
 static void nyxel_pairing_post(NSString *name, NSDictionary *userInfo) {
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -191,8 +209,11 @@ int nyxel_pairable_host_start(const char *name, const char *model) {
                                                                    type:@"_remotepairing-pairable-host._tcp."
                                                                    name:serviceName
                                                                    port:ntohs(address.sin_port)];
+    nyxel_pairing_host_delegate = [NyxelPairingNetServiceDelegate new];
+    nyxel_pairing_host_service.delegate = nyxel_pairing_host_delegate;
     nyxel_pairing_host_service.includesPeerToPeer = YES;
     [nyxel_pairing_host_service setTXTRecordData:txtRecord];
+    [nyxel_pairing_host_service scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
     [nyxel_pairing_host_service publish];
 
     nyxel_pairing_host_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, (uintptr_t)listener, 0,
@@ -202,7 +223,6 @@ int nyxel_pairable_host_start(const char *name, const char *model) {
         if (fd >= 0) nyxel_pairing_accept_connection(fd);
     });
     dispatch_resume(nyxel_pairing_host_source);
-    nyxel_pairing_post(@"NyxelPairingHostReady", @{ @"name": serviceName });
     return 0;
 }
 
@@ -212,9 +232,11 @@ void nyxel_pairable_host_stop(void) {
         nyxel_pairing_host_source = nil;
     }
     if (nyxel_pairing_host_service) {
+        [nyxel_pairing_host_service removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
         [nyxel_pairing_host_service stop];
         nyxel_pairing_host_service = nil;
     }
+    nyxel_pairing_host_delegate = nil;
     if (nyxel_pairing_host_listener >= 0) {
         close(nyxel_pairing_host_listener);
         nyxel_pairing_host_listener = -1;
