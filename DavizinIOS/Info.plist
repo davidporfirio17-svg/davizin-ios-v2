@@ -58,6 +58,13 @@
 	<string>Dark</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Nyxel External usa Face ID para proteger la operación cuando activas esta opción.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Nyxel External crea un túnel de red local en el dispositivo para vincularlo.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_remotepairing-pairable-host._tcp</string>
+		<string>_3105airlift._tcp</string>
+	</array>
 	<key>MinimumOSVersion</key>
 	<string>16.0</string>
 	<key>LSApplicationQueriesSchemes</key>
