@@ -196,11 +196,9 @@ int nyxel_pairable_host_start(const char *name, const char *model) {
         }
     }];
     NSData *txtRecord = [NSNetService dataFromTXTRecordDictionary:records];
-    // External deliberately keeps the human-facing Bonjour name separate from
-    // the stable UUID in the TXT record's `identifier` field.  Publishing the
-    // UUID as the service name makes iPadOS show the wrong entry and can cause
-    // mDNS to reject malformed/overlong generated identifiers.
-    NSString *serviceName = @"2424 AirLift Pairing";
+    // PairableHost uses the generated service identifier as the mDNS instance
+    // name. The human-facing name is already carried by the TXT `name` record.
+    NSString *serviceName = [NSString stringWithUTF8String:serviceID];
     idevice_string_free(serviceID);
     if (!serviceName || !txtRecord) {
         pairable_host_free(nyxel_pairing_host_handle);
