@@ -83,6 +83,7 @@ int nyxel_pair_rppairing(const char *service_name, const char *reg_type, const c
 
 static PairableHostHandle *nyxel_pairing_host_handle;
 static NSNetService *nyxel_pairing_host_service;
+static NSNetService *nyxel_airlift_probe_service;
 static int nyxel_pairing_host_listener = -1;
 static dispatch_source_t nyxel_pairing_host_source;
 static void nyxel_pairing_post(NSString *name, NSDictionary *userInfo);
@@ -195,7 +196,11 @@ int nyxel_pairable_host_start(const char *name, const char *model) {
         }
     }];
     NSData *txtRecord = [NSNetService dataFromTXTRecordDictionary:records];
-    NSString *serviceName = [NSString stringWithUTF8String:serviceID];
+    // External deliberately keeps the human-facing Bonjour name separate from
+    // the stable UUID in the TXT record's `identifier` field.  Publishing the
+    // UUID as the service name makes iPadOS show the wrong entry and can cause
+    // mDNS to reject malformed/overlong generated identifiers.
+    NSString *serviceName = @"2424 AirLift Pairing";
     idevice_string_free(serviceID);
     if (!serviceName || !txtRecord) {
         pairable_host_free(nyxel_pairing_host_handle);
@@ -204,17 +209,35 @@ int nyxel_pairable_host_start(const char *name, const char *model) {
         return -6;
     }
 
+    uint16_t publishedPort = ntohs(address.sin_port);
+    if (publishedPort == 0) {
+        pairable_host_free(nyxel_pairing_host_handle);
+        nyxel_pairing_host_handle = NULL;
+        close(listener);
+        return -7;
+    }
     nyxel_pairing_host_listener = listener;
-    nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@"local."
+    nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@""
                                                                    type:@"_remotepairing-pairable-host._tcp."
                                                                    name:serviceName
-                                                                   port:ntohs(address.sin_port)];
+                                                                   port:publishedPort];
     nyxel_pairing_host_delegate = [NyxelPairingNetServiceDelegate new];
     nyxel_pairing_host_service.delegate = nyxel_pairing_host_delegate;
     nyxel_pairing_host_service.includesPeerToPeer = YES;
     [nyxel_pairing_host_service setTXTRecordData:txtRecord];
     [nyxel_pairing_host_service scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
     [nyxel_pairing_host_service publish];
+
+    // External also publishes this lightweight probe service.  It is not the
+    // pairing protocol itself, but iPadOS uses it to identify the AirLift host
+    // and it is useful for diagnosing discovery independently of Pair-Setup.
+    nyxel_airlift_probe_service = [[NSNetService alloc] initWithDomain:@""
+                                                                   type:@"_3105airlift._tcp."
+                                                                   name:@"2424AirLiftProbe"
+                                                                   port:publishedPort];
+    nyxel_airlift_probe_service.includesPeerToPeer = YES;
+    [nyxel_airlift_probe_service scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
+    [nyxel_airlift_probe_service publish];
 
     nyxel_pairing_host_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, (uintptr_t)listener, 0,
                                                         dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
@@ -235,6 +258,11 @@ void nyxel_pairable_host_stop(void) {
         [nyxel_pairing_host_service removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
         [nyxel_pairing_host_service stop];
         nyxel_pairing_host_service = nil;
+    }
+    if (nyxel_airlift_probe_service) {
+        [nyxel_airlift_probe_service removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
+        [nyxel_airlift_probe_service stop];
+        nyxel_airlift_probe_service = nil;
     }
     nyxel_pairing_host_delegate = nil;
     if (nyxel_pairing_host_listener >= 0) {
