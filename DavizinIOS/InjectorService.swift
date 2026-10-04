@@ -305,7 +305,7 @@ class InjectorService {
 
         if let error = writeToContainer(finalData, relPath: activeRel, container: container, bundleID: bundleID) {
             return InjectorResult(success: false,
-                message: "Error al inyectar: \(error.localizedDescription)")
+                message: "Error al inyectar: \(error.localizedDescription) {MCM: \(DavizinMCMLastDiagnostic() ?? "sin dato")}")
         }
         try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
 
@@ -343,7 +343,7 @@ class InjectorService {
                 try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
             } catch {
                 return InjectorResult(success: false,
-                    message: "Error al restaurar: \(error.localizedDescription)")
+                    message: "Error al restaurar: \(error.localizedDescription) {MCM: \(DavizinMCMLastDiagnostic() ?? "sin dato")}")
             }
         } else if UserDefaults.standard.bool(forKey: originalMissingKey(for: game)) {
             do {

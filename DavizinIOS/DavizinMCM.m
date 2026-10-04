@@ -93,7 +93,14 @@ static NSString *getSigningID(void) {
     return result;
 }
 
+static NSString *gDavizinMCMLastDiagnostic;
+
+NSString *DavizinMCMLastDiagnostic(void) {
+    return gDavizinMCMLastDiagnostic;
+}
+
 static void DavizinMCMLog(NSString *message) {
+    gDavizinMCMLastDiagnostic = message;
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSArray<NSString *> *existing = [defaults stringArrayForKey:@"nyxel.activity.log"] ?: @[];
     NSDateFormatter *formatter = [NSDateFormatter new];
