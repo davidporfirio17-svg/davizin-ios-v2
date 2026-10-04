@@ -28,6 +28,9 @@
 		A21 = {isa=PBXBuildFile;fileRef=F24;};
 		A22 = {isa=PBXBuildFile;fileRef=F25;};
 		A99 = {isa=PBXBuildFile;fileRef=F99;};
+		A98 = {isa=PBXBuildFile;fileRef=F98;};
+		AEXT = {isa=PBXBuildFile;fileRef=EXTP;settings={ATTRIBUTES=();};};
+		AE01 = {isa=PBXBuildFile;fileRef=EF01;};
 			A23 = {isa=PBXBuildFile;fileRef=F26;};
 			A24 = {isa=PBXBuildFile;fileRef=F27;};
 			A25 = {isa=PBXBuildFile;fileRef=F28;};
@@ -65,6 +68,11 @@
 		F22 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=DavizinToast.swift;sourceTree="<group>";};
 		F23 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=SoundService.swift;sourceTree="<group>";};
 		F24 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=SplashViewController.swift;sourceTree="<group>";};
+			F98 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NixelVPNManager.swift;sourceTree="<group>";};
+			EF01 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=PacketTunnelProvider.swift;sourceTree="<group>";};
+			EF02 = {isa=PBXFileReference;lastKnownFileType=text.plist.xml;path=Info.plist;sourceTree="<group>";};
+			EF03 = {isa=PBXFileReference;lastKnownFileType=text.plist.entitlements;path=ExternalTunnel.entitlements;sourceTree="<group>";};
+			EXTP = {isa=PBXFileReference;explicitFileType=wrapper.app-extension;includeInIndex=0;path=ExternalTunnel.appex;sourceTree=BUILT_PRODUCTS_DIR;};
 			F99 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NyxelVPNView.swift;sourceTree="<group>";};
 			F25 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NoticeViewController.swift;sourceTree="<group>";};
 			F26 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=MissionMapViewController.swift;sourceTree="<group>";};
@@ -82,15 +90,18 @@
 		PROD = {isa=PBXFileReference;explicitFileType=wrapper.application;includeInIndex=0;path=DavizinIOS.app;sourceTree=BUILT_PRODUCTS_DIR;};
 /* PBXFrameworksBuildPhase */
 		PH_F = {isa=PBXFrameworksBuildPhase;buildActionMask=2147483647;files=();runOnlyForDeploymentPostprocessing=0;};
+		PH_EF = {isa=PBXFrameworksBuildPhase;buildActionMask=2147483647;files=();runOnlyForDeploymentPostprocessing=0;};
+		PH_EB = {isa=PBXCopyFilesBuildPhase;buildActionMask=2147483647;dstPath="";dstSubfolderSpec=13;files=(AEXT);name="Embed Foundation Extensions";runOnlyForDeploymentPostprocessing=0;};
 /* PBXGroup */
-			GRP_M = {isa=PBXGroup;children=(GRP_S,GRP_P);sourceTree="<group>";};
-				GRP_S = {isa=PBXGroup;children=(F01,F02,F03,F04,F05,F06,F07,F08,F09,F10,F11,F12,F13,F14,F15,F16,F17,F18,F19,F20,F21,F22,F23,F24,F25,F26,F27,F28,F29,F30,F31,F32,F33,F99,FR1,FR3,FR4,FR5);path=DavizinIOS;sourceTree="<group>";};
-		GRP_P = {isa=PBXGroup;children=(PROD);name=Products;sourceTree="<group>";};
+			GRP_M = {isa=PBXGroup;children=(GRP_S,GRP_E,GRP_P);sourceTree="<group>";};
+				GRP_S = {isa=PBXGroup;children=(F01,F02,F03,F04,F05,F06,F07,F08,F09,F10,F11,F12,F13,F14,F15,F16,F17,F18,F19,F20,F21,F22,F23,F24,F25,F26,F27,F28,F29,F30,F31,F32,F33,F99,F98,FR1,FR3,FR4,FR5);path=DavizinIOS;sourceTree="<group>";};
+		GRP_P = {isa=PBXGroup;children=(PROD,EXTP);name=Products;sourceTree="<group>";};
+		GRP_E = {isa=PBXGroup;children=(EF01,EF02,EF03);path=ExternalTunnel;sourceTree="<group>";};
 /* PBXNativeTarget */
 		TGT = {
 			isa=PBXNativeTarget;
 			buildConfigurationList=CFGL_T;
-			buildPhases=(PH_S,PH_R,PH_F);
+			buildPhases=(PH_S,PH_R,PH_F,PH_EB);
 			buildRules=();
 			dependencies=();
 			name=DavizinIOS;
@@ -98,10 +109,11 @@
 			productReference=PROD;
 			productType="com.apple.product-type.application";
 		};
+		TUN = {isa=PBXNativeTarget;buildConfigurationList=CFGL_E;buildPhases=(PH_ES,PH_ER,PH_EF);buildRules=();dependencies=();name=ExternalTunnel;productName=ExternalTunnel;productReference=EXTP;productType="com.apple.product-type.app-extension";};
 /* PBXProject */
 		PROJ = {
 			isa=PBXProject;
-			attributes={LastUpgradeCheck=1500;TargetAttributes={TGT={CreatedOnToolsVersion=15.0;};};};
+			attributes={LastUpgradeCheck=1500;TargetAttributes={TGT={CreatedOnToolsVersion=15.0;};TUN={CreatedOnToolsVersion=15.0;};};};
 			buildConfigurationList=CFGL_P;
 			compatibilityVersion="Xcode 14.0";
 			developmentRegion=es;
@@ -111,7 +123,7 @@
 			productRefGroup=GRP_P;
 			projectDirPath="";
 			projectRoot="";
-			targets=(TGT);
+			targets=(TGT,TUN);
 		};
 /* PBXResourcesBuildPhase */
 			PH_R = {isa=PBXResourcesBuildPhase;buildActionMask=2147483647;files=(AR1,AR3,AR4,AR5);runOnlyForDeploymentPostprocessing=0;};
@@ -119,9 +131,14 @@
 		PH_S = {
 			isa=PBXSourcesBuildPhase;
 				buildActionMask=2147483647;
-					files=(A01,A02,A03,A04,A05,A06,A07,A08,A09,A10,A11,A12,A13,A14,A15,A16,A17,A19,A20,A21,A22,A23,A24,A25,A26,A27,A28,A29,A30,A99);
+					files=(A01,A02,A03,A04,A05,A06,A07,A08,A09,A10,A11,A12,A13,A14,A15,A16,A17,A19,A20,A21,A22,A23,A24,A25,A26,A27,A28,A29,A30,A99,A98);
 			runOnlyForDeploymentPostprocessing=0;
 		};
+		PH_ES = {isa=PBXSourcesBuildPhase;buildActionMask=2147483647;files=(AE01);runOnlyForDeploymentPostprocessing=0;};
+		PH_ER = {isa=PBXResourcesBuildPhase;buildActionMask=2147483647;files=();runOnlyForDeploymentPostprocessing=0;};
+		CFG_ED = {isa=XCBuildConfiguration;buildSettings={CODE_SIGN_ENTITLEMENTS=ExternalTunnel/ExternalTunnel.entitlements;CODE_SIGNING_ALLOWED=NO;CODE_SIGNING_REQUIRED=NO;GENERATE_INFOPLIST_FILE=NO;INFOPLIST_FILE=ExternalTunnel/Info.plist;IPHONEOS_DEPLOYMENT_TARGET=16.0;PRODUCT_BUNDLE_IDENTIFIER=com.apple.mobile.MobileHouseArrest.ExternalTunnel;PRODUCT_NAME="$(TARGET_NAME)";SDKROOT=iphoneos;SWIFT_VERSION=5.0;TARGETED_DEVICE_FAMILY="1,2";};name=Debug;};
+		CFG_ER = {isa=XCBuildConfiguration;buildSettings={CODE_SIGN_ENTITLEMENTS=ExternalTunnel/ExternalTunnel.entitlements;CODE_SIGNING_ALLOWED=NO;CODE_SIGNING_REQUIRED=NO;GENERATE_INFOPLIST_FILE=NO;INFOPLIST_FILE=ExternalTunnel/Info.plist;IPHONEOS_DEPLOYMENT_TARGET=16.0;PRODUCT_BUNDLE_IDENTIFIER=com.apple.mobile.MobileHouseArrest.ExternalTunnel;PRODUCT_NAME="$(TARGET_NAME)";SDKROOT=iphoneos;SWIFT_VERSION=5.0;TARGETED_DEVICE_FAMILY="1,2";};name=Release;};
+		CFGL_E = {isa=XCConfigurationList;buildConfigurations=(CFG_ED,CFG_ER);defaultConfigurationIsVisible=0;defaultConfigurationName=Release;};
 /* XCBuildConfiguration */
 			CFG_D = {isa=XCBuildConfiguration;buildSettings={IPHONEOS_DEPLOYMENT_TARGET=16.0;SDKROOT=iphoneos;SWIFT_OPTIMIZATION_LEVEL="-Onone";};name=Debug;};
 			CFG_R = {isa=XCBuildConfiguration;buildSettings={IPHONEOS_DEPLOYMENT_TARGET=16.0;SDKROOT=iphoneos;SWIFT_OPTIMIZATION_LEVEL="-O";};name=Release;};

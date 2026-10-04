@@ -1,10 +1,12 @@
 import UIKit
+import NetworkExtension
 
 /// Pantalla aislada del apartado VPN. No comparte lógica con Modos, Operación ni la inyección.
 final class NyxelVPNView: UIView {
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
     private let statusLabel = UILabel()
+    private let toggleButton = DavizinButton(title: "Activar VPN", style: .primary)
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -56,10 +58,48 @@ final class NyxelVPNView: UIView {
         stack.addArrangedSubview(makeStatusCard())
         stack.addArrangedSubview(makeStepsCard())
 
-        let settingsButton = DavizinButton(title: "Abrir ajustes de VPN", style: .primary)
+        toggleButton.addTarget(self, action: #selector(toggleVPN), for: .touchUpInside)
+        toggleButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight).isActive = true
+        stack.addArrangedSubview(toggleButton)
+
+        let settingsButton = DavizinButton(title: "Abrir ajustes de VPN", style: .secondary)
         settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
         settingsButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight).isActive = true
         stack.addArrangedSubview(settingsButton)
+
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshStatus), name: .NEVPNStatusDidChange, object: nil)
+        NixelVPNManager.shared.load { [weak self] _ in self?.refreshStatus() }
+        refreshStatus()
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    @objc private func refreshStatus() {
+        DispatchQueue.main.async {
+            let manager = NixelVPNManager.shared
+            self.statusLabel.text = NixelVPNManager.statusText(manager.status)
+            self.statusLabel.textColor = manager.status == .connected ? AppTheme.success : AppTheme.warm
+            self.toggleButton.setTitle(manager.isActive ? "Detener VPN" : "Activar VPN", for: .normal)
+        }
+    }
+
+    @objc private func toggleVPN() {
+        let manager = NixelVPNManager.shared
+        if manager.isActive {
+            manager.stop()
+            return
+        }
+        statusLabel.text = "Activando…"
+        manager.start { [weak self] result in
+            DispatchQueue.main.async {
+                if case .failure(let error) = result {
+                    self?.statusLabel.text = "No se pudo activar: \(error.localizedDescription)"
+                    self?.statusLabel.textColor = AppTheme.failure
+                } else {
+                    self?.refreshStatus()
+                }
+            }
+        }
     }
 
     private func makeStatusCard() -> UIView {
