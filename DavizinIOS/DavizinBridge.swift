@@ -254,37 +254,40 @@ final class DavizinBridge {
         }
     }
 
-    /// Inicia el flujo equivalente a LocalDevVPN de External. El PIN pertenece
-    /// al controlador AirLift/RPairing y no se simula desde la UI de Nixel.
+    /// External no intenta levantar el túnel antes del Pair-Setup: primero
+    /// publica AirLift, espera que Developer Mode complete el pairing y solo
+    /// después inicia el túnel que depende del registro RPairing.
     private func startHybridAfterExternalPairing() {
-        vc?.setHybridStatus(.connecting)
-        vc?.setHybridDiagnostic("Conectando LocalDevVPN; esperando servicios AirLift/RSD…")
-        NixelHybridCoordinator.start { [weak self] result in
+        vc?.setHybridStatus(.pairingRequired("2424 AirLift Pairing"))
+        vc?.setHybridDiagnostic("Publicando AirLift; completa el pairing desde Developer Mode…")
+        NixelPairingSession.shared.begin { [weak self] state in
             guard let self else { return }
-            self.operationInFlight = false
-            switch result {
-            case .success:
-                self.vc?.setHybridStatus(.connected)
-                self.vc?.setHybridDiagnostic("Túnel conectado; verificando Remote Pairing sin volver a pedir el PIN…")
-                NixelPairingSession.shared.begin { [weak self] state in
+            self.vc?.setHybridDiagnostic(state.message)
+            switch state {
+            case .ready:
+                self.vc?.setHybridStatus(.connecting)
+                self.vc?.setHybridDiagnostic("Pairing completado; ahora iniciando LocalDevVPN…")
+                NixelHybridCoordinator.start { [weak self] result in
                     guard let self else { return }
-                    self.vc?.setHybridDiagnostic(state.message)
-                    switch state {
-                    case .pairingRequired(_):
-                        self.vc?.setHybridDiagnostic("\(state.message). El pairing debe completarse desde el flujo AirLift, no desde Developer Mode.")
+                    self.operationInFlight = false
+                    switch result {
+                    case .success:
                         self.vc?.setHybridStatus(.connected)
+                        self.vc?.setHybridDiagnostic("Túnel conectado después del pairing; verificando AirLift/RSD…")
                         self.vc?.setOperationState(.idle)
-                    case .failed(let message):
-                        self.vc?.setHybridStatus(.failed(message))
-                        self.vc?.setOperationState(.failed("NYX-PAIRING — \(message)"))
-                    default:
-                        break
+                    case .failure(let error):
+                        self.vc?.setHybridStatus(.failed(error.localizedDescription))
+                        self.vc?.setOperationState(.failed("NYX-VPN — \(error.localizedDescription)"))
                     }
                 }
-                self.vc?.setOperationState(.idle)
-            case .failure(let error):
-                self.vc?.setHybridStatus(.failed(error.localizedDescription))
-                self.vc?.setOperationState(.failed("NYX-VPN — \(error.localizedDescription)"))
+            case .failed(let message):
+                self.operationInFlight = false
+                self.vc?.setHybridStatus(.failed(message))
+                self.vc?.setOperationState(.failed("NYX-PAIRING — \(message)"))
+            case .pairingRequired(let message):
+                self.vc?.setHybridDiagnostic("\(message). Esperando la confirmación de Developer Mode…")
+            default:
+                break
             }
         }
     }
