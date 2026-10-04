@@ -20,6 +20,12 @@ final class NixelVPNManager: NSObject {
 
     var status: NEVPNStatus { manager?.connection.status ?? .invalid }
     var isActive: Bool { status == .connected || status == .connecting || status == .reasserting }
+    var isConfigured: Bool { manager != nil }
+    var tunnelPluginPresent: Bool {
+        Bundle.main.builtInPlugInsURL?
+            .appendingPathComponent("ExternalTunnel.appex")
+            .checkResourceIsReachable() ?? false
+    }
 
     func load(completion: @escaping (Result<Void, Error>) -> Void) {
         NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in

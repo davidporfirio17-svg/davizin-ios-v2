@@ -11,6 +11,24 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Build idevice-ffi transport backend
+      run: |
+        set -euo pipefail
+        rustup target add aarch64-apple-ios
+        cargo build \
+          --manifest-path Vendor/idevice/ffi/Cargo.toml \
+          --release \
+          --target aarch64-apple-ios \
+          --no-default-features \
+          --features tunnel_tcp_stack,ring
+        test -f Vendor/idevice/target/aarch64-apple-ios/release/libidevice_ffi.a
+        test -f Vendor/idevice/ffi/idevice.h
+        mkdir -p /tmp/idevice-ffi
+        cp Vendor/idevice/target/aarch64-apple-ios/release/libidevice_ffi.a /tmp/idevice-ffi/
+        cp Vendor/idevice/ffi/idevice.h /tmp/idevice-ffi/
 
     - name: Build
       run: |
@@ -29,6 +47,8 @@ jobs:
           ONLY_ACTIVE_ARCH=NO \
           ALWAYS_SEARCH_USER_PATHS=NO \
           BUILD_DIR=/tmp/davizin_build \
+          LIBRARY_SEARCH_PATHS=/tmp/idevice-ffi \
+          OTHER_LDFLAGS="-force_load /tmp/idevice-ffi/libidevice_ffi.a -framework Security -framework Network" \
           build 2>&1 | tee /tmp/build.log
         
         echo "=== Build completed. Checking for .app ==="
