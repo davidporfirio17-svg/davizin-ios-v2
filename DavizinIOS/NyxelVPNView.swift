@@ -10,8 +10,6 @@ final class NyxelVPNView: UIView {
     private let pairingLabel = UILabel()
     private let pairingLogLabel = UILabel()
     private let pairButton = DavizinButton(title: "Emparejar (publicar 2424)", style: .secondary)
-    private let pinField = UITextField()
-    private let pinButton = DavizinButton(title: "Enviar PIN", style: .secondary)
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -192,15 +190,13 @@ final class NyxelVPNView: UIView {
         pairButton.addTarget(self, action: #selector(beginPairing), for: .touchUpInside)
         pairButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight).isActive = true
 
-        pinField.placeholder = "PIN mostrado en el iPad"
-        pinField.keyboardType = .numberPad
-        pinField.borderStyle = .roundedRect
-        pinField.textColor = AppTheme.primaryText
+        let pinHint = UILabel()
+        pinHint.text = "Después de tocar \"Pair with 2424\" en Ajustes, iOS pide un código. Ese código lo muestra esta app arriba, en el estado — escríbelo en el diálogo de iOS, no aquí."
+        pinHint.font = AppTheme.bodyFont()
+        pinHint.textColor = AppTheme.secondaryText
+        pinHint.numberOfLines = 0
 
-        pinButton.addTarget(self, action: #selector(submitPIN), for: .touchUpInside)
-        pinButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight).isActive = true
-
-        let inner = UIStackView(arrangedSubviews: [title, pairingLabel, pairButton, pinField, pinButton, pairingLogLabel])
+        let inner = UIStackView(arrangedSubviews: [title, pairingLabel, pairButton, pinHint, pairingLogLabel])
         inner.axis = .vertical
         inner.spacing = 10
         card.addContent(inner)
@@ -227,10 +223,16 @@ final class NyxelVPNView: UIView {
             self.pairingLabel.text = state.message
             switch state {
             case .failed:
+                self.pairingLabel.font = AppTheme.bodyFont()
                 self.pairingLabel.textColor = AppTheme.failure
             case .ready, .paired:
+                self.pairingLabel.font = AppTheme.bodyFont()
                 self.pairingLabel.textColor = AppTheme.success
+            case .pairingRequired:
+                self.pairingLabel.font = AppTheme.titleFont(20)
+                self.pairingLabel.textColor = AppTheme.accent
             default:
+                self.pairingLabel.font = AppTheme.bodyFont()
                 self.pairingLabel.textColor = AppTheme.secondaryText
             }
             let previous = self.pairingLogLabel.text.map { $0 + "\n" } ?? ""
@@ -238,14 +240,4 @@ final class NyxelVPNView: UIView {
         }
     }
 
-    @objc private func submitPIN() {
-        guard let pin = pinField.text, !pin.isEmpty else { return }
-        NixelPairingSession.shared.submitPIN(pin) { [weak self] state in
-            guard let self else { return }
-            DispatchQueue.main.async {
-                self.pairingLabel.text = state.message
-                self.pairingLabel.textColor = { if case .failed = state { return AppTheme.failure } else { return AppTheme.success } }()
-            }
-        }
-    }
 }
