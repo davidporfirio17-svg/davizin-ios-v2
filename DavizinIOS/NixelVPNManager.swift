@@ -22,9 +22,8 @@ final class NixelVPNManager: NSObject {
     var isActive: Bool { status == .connected || status == .connecting || status == .reasserting }
     var isConfigured: Bool { manager != nil }
     var tunnelPluginPresent: Bool {
-        Bundle.main.builtInPlugInsURL?
-            .appendingPathComponent("ExternalTunnel.appex")
-            .checkResourceIsReachable() ?? false
+        guard let url = Bundle.main.builtInPlugInsURL?.appendingPathComponent("ExternalTunnel.appex") else { return false }
+        return (try? url.checkResourceIsReachable()) ?? false
     }
 
     func load(completion: @escaping (Result<Void, Error>) -> Void) {
