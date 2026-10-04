@@ -691,7 +691,7 @@ private final class NixelAirLiftNWPublisher {
 }
 
 @_cdecl("nyxel_nw_listener_start")
-private func nyxel_nw_listener_start(_ serviceName: UnsafePointer<CChar>?, _ rawPort: UInt16,
+func nyxel_nw_listener_start(_ serviceName: UnsafePointer<CChar>?, _ rawPort: UInt16,
                                      _ txt: UnsafePointer<UInt8>?, _ txtLen: Int) {
     guard let serviceName, let txt, txtLen > 0 else { return }
     let name = String(cString: serviceName)
@@ -700,6 +700,6 @@ private func nyxel_nw_listener_start(_ serviceName: UnsafePointer<CChar>?, _ raw
 }
 
 @_cdecl("nyxel_nw_listener_stop")
-private func nyxel_nw_listener_stop() {
+func nyxel_nw_listener_stop() {
     NixelAirLiftNWPublisher.shared.stop()
 }
