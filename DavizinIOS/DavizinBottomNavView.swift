@@ -3,13 +3,17 @@ import UIKit
 final class DavizinBottomNavView: UIView {
     var onModes: (() -> Void)?
     var onProfile: (() -> Void)?
+    var onVPN: (() -> Void)?
 
     private let modesButton = UIButton(type: .system)
     private let profileButton = UIButton(type: .system)
+    private let vpnButton = UIButton(type: .system)
     private let modesLabel = UILabel()
     private let profileLabel = UILabel()
+    private let vpnLabel = UILabel()
     private let modesIndicator = UIView()
     private let profileIndicator = UIView()
+    private let vpnIndicator = UIView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -26,15 +30,18 @@ final class DavizinBottomNavView: UIView {
         let normalColor = AppTheme.secondaryText
         modesButton.tintColor = item == .modes ? selectedColor : normalColor
         profileButton.tintColor = item == .profile ? selectedColor : normalColor
+        vpnButton.tintColor = item == .vpn ? selectedColor : normalColor
         modesLabel.textColor = item == .modes ? selectedColor : normalColor
         profileLabel.textColor = item == .profile ? selectedColor : normalColor
+        vpnLabel.textColor = item == .vpn ? selectedColor : normalColor
         UIView.animate(withDuration: AppTheme.durationPopover) {
             self.modesIndicator.alpha = item == .modes ? 1.0 : 0.0
             self.profileIndicator.alpha = item == .profile ? 1.0 : 0.0
+            self.vpnIndicator.alpha = item == .vpn ? 1.0 : 0.0
         }
     }
 
-    enum Item { case modes, profile }
+    enum Item { case modes, profile, vpn }
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
@@ -50,8 +57,9 @@ final class DavizinBottomNavView: UIView {
 
         configureButton(modesButton, image: "square.grid.2x2.fill", label: modesLabel, text: "MODOS", action: #selector(modesTapped))
         configureButton(profileButton, image: "person.crop.circle.fill", label: profileLabel, text: "PERFIL", action: #selector(profileTapped))
+        configureButton(vpnButton, image: "lock.shield.fill", label: vpnLabel, text: "VPN", action: #selector(vpnTapped))
 
-        let stack = UIStackView(arrangedSubviews: [makeItem(button: modesButton, label: modesLabel, indicator: modesIndicator), makeItem(button: profileButton, label: profileLabel, indicator: profileIndicator)])
+        let stack = UIStackView(arrangedSubviews: [makeItem(button: modesButton, label: modesLabel, indicator: modesIndicator), makeItem(button: profileButton, label: profileLabel, indicator: profileIndicator), makeItem(button: vpnButton, label: vpnLabel, indicator: vpnIndicator)])
         stack.axis = .horizontal
         stack.distribution = .fillEqually
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -103,5 +111,9 @@ final class DavizinBottomNavView: UIView {
 
     @objc private func profileTapped() {
         onProfile?()
+    }
+
+    @objc private func vpnTapped() {
+        onVPN?()
     }
 }

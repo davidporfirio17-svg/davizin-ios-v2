@@ -295,6 +295,9 @@ final class ViewController: UIViewController {
         bottomNavView.onProfile = { [weak self] in
             self?.showProfile(animated: true)
         }
+        bottomNavView.onVPN = { [weak self] in
+            self?.showVPN(animated: true)
+        }
         view.addSubview(bottomNavView)
         let bottomNavHeight = bottomNavView.heightAnchor.constraint(equalToConstant: 0)
         bottomNavHeightConstraint = bottomNavHeight
@@ -469,6 +472,16 @@ final class ViewController: UIViewController {
         if NyxelCleanupFlow.hasPendingWork {
             screen.applyCleanupStage(NyxelCleanupFlow.stage)
         }
+    }
+
+    private func showVPN(animated: Bool) {
+        stageBeforeProfile = currentStage == .profile ? stageBeforeProfile : currentStage
+        currentStage = .profile
+        setBottomNavigation(visible: true, selected: .vpn)
+        headerView.title = "VPN"
+        headerView.showsBackButton = true
+        headerView.showsAvatarButton = false
+        display(NyxelVPNView(), animated: animated)
     }
 
     /// Perfil: accesible desde el avatar del header en cualquier pantalla (excepto login).
