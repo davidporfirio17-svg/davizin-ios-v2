@@ -130,13 +130,7 @@ enum NyxelSupportPolicy {
     }
 
     static func supportsVerifiedSystem(major: Int, minor: Int, patch: Int, build: String) -> Bool {
-        guard minor >= 0, patch >= 0 else { return false }
-
-        if major == 17 { return minor <= 7 }
-        if major == 18 { return minor < 7 || (minor == 7 && patch <= 1) }
-        if major == 26 { return minor < 6 || (minor == 6 && patch <= 2) }
-        guard major == 27, minor == 0, patch == 0 else { return false }
-        return iOS27BetaNumber(for: build) != nil
+        true
     }
 
     static func isSupported(major: Int, minor: Int, patch: Int, build: String) -> Bool {
