@@ -122,9 +122,8 @@ static void DavizinMCMLog(NSString *message) {
 }
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
-    static const uint64_t kClass = 0x6;
-    static const uint64_t kPart = 0x3;
-    static const uint64_t kFlags = 0x7;
+    static const uint64_t kClass = 2;
+    static const uint64_t kFlags = 0x900000000ULL;
 
     NSString *sid = getSigningID();
     if (![sid isEqualToString:@"com.apple.mobile.MobileHouseArrest"]) {
@@ -146,8 +145,6 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
         xpc_obj_t xid = api->xpcStr(bundleID.UTF8String);
         if (xid) api->setIds(query, xid);
     }
-    if (api->setPart) api->setPart(query, kPart);
-    if (api->setDomain) api->setDomain(query, "");
     api->setFlags(query, kFlags);
 
     void *obj = api->getSingle(query);
@@ -176,8 +173,7 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     if (api->activateExt) {
         activateResult = api->activateExt(obj);
     }
-    DavizinMCMLog([NSString stringWithFormat:@"MCM %@: class=0x6 part=0x3 activate=%d",
-                   bundleID, activateResult]);
+    DavizinMCMLog([NSString stringWithFormat:@"MCM %@: activate=%d", bundleID, activateResult]);
 
     if (api->freeObj) api->freeObj(obj);
     api->freeQ(query);
