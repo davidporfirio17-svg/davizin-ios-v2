@@ -48,6 +48,14 @@ private func activePathKey(for game: DavizinGame) -> String {
     return game == .freeFireMax ? "dz_active_path_max" : "dz_active_path_normal"
 }
 
+private func originalMissingKey(for game: DavizinGame) -> String {
+    return game == .freeFireMax ? "dz_original_missing_max" : "dz_original_missing_normal"
+}
+
+private func restoreCompletedKey(for game: DavizinGame) -> String {
+    return game == .freeFireMax ? "dz_restore_completed_max" : "dz_restore_completed_normal"
+}
+
 private func legacyDestPathRel(for game: DavizinGame) -> String {
     return kBaseFolder + "/" + savedDestFileName(for: game)
 }
@@ -80,6 +88,43 @@ class InjectorService {
         case .freeFireMax: return "com.dts.freefiremax"
         case .freeFire:    return "com.dts.freefireth"
         }
+    }
+
+    /// Escribe en el contenedor del juego. Si hay un registro de pairing
+    /// AirLift guardado, usa ese canal (permisos elevados vía house_arrest/AFC);
+    /// si no, cae al acceso directo de siempre. `relPath` es relativo al
+    /// contenedor (p. ej. "Documents/.../avatar/assetindexer.xxx").
+    private struct ContainerWriteError: LocalizedError {
+        let airliftNote: String
+        let directError: Swift.Error
+        var errorDescription: String? { "\(directError.localizedDescription) [\(airliftNote)]" }
+    }
+
+    private static func writeToContainer(_ data: Data, relPath: String, container: String, bundleID: String) -> Swift.Error? {
+        var airliftNote = "AirLift: sin registro de pairing guardado"
+        if NixelAirLiftFileChannel.isAvailable {
+            switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
+            case .success: return nil
+            case .failure(let error):
+                airliftNote = "AirLift falló: \(error.message)"
+                NyxelActivityLog.record("AirLift write falló (\(relPath)): \(error.message); usando método directo")
+            }
+        }
+        do {
+            try data.write(to: URL(fileURLWithPath: container + "/" + relPath), options: .atomic)
+            return nil
+        } catch {
+            return ContainerWriteError(airliftNote: airliftNote, directError: error)
+        }
+    }
+
+    private static func readFromContainer(relPath: String, container: String, bundleID: String) -> Data? {
+        if NixelAirLiftFileChannel.isAvailable {
+            if case .success(let data) = NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
+                return data
+            }
+        }
+        return try? Data(contentsOf: URL(fileURLWithPath: container + "/" + relPath))
     }
 
     /// Comprueba si el bundle está instalado y accesible en el sistema verificado.
@@ -235,26 +280,39 @@ class InjectorService {
         try? fm.createDirectory(atPath: destDir,
                                 withIntermediateDirectories: true)
 
-        if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
-            do {
-                let original = try Data(contentsOf: URL(fileURLWithPath: destPath))
-                try original.write(to: URL(fileURLWithPath: backupPath))
-            } catch {
+        let backupRel = disguisedBackupPath(for: activeRel)
+        let originalFileExists = fm.fileExists(atPath: destPath)
+        if originalFileExists && !fm.fileExists(atPath: backupPath) {
+            guard let original = readFromContainer(relPath: activeRel, container: container, bundleID: bundleID) else {
+                return InjectorResult(success: false, message: "Error haciendo backup: no se pudo leer el archivo original.")
+            }
+            if let error = writeToContainer(original, relPath: backupRel, container: container, bundleID: bundleID) {
                 return InjectorResult(success: false,
                     message: "Error haciendo backup: \(error.localizedDescription)")
             }
         }
 
-        do {
-            try finalData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
-            try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        } catch {
+        let hasBackup = fm.fileExists(atPath: backupPath)
+        let originalWasMissing = !originalFileExists && !hasBackup
+        guard hasBackup || originalWasMissing else {
             return InjectorResult(success: false,
-                message: "Error al inyectar: \(error.localizedDescription)")
+                message: "No se encontró un archivo original restaurable. No se inyectó nada.")
         }
 
+        UserDefaults.standard.set(originalWasMissing, forKey: originalMissingKey(for: game))
+        UserDefaults.standard.set(false, forKey: restoreCompletedKey(for: game))
+        NyxelCleanupFlow.markInjectionWriteStarted(for: game)
+
+        if let error = writeToContainer(finalData, relPath: activeRel, container: container, bundleID: bundleID) {
+            return InjectorResult(success: false,
+                message: "Error al inyectar: \(error.localizedDescription) {MCM: \(DavizinMCMLastDiagnostic() ?? "sin dato")}")
+        }
+        try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
+
+        NyxelCleanupFlow.markInjectionSucceeded(for: game)
+
         return InjectorResult(success: true,
-            message: "¡\(mode.displayName) inyectado! Cierra y abre Free Fire.")
+            message: "¡\(mode.displayName) inyectado! Abre Free Fire, espera 8–10 segundos, vuelve a Nyxel y limpia la sesión.")
     }
 
     static func uninject(game: DavizinGame) -> InjectorResult {
@@ -271,23 +329,41 @@ class InjectorService {
         let destPath   = container + "/" + activeRel
         let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
 
-        guard fm.fileExists(atPath: backupPath) else {
+        let backupRel = disguisedBackupPath(for: activeRel)
+        if fm.fileExists(atPath: backupPath) {
+            do {
+                guard let backupData = readFromContainer(relPath: backupRel, container: container, bundleID: bundleID) else {
+                    throw NSError(domain: "Nyxel", code: -1, userInfo: [NSLocalizedDescriptionKey: "no se pudo leer el respaldo"])
+                }
+                if let error = writeToContainer(backupData, relPath: activeRel, container: container, bundleID: bundleID) {
+                    throw error
+                }
+                UserDefaults.standard.set(true, forKey: restoreCompletedKey(for: game))
+                try fm.removeItem(atPath: backupPath)
+                try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
+            } catch {
+                return InjectorResult(success: false,
+                    message: "Error al restaurar: \(error.localizedDescription) {MCM: \(DavizinMCMLastDiagnostic() ?? "sin dato")}")
+            }
+        } else if UserDefaults.standard.bool(forKey: originalMissingKey(for: game)) {
+            do {
+                if fm.fileExists(atPath: destPath) { try fm.removeItem(atPath: destPath) }
+                UserDefaults.standard.set(true, forKey: restoreCompletedKey(for: game))
+            } catch {
+                return InjectorResult(success: false,
+                    message: "Error al retirar el archivo temporal: \(error.localizedDescription)")
+            }
+        } else if UserDefaults.standard.bool(forKey: restoreCompletedKey(for: game)) {
+            // El original ya quedó escrito; se conserva la confirmación tras un cierre inesperado.
+        } else {
             return InjectorResult(success: false,
-                message: "No hay backup para restaurar")
+                message: "No hay un respaldo restaurable; no se confirmó la limpieza.")
         }
 
-        do {
-            let backupData = try Data(contentsOf: URL(fileURLWithPath: backupPath))
-            try backupData.write(to: URL(fileURLWithPath: destPath), options: .atomic)
-            try? fm.removeItem(atPath: backupPath)
-            try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        } catch {
-            return InjectorResult(success: false,
-                message: "Error al restaurar: \(error.localizedDescription)")
-        }
+        UserDefaults.standard.set(false, forKey: originalMissingKey(for: game))
 
         return InjectorResult(success: true,
-            message: "¡Restaurado! Cierra y abre Free Fire.")
+            message: "Sesión limpia. Pulsa Abrir juego para volver a Free Fire.")
     }
 
     /// Resultado del chequeo de compatibilidad del dispositivo.

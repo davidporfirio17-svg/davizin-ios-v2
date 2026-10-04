@@ -38,7 +38,7 @@ final class DavizinAnimatedBackgroundView: UIView {
     deinit { displayLink?.invalidate() }
 
     private func setup() {
-        backgroundColor = UIColor(red: 0.024, green: 0.027, blue: 0.043, alpha: 1)
+        backgroundColor = AppTheme.background
         isUserInteractionEnabled = false
         layer.masksToBounds = true
         buildNodes()

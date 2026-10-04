@@ -31,6 +31,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     /// DavizinBridge, porque el /check del Worker exige key+hwid: no existe
     /// forma de consultar un aviso antes de que la persona escriba su key.
     private func showMainApp(in window: UIWindow) {
+        // Log compatibility status before proceeding
+        let compatStatus = NyxelSupportPolicy.status.label
+        nyxelLog("Scene loading: Compatibility status = \(compatStatus)", level: "INFO")
+        
         let rootViewController = ViewController()
         rootViewController.modalPresentationStyle = .fullScreen
 
