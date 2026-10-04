@@ -79,7 +79,10 @@ final class NyxelVPNView: UIView {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
-        NixelPairingSession.shared.stop()
+        // Ojo: NO detener NixelPairingSession aquí. El usuario sale de esta
+        // pestaña para ir a inyectar — si apagamos el host de emparejamiento
+        // al cambiar de pestaña, el dispositivo pierde la sesión justo antes
+        // de necesitarla para abrir el túnel AFC.
     }
 
     @objc private func refreshStatus() {

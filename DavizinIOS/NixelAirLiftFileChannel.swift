@@ -17,7 +17,7 @@ enum NixelAirLiftFileChannel {
         NixelPairingRecordStore.shared.load(deviceID: "2424") != nil
     }
 
-    static func write(_ data: Data, toRelativePath relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 6) -> Result<Void, ChannelError> {
+    static func write(_ data: Data, toRelativePath relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Void, ChannelError> {
         guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
             return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
         }
@@ -47,7 +47,7 @@ enum NixelAirLiftFileChannel {
         return .failure(ChannelError(message: message))
     }
 
-    static func read(relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 6) -> Result<Data, ChannelError> {
+    static func read(relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Data, ChannelError> {
         guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
             return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
         }
