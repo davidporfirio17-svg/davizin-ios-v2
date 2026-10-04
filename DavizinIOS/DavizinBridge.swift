@@ -284,8 +284,8 @@ final class DavizinBridge {
                 self.operationInFlight = false
                 self.vc?.setHybridStatus(.failed(message))
                 self.vc?.setOperationState(.failed("NYX-PAIRING — \(message)"))
-            case .pairingRequired(let message):
-                self.vc?.setHybridDiagnostic("\(message). Esperando la confirmación de Developer Mode…")
+            case .pairingRequired:
+                self.vc?.setHybridDiagnostic("\(state.message). Esperando la confirmación de Developer Mode…")
             default:
                 break
             }
