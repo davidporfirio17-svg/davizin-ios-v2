@@ -217,27 +217,39 @@ int nyxel_pairable_host_start(const char *name, const char *model) {
         return -7;
     }
     nyxel_pairing_host_listener = listener;
-    nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@""
-                                                                   type:@"_remotepairing-pairable-host._tcp."
-                                                                   name:serviceName
-                                                                   port:publishedPort];
-    nyxel_pairing_host_delegate = [NyxelPairingNetServiceDelegate new];
-    nyxel_pairing_host_service.delegate = nyxel_pairing_host_delegate;
-    nyxel_pairing_host_service.includesPeerToPeer = YES;
-    [nyxel_pairing_host_service setTXTRecordData:txtRecord];
-    [nyxel_pairing_host_service scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
-    [nyxel_pairing_host_service publish];
 
-    // External also publishes this lightweight probe service.  It is not the
-    // pairing protocol itself, but iPadOS uses it to identify the AirLift host
-    // and it is useful for diagnosing discovery independently of Pair-Setup.
-    nyxel_airlift_probe_service = [[NSNetService alloc] initWithDomain:@""
-                                                                   type:@"_3105airlift._tcp."
-                                                                   name:@"2424AirLiftProbe"
-                                                                   port:publishedPort];
-    nyxel_airlift_probe_service.includesPeerToPeer = YES;
-    [nyxel_airlift_probe_service scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
-    [nyxel_airlift_probe_service publish];
+    // External's AirLiftPairingController is main-actor driven.  NSNetService
+    // must be created, scheduled, and published on the same run loop; creating
+    // it from the caller's worker queue can surface only the opaque
+    // NSNetServicesErrorDomain/-72000 error on iOS.
+    void (^publishBonjour)(void) = ^{
+        nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@""
+                                                                       type:@"_remotepairing-pairable-host._tcp."
+                                                                       name:serviceName
+                                                                       port:publishedPort];
+        nyxel_pairing_host_delegate = [NyxelPairingNetServiceDelegate new];
+        nyxel_pairing_host_service.delegate = nyxel_pairing_host_delegate;
+        nyxel_pairing_host_service.includesPeerToPeer = YES;
+        [nyxel_pairing_host_service setTXTRecordData:txtRecord];
+        [nyxel_pairing_host_service scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
+        [nyxel_pairing_host_service publish];
+
+        // External also publishes this lightweight probe service.  It is not
+        // the pairing protocol itself, but helps iPadOS identify AirLift and
+        // diagnose discovery independently of Pair-Setup.
+        nyxel_airlift_probe_service = [[NSNetService alloc] initWithDomain:@""
+                                                                       type:@"_3105airlift._tcp."
+                                                                       name:@"2424AirLiftProbe"
+                                                                       port:publishedPort];
+        nyxel_airlift_probe_service.includesPeerToPeer = YES;
+        [nyxel_airlift_probe_service scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
+        [nyxel_airlift_probe_service publish];
+    };
+    if ([NSThread isMainThread]) {
+        publishBonjour();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), publishBonjour);
+    }
 
     nyxel_pairing_host_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, (uintptr_t)listener, 0,
                                                         dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
