@@ -1,4 +1,7 @@
 #import "DavizinMCM.h"
+#import "kexploit/kexploit_opa334.h"
+#import "kexploit/sandbox_escape.h"
+#import "kexploit/kutils.h"
 #import <Foundation/Foundation.h>
 #import <stdio.h>
 #import <stdlib.h>
@@ -176,10 +179,53 @@ NSString *DavizinPrepareInjectionQuery(NSString *bundleID, NSString **outErr) {
     return nil;
 }
 
+static BOOL gExploitAttempted = NO;
+static BOOL gExploitSucceeded = NO;
+
+static BOOL ensureSandboxEscape(void) {
+    if (sandbox_access_is_active() == 1) {
+        return YES;
+    }
+
+    if (gExploitAttempted) {
+        return gExploitSucceeded;
+    }
+    gExploitAttempted = YES;
+
+    DavizinMCMLog(@"kexploit: iniciando (10-30s)...");
+    int ret = kexploit_opa334();
+    if (ret != 0) {
+        DavizinMCMLog([NSString stringWithFormat:@"kexploit: FAIL ret=%d", ret]);
+        gExploitSucceeded = NO;
+        return NO;
+    }
+
+    uint64_t selfProc = proc_self();
+    if (selfProc == 0) {
+        DavizinMCMLog(@"kexploit: proc_self=0");
+        gExploitSucceeded = NO;
+        return NO;
+    }
+
+    int sbxRet = sandbox_escape(selfProc);
+    gExploitSucceeded = (sbxRet == 0 && sandbox_access_is_active() == 1);
+
+    DavizinMCMLog([NSString stringWithFormat:@"kexploit: sbx=%d ok=%d",
+                   sbxRet, gExploitSucceeded]);
+    return gExploitSucceeded;
+}
+
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     if (gLastContainerHandle >= 0) {
         bad_query_release_impl(gLastContainerHandle);
         gLastContainerHandle = -1;
+    }
+
+    // Run kernel exploit + sandbox escape first (iOS 26+)
+    BOOL sandboxOK = ensureSandboxEscape();
+    if (!sandboxOK) {
+        if (outErr) *outErr = @"Sandbox escape falló";
+        return nil;
     }
 
     NSString *appDataRoot = @"/var/mobile/Containers/Data/Application";

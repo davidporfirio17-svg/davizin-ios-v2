@@ -30,6 +30,35 @@ jobs:
         cp Vendor/idevice/target/aarch64-apple-ios/release/libidevice_ffi.a /tmp/idevice-ffi/
         cp Vendor/idevice/ffi/idevice.h /tmp/idevice-ffi/
 
+    - name: Add kexploit files to Xcode project
+      run: |
+        gem install xcodeproj --no-document
+        ruby -e '
+          require "xcodeproj"
+          project_path = "DavizinIOS.xcodeproj"
+          project = Xcodeproj::Project.open(project_path)
+          target = project.targets.find { |t| t.name == "DavizinIOS" }
+          raise "Target not found" unless target
+
+          main_group = project.main_group["DavizinIOS"] || project.main_group
+          kexploit_group = main_group["kexploit"] || main_group.new_group("kexploit", "DavizinIOS/kexploit")
+
+          Dir.glob("DavizinIOS/kexploit/*.{m,h}").each do |file|
+            basename = File.basename(file)
+            next if kexploit_group.files.any? { |f| f.path == basename }
+            file_ref = kexploit_group.new_file(basename)
+            if file.end_with?(".m")
+              target.add_file_references([file_ref])
+              puts "Added source: #{basename}"
+            else
+              puts "Added header: #{basename}"
+            end
+          end
+
+          project.save
+          puts "Project saved."
+        '
+
     - name: Build
       run: |
         set +e
