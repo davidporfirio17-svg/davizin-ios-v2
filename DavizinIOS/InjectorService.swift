@@ -1,15 +1,6 @@
 import Foundation
 import CryptoKit
 
-// LSApplicationWorkspace para detectar apps instaladas (API privada pero estable)
-@objc protocol LSApplicationWorkspace {
-    func allApplications() -> [Any]?
-}
-
-extension NSObject {
-    @objc var applicationIdentifier: String { "" }
-}
-
 struct InjectorResult {
     let success: Bool
     let message: String
@@ -385,21 +376,8 @@ class InjectorService {
 		case unsupportedSystem   // la versión/build del sistema no está verificada
     }
 
-	/// Verifica si un bundle está instalado usando LSApplicationWorkspace
-	private static func isBundleInstalledViaWorkspace(_ bundleID: String) -> Bool {
-		guard let workspaceClass = NSClassFromString("LSApplicationWorkspace") else { return false }
-		guard let workspace = workspaceClass.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() else { return false }
-		guard let apps = (workspace as AnyObject).perform(NSSelectorFromString("allApplications"))?.takeRetainedValue() as? [AnyObject] else { return false }
-
-		for app in apps {
-			if let appID = app.perform(NSSelectorFromString("applicationIdentifier"))?.takeUnretainedValue() as? String,
-			   appID == bundleID {
-				return true
-			}
-		}
-		return false
-	}
-
+	/// Prueba REAL si el dispositivo puede inyectar, intentando acceder al
+	/// contenedor de Free Fire (MAX o normal) via MCM. No inyecta nada.
 	/// Intenta verificar si un bundle está instalado enumerando containers
 	private static func isBundleInstalledViaEnumeration(_ bundleID: String) -> Bool {
 		let fm = FileManager.default
@@ -441,11 +419,8 @@ class InjectorService {
                 }
                 algunInstalado = true
             } else {
-                // Fallback 1: use LSApplicationWorkspace (most reliable)
-                if isBundleInstalledViaWorkspace(bid) {
-                    algunInstalado = true
-                } else if isBundleInstalledViaEnumeration(bid) {
-                    // Fallback 2: enumerate containers if workspace fails
+                // Fallback: enumerate containers to check if installed
+                if isBundleInstalledViaEnumeration(bid) {
                     algunInstalado = true
                 }
             }
