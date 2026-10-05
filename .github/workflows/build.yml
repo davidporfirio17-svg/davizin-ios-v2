@@ -33,17 +33,20 @@ jobs:
     - name: Add kexploit files to Xcode project
       run: |
         gem install xcodeproj --no-document
-        ruby -e '
+        ruby <<'RUBY'
           require "xcodeproj"
           project_path = "DavizinIOS.xcodeproj"
           project = Xcodeproj::Project.open(project_path)
           target = project.targets.find { |t| t.name == "DavizinIOS" }
           raise "Target not found" unless target
 
-          main_group = project.main_group["DavizinIOS"] || project.main_group
-          kexploit_group = main_group["kexploit"] || main_group.new_group("kexploit", "DavizinIOS/kexploit")
+          davizin_group = project.main_group["DavizinIOS"] || project.main_group
+          kexploit_group = davizin_group["kexploit"]
+          if kexploit_group.nil?
+            kexploit_group = davizin_group.new_group("kexploit", "kexploit")
+          end
 
-          Dir.glob("DavizinIOS/kexploit/*.{m,h}").each do |file|
+          Dir.glob("DavizinIOS/kexploit/*.{m,h}").sort.each do |file|
             basename = File.basename(file)
             next if kexploit_group.files.any? { |f| f.path == basename }
             file_ref = kexploit_group.new_file(basename)
@@ -57,7 +60,8 @@ jobs:
 
           project.save
           puts "Project saved."
-        '
+        RUBY
+        ls -la DavizinIOS/kexploit/
 
     - name: Build
       run: |
@@ -90,7 +94,7 @@ jobs:
 
         if [ "$status" -ne 0 ]; then
           echo "=== Build FAILED (status $status); emitting annotations ==="
-          grep -iE "error:|fatal error|undefined symbol|ld: " /tmp/build.log | sort -u | head -30 | while IFS= read -r line; do
+          grep -iE "error:|fatal error|undefined symbol" /tmp/build.log | grep -v "^ld: warning" | sort -u | head -30 | while IFS= read -r line; do
             escaped=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')
             echo "::error::${escaped}"
           done
@@ -104,14 +108,14 @@ jobs:
           echo "ERROR: No .app found"
           exit 1
         fi
-        
+
         echo "Found app: $APP"
         du -sh "$APP"
-        
+
         mkdir -p /tmp/Payload
         cp -r "$APP" /tmp/Payload/DavizinIOS.app
         cd /tmp && zip -r Nyxel_External_unsigned.ipa Payload/
-        
+
         ls -lh /tmp/Nyxel_External_unsigned.ipa
         unzip -l /tmp/Nyxel_External_unsigned.ipa | head -20
 
