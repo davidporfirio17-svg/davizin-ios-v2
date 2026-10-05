@@ -8,3 +8,4 @@
 #import "kexploit/kutils.h"
 #import "kexploit/vnode.h"
 #import "kexploit/offsets.h"
+#import "kexploit/bad_query.h"
