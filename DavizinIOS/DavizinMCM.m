@@ -172,12 +172,11 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     if ([path hasPrefix:@"/var/"])
         path = [@"/private" stringByAppendingString:path];
 
-    int activateResult = -99;
-    if (api->activateExt) {
-        activateResult = api->activateExt(obj);
+    if (api->getToken && api->sbConsume) {
+        char *tok = api->getToken(obj);
+        if (tok && tok[0]) api->sbConsume(tok);
+        if (tok) free(tok);
     }
-    DavizinMCMLog([NSString stringWithFormat:@"MCM %@: class=0x6 part=0x3 activate=%d",
-                   bundleID, activateResult]);
 
     if (api->freeObj) api->freeObj(obj);
     api->freeQ(query);
