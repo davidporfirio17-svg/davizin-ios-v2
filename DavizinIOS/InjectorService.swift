@@ -1,9 +1,22 @@
 import Foundation
 import CryptoKit
+import UserNotifications
 
 struct InjectorResult {
     let success: Bool
     let message: String
+}
+
+// MARK: - Error Notifications
+fileprivate func sendErrorNotification(_ title: String, _ body: String) {
+    let content = UNMutableNotificationContent()
+    content.title = title
+    content.body = body
+    content.sound = .default
+    content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
+
+    let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
+    UNUserNotificationCenter.current().add(request)
 }
 
 // Carpeta base donde vive el archivo dentro del contenedor de Free Fire.
@@ -245,12 +258,12 @@ class InjectorService {
     }
 
 	static func inject(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) -> InjectorResult {
-		guard NyxelSupportPolicy.isCurrentSystemSupported else {
-			return InjectorResult(
-				success: false,
-				message: "Versión no verificada: \(NyxelSupportPolicy.currentSystemDescription)"
-			)
-		}
+		do {
+			guard NyxelSupportPolicy.isCurrentSystemSupported else {
+				throw NSError(domain: "Davizin", code: -1, userInfo: [
+					NSLocalizedDescriptionKey: "Versión no verificada: \(NyxelSupportPolicy.currentSystemDescription)"
+				])
+			}
 
 		let fm = FileManager.default
         let bundleID = bundleID(for: game)
@@ -315,6 +328,15 @@ class InjectorService {
 
         return InjectorResult(success: true,
             message: "¡\(mode.displayName) inyectado! Abre Free Fire, espera 8–10 segundos, vuelve a Nyxel y limpia la sesión.")
+		} catch let error as NSError {
+			let msg = error.localizedDescription
+			sendErrorNotification("Error de Inyección", msg)
+			return InjectorResult(success: false, message: msg)
+		} catch {
+			let msg = error.localizedDescription
+			sendErrorNotification("Error Fatal", msg)
+			return InjectorResult(success: false, message: msg)
+		}
     }
 
     static func uninject(game: DavizinGame) -> InjectorResult {
