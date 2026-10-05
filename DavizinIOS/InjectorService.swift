@@ -406,27 +406,32 @@ class InjectorService {
 			return .unsupportedSystem
 		}
 
-		let fm = FileManager.default
-        let bundles = ["com.dts.freefiremax", "com.dts.freefireth"]
+		// On iOS 27+, sandbox escape is not available, so we can't reliably verify
+		// if Free Fire is installed. Instead, trust that if the user got this far,
+		// they likely have it installed. Injection will fail clearly if they don't.
+		let bundles = ["com.dts.freefiremax", "com.dts.freefireth"]
 
-        var algunInstalado = false
         for bid in bundles {
             var err: NSString?
-            // Try MCM first
+            // Try MCM/bad_query
             if let container = DavizinGetContainerPath(bid, &err) {
-                // bad_query found it → always compatible, even if we can't verify with FileManager
-                // (FileManager requires sandbox escape on iOS 27)
+                // Found it → definitely compatible
                 return .compatible
-            } else {
-                // Fallback: enumerate containers to check if installed
-                if isBundleInstalledViaEnumeration(bid) {
-                    algunInstalado = true
-                }
             }
         }
-        // Si obtuvimos algun path pero no accesible → already returned .compatible
-        // Si nunca obtuvimos path → el juego no esta instalado
-        return algunInstalado ? .compatible : .noGameInstalled
+
+        // bad_query failed (expected on iOS 27 without kexploit)
+        // Try fallback enumeration if possible
+        for bid in bundles {
+            if isBundleInstalledViaEnumeration(bid) {
+                return .compatible
+            }
+        }
+
+        // Can't verify via filesystem. On iOS 27, this is expected.
+        // Return .compatible anyway - if they don't have Free Fire, injection will fail
+        // with a clearer error message.
+        return .compatible
     }
 
 }
