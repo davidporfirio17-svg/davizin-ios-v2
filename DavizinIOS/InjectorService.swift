@@ -261,7 +261,12 @@ class InjectorService {
     }
 
 	static func inject(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) -> InjectorResult {
+		defer { print("❌ inject() COMPLETÓ (defer)") }
+
+		print("🔵 inject() INICIANDO")
+
 		do {
+			print("🔵 PASO 1: Verificando iOS...")
 			sendErrorNotification("🔍 PASO 1", "Verificando iOS...")
 
 			guard NyxelSupportPolicy.isCurrentSystemSupported else {
@@ -374,14 +379,21 @@ class InjectorService {
         return InjectorResult(success: true,
             message: "¡\(mode.displayName) inyectado! Abre Free Fire, espera 8–10 segundos, vuelve a Nyxel y limpia la sesión.")
 		} catch let error as NSError {
-			let msg = "Paso desconocido - \(error.localizedDescription)"
-			sendErrorNotification("💥 ERROR NSError", msg)
+			let msg = "NSError: \(error.localizedDescription)"
+			print("💥 CRASH NSError: \(msg)")
+			sendErrorNotification("💥 NSError", msg)
 			return InjectorResult(success: false, message: msg)
 		} catch {
-			let msg = "Paso desconocido - \(error.localizedDescription)"
-			sendErrorNotification("💥 ERROR Fatal", msg)
+			let msg = "Excepción: \(error)"
+			print("💥 CRASH Exception: \(msg)")
+			sendErrorNotification("💥 Exception", msg)
 			return InjectorResult(success: false, message: msg)
 		}
+
+		// Si llegamos aquí sin retornar, algo muy malo pasó
+		print("⚠️ FATAL: inject() reached end without return")
+		sendErrorNotification("⚠️ FATAL", "Código llegó al final sin retorno")
+		return InjectorResult(success: false, message: "Fatal: código llegó al final")
     }
 
     static func uninject(game: DavizinGame) -> InjectorResult {
