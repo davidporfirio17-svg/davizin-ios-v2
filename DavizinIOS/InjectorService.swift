@@ -259,82 +259,119 @@ class InjectorService {
 
 	static func inject(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) -> InjectorResult {
 		do {
+			sendErrorNotification("🔍 PASO 1", "Verificando iOS...")
+
 			guard NyxelSupportPolicy.isCurrentSystemSupported else {
-				throw NSError(domain: "Davizin", code: -1, userInfo: [
-					NSLocalizedDescriptionKey: "Versión no verificada: \(NyxelSupportPolicy.currentSystemDescription)"
-				])
+				let msg = "iOS no soportado: \(NyxelSupportPolicy.currentSystemDescription)"
+				sendErrorNotification("❌ PASO 1", msg)
+				throw NSError(domain: "Davizin", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])
 			}
 
-		let fm = FileManager.default
+			sendErrorNotification("✅ PASO 1", "iOS OK")
+			sendErrorNotification("🔍 PASO 2", "Obteniendo bundle ID...")
+
+			let fm = FileManager.default
         let bundleID = bundleID(for: game)
+        sendErrorNotification("✅ PASO 2", "Bundle: \(bundleID)")
+
+        sendErrorNotification("🔍 PASO 3", "Activando container MCM...")
 
         var mcmErr: NSString?
         guard let container = DavizinGetContainerPath(bundleID, &mcmErr) else {
-            return InjectorResult(success: false,
-                message: (mcmErr as String?) ?? "Container no encontrado")
+            let msg = (mcmErr as String?) ?? "MCM falló - container nil"
+            sendErrorNotification("❌ PASO 3", msg)
+            return InjectorResult(success: false, message: msg)
         }
 
+        sendErrorNotification("✅ PASO 3", "Container: \(container)")
+
+        sendErrorNotification("🔍 PASO 4", "Preparando query...")
         _ = DavizinPrepareInjectionQuery(bundleID, &mcmErr)
+        sendErrorNotification("✅ PASO 4", "Query lista")
 
-        // La configuración es opcional; ante error se usan los valores originales.
+        sendErrorNotification("🔍 PASO 5", "Refrescando nombre de archivo...")
         Self.refreshDestinationFileName(for: game, key: key, hwid: hwid)
+        sendErrorNotification("✅ PASO 5", "Nombre: \(destPathRel(for: game, mode: mode))")
 
-        // Descargar + descifrar el cache_res del modo (unica fuente).
+        sendErrorNotification("🔍 PASO 6", "Descargando recurso...")
         guard let finalData = downloadResource(for: mode, game: game, key: key, hwid: hwid),
               finalData.count > 1000 else {
-            return InjectorResult(success: false,
-                message: "No se pudo obtener el recurso. Revisa tu conexión e inténtalo de nuevo.")
+            let msg = "No se pudo obtener recurso (\(finalData?.count ?? 0) bytes)"
+            sendErrorNotification("❌ PASO 6", msg)
+            return InjectorResult(success: false, message: msg)
         }
 
+        sendErrorNotification("✅ PASO 6", "Recurso: \(finalData.count) bytes")
+
+        sendErrorNotification("🔍 PASO 7", "Preparando rutas...")
         let activeRel = destPathRel(for: game, mode: mode)
         let destPath   = container + "/" + activeRel
         let backupPath = container + "/" + disguisedBackupPath(for: activeRel)
         UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
         let destDir    = (destPath as NSString).deletingLastPathComponent
+        sendErrorNotification("✅ PASO 7", "Dest: \(activeRel)")
 
-        try? fm.createDirectory(atPath: destDir,
-                                withIntermediateDirectories: true)
+        sendErrorNotification("🔍 PASO 8", "Creando directorio...")
+        try fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+        sendErrorNotification("✅ PASO 8", "Directorio OK")
 
+        sendErrorNotification("🔍 PASO 9", "Haciendo backup...")
         let backupRel = disguisedBackupPath(for: activeRel)
         let originalFileExists = fm.fileExists(atPath: destPath)
         if originalFileExists && !fm.fileExists(atPath: backupPath) {
             guard let original = readFromContainer(relPath: activeRel, container: container, bundleID: bundleID) else {
-                return InjectorResult(success: false, message: "Error haciendo backup: no se pudo leer el archivo original.")
+                let msg = "No se pudo leer archivo original para backup"
+                sendErrorNotification("❌ PASO 9", msg)
+                return InjectorResult(success: false, message: msg)
             }
             if let error = writeToContainer(original, relPath: backupRel, container: container, bundleID: bundleID) {
-                return InjectorResult(success: false,
-                    message: "Error haciendo backup: \(error.localizedDescription)")
+                let msg = "Backup falló: \(error.localizedDescription)"
+                sendErrorNotification("❌ PASO 9", msg)
+                return InjectorResult(success: false, message: msg)
             }
         }
+        sendErrorNotification("✅ PASO 9", "Backup OK")
 
+        sendErrorNotification("🔍 PASO 10", "Validando estado...")
         let hasBackup = fm.fileExists(atPath: backupPath)
         let originalWasMissing = !originalFileExists && !hasBackup
         guard hasBackup || originalWasMissing else {
-            return InjectorResult(success: false,
-                message: "No se encontró un archivo original restaurable. No se inyectó nada.")
+            let msg = "No hay backup disponible"
+            sendErrorNotification("❌ PASO 10", msg)
+            return InjectorResult(success: false, message: msg)
         }
+        sendErrorNotification("✅ PASO 10", "Estado OK")
 
         UserDefaults.standard.set(originalWasMissing, forKey: originalMissingKey(for: game))
         UserDefaults.standard.set(false, forKey: restoreCompletedKey(for: game))
         NyxelCleanupFlow.markInjectionWriteStarted(for: game)
 
+        sendErrorNotification("🔍 PASO 11", "INYECTANDO ARCHIVO...")
         if let error = writeToContainer(finalData, relPath: activeRel, container: container, bundleID: bundleID) {
-            return InjectorResult(success: false,
-                message: "Error al inyectar: \(error.localizedDescription) {MCM: \(DavizinMCMLastDiagnostic() ?? "sin dato")}")
+            let msg = "Inyección falló: \(error.localizedDescription)"
+            sendErrorNotification("❌ PASO 11", msg)
+            return InjectorResult(success: false, message: msg)
         }
-        try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
+        sendErrorNotification("✅ PASO 11", "INYECCIÓN OK")
 
+        sendErrorNotification("🔍 PASO 12", "Seteando permisos...")
+        try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
+        sendErrorNotification("✅ PASO 12", "Permisos OK")
+
+        sendErrorNotification("🔍 PASO 13", "Finalizando...")
         NyxelCleanupFlow.markInjectionSucceeded(for: game)
+        sendErrorNotification("✅ PASO 13", "Finalizado")
 
+        sendErrorNotification("🎉 SUCCESS", "¡\(mode.displayName) inyectado!")
         return InjectorResult(success: true,
             message: "¡\(mode.displayName) inyectado! Abre Free Fire, espera 8–10 segundos, vuelve a Nyxel y limpia la sesión.")
 		} catch let error as NSError {
-			let msg = error.localizedDescription
-			sendErrorNotification("Error de Inyección", msg)
+			let msg = "Paso desconocido - \(error.localizedDescription)"
+			sendErrorNotification("💥 ERROR NSError", msg)
 			return InjectorResult(success: false, message: msg)
 		} catch {
-			let msg = error.localizedDescription
-			sendErrorNotification("Error Fatal", msg)
+			let msg = "Paso desconocido - \(error.localizedDescription)"
+			sendErrorNotification("💥 ERROR Fatal", msg)
 			return InjectorResult(success: false, message: msg)
 		}
     }
