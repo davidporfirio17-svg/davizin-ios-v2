@@ -1,4 +1,5 @@
 #import "DavizinMCM.h"
+#import "mcm_bridge.h"
 #import "NixelIdeviceFFI.h"
 #import "NixelAirLiftBridge.h"
 #import "kexploit/kexploit_opa334.h"
