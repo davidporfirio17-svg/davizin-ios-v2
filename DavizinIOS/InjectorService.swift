@@ -9,14 +9,17 @@ struct InjectorResult {
 
 // MARK: - Error Notifications
 fileprivate func sendErrorNotification(_ title: String, _ body: String) {
-    let content = UNMutableNotificationContent()
-    content.title = title
-    content.body = body
-    content.sound = .default
-    content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
-
-    let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
-    UNUserNotificationCenter.current().add(request)
+    DispatchQueue.main.async {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
+            UNUserNotificationCenter.current().add(request)
+        }
+    }
 }
 
 // Carpeta base donde vive el archivo dentro del contenedor de Free Fire.
