@@ -15,7 +15,7 @@ typedef void  (*cm_query_set_xpc_fn)(void *, xpc_obj_t);
 typedef void  (*cm_query_set_part_fn)(void *, uint64_t);
 typedef void  (*cm_query_set_domain_fn)(void *, const char *);
 typedef void *(*cm_query_single_fn)(void *);
-typedef int   (*cm_query_iterate_fn)(void *, void *, void *);
+typedef int   (*cm_query_iterate_fn)(void *, int (*)(void *, void *), void *);
 typedef void *(*cm_query_err_fn)(void *);
 typedef void  (*cm_query_free_fn)(void *);
 typedef const char *(*cm_path_fn)(void *);
