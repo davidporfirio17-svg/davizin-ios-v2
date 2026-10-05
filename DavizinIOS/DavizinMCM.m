@@ -11,14 +11,22 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
         if (outErr) *outErr = @"bundleID es nil o vacío";
         return nil;
     }
-    
-    // Try to get container path for the app (class 2 = MCMApplicationDataContainer)
-    NSString *path = MCMContainerPathForIdentifier(2, bundleID, NO, outErr);
+
+    // Try MCMActivateContainerPath first - grants write access via file descriptor
+    // This is what External uses for actual file operations
+    NSString *path = MCMActivateContainerPath(2, bundleID, NO, outErr);
     if (path) {
-        DavizinMCMLog([NSString stringWithFormat:@"Container encontrado para %@: %@", bundleID, path]);
+        DavizinMCMLog([NSString stringWithFormat:@"Container ACTIVADO para %@: %@", bundleID, path]);
         return path;
     }
-    
+
+    // Fallback: get path without activation (read-only)
+    path = MCMContainerPathForIdentifier(2, bundleID, NO, outErr);
+    if (path) {
+        DavizinMCMLog([NSString stringWithFormat:@"Container encontrado (read-only) para %@: %@", bundleID, path]);
+        return path;
+    }
+
     if (outErr) {
         DavizinMCMLog([NSString stringWithFormat:@"No encontrado %@ - %@", bundleID, *outErr ?: @"unknown"]);
     }
