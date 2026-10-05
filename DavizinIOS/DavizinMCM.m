@@ -1,113 +1,10 @@
 #import "DavizinMCM.h"
+#import "bad_query.h"
 #import <Foundation/Foundation.h>
-#import <dlfcn.h>
-#import <stdlib.h>
-#import <fcntl.h>
-
-// Tipos XPC sin importar xpc/xpc.h
-typedef void *xpc_obj_t;
-typedef xpc_obj_t (*xpc_string_create_fn)(const char *);
-
-// Tipos containermanager
-typedef void *(*cm_query_create_fn)(void);
-typedef void  (*cm_query_set_u64_fn)(void *, uint64_t);
-typedef void  (*cm_query_set_xpc_fn)(void *, xpc_obj_t);
-typedef void  (*cm_query_set_part_fn)(void *, uint64_t);
-typedef void  (*cm_query_set_domain_fn)(void *, const char *);
-typedef void *(*cm_query_single_fn)(void *);
-typedef int   (*cm_query_iterate_fn)(void *, void *, void *);
-typedef void *(*cm_query_err_fn)(void *);
-typedef void  (*cm_query_free_fn)(void *);
-typedef const char *(*cm_path_fn)(void *);
-typedef char *(*cm_token_fn)(void *);
-typedef int   (*cm_activate_ext_fn)(void *);
-typedef void  (*cm_free_fn)(void *);
-typedef int   (*cm_posix_fn)(void *);
-typedef const char *(*cm_msg_fn)(void *);
-typedef int64_t (*sb_consume_fn)(const char *);
-
-typedef struct {
-    cm_query_create_fn     create;
-    cm_query_set_u64_fn    setClass;
-    cm_query_set_xpc_fn    setIds;
-    cm_query_set_xpc_fn    setGroupIds;
-    cm_query_set_u64_fn    setFlags;
-    cm_query_set_part_fn   setPart;
-    cm_query_set_domain_fn setDomain;
-    cm_query_single_fn     getSingle;
-    cm_query_iterate_fn    iterate;
-    cm_query_err_fn        getErr;
-    cm_query_free_fn       freeQ;
-    cm_path_fn             getPath;
-    cm_token_fn            getToken;
-    cm_activate_ext_fn     activateExt;
-    cm_free_fn             freeObj;
-    cm_posix_fn            posix;
-    cm_msg_fn              msg;
-    xpc_string_create_fn   xpcStr;
-    sb_consume_fn          sbConsume;
-} API;
-
-static API *getAPI(void) {
-    static API api;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        void *cm = dlopen("/usr/lib/system/libsystem_containermanager.dylib", RTLD_NOW|RTLD_LOCAL);
-        void *h  = cm ? cm : RTLD_DEFAULT;
-        void *xh = dlopen("/usr/lib/system/libxpc.dylib", RTLD_NOW|RTLD_LOCAL);
-        if (!xh) xh = RTLD_DEFAULT;
-        void *sh = dlopen("/usr/lib/system/libsystem_sandbox.dylib", RTLD_NOW|RTLD_LOCAL);
-        if (!sh) sh = RTLD_DEFAULT;
-
-#define G(lib,field,sym) api.field = (__typeof(api.field))dlsym(lib,sym)
-        G(h,  create,       "container_query_create");
-        G(h,  setClass,     "container_query_set_class");
-        G(h,  setIds,       "container_query_set_identifiers");
-        G(h,  setGroupIds,  "container_query_set_group_identifiers");
-        G(h,  setFlags,     "container_query_operation_set_flags");
-        G(h,  setPart,      "container_query_operation_set_part");
-        G(h,  setDomain,    "container_query_operation_set_part_domain");
-        G(h,  getSingle,    "container_query_get_single_result");
-        G(h,  iterate,      "container_query_iterate_results_sync");
-        G(h,  getErr,       "container_query_get_last_error");
-        G(h,  freeQ,        "container_query_free");
-        G(h,  getPath,      "container_object_get_path");
-        G(h,  getToken,     "container_copy_sandbox_token");
-        G(h,  activateExt,  "container_object_sandbox_extension_activate");
-        G(h,  freeObj,      "container_object_free");
-        G(h,  posix,        "container_error_get_posix_errno");
-        G(h,  msg,          "container_error_get_message");
-        G(xh, xpcStr,       "xpc_string_create");
-        G(sh, sbConsume,    "sandbox_extension_consume");
-#undef G
-    });
-    return &api;
-}
-
-// Signing ID via dlsym
-typedef void *(*SecTaskCreateFn)(void *);
-typedef void *(*SecTaskCopyIDFn)(void *, void **);
-
-static NSString *getSigningID(void) {
-    static NSString *result;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        SecTaskCreateFn cfn = (SecTaskCreateFn)dlsym(RTLD_DEFAULT, "SecTaskCreateFromSelf");
-        SecTaskCopyIDFn idfn = (SecTaskCopyIDFn)dlsym(RTLD_DEFAULT, "SecTaskCopySigningIdentifier");
-        if (cfn && idfn) {
-            void *task = cfn(NULL);
-            if (task) {
-                void *err = NULL;
-                void *val = idfn(task, &err);
-                if (val) { result = [(__bridge NSString *)val copy]; CFRelease(val); }
-                CFRelease(task);
-            }
-        }
-    });
-    return result;
-}
+#import <sys/stat.h>
 
 static NSString *gDavizinMCMLastDiagnostic;
+static int64_t gLastContainerHandle = -1;
 
 NSString *DavizinMCMLastDiagnostic(void) {
     return gDavizinMCMLastDiagnostic;
@@ -126,61 +23,66 @@ static void DavizinMCMLog(NSString *message) {
     [defaults setObject:values forKey:@"nyxel.activity.log"];
 }
 
+static NSString *findContainerByBundleID(NSString *rootPath, NSString *bundleID) {
+    NSArray *contents = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:rootPath error:nil];
+    for (NSString *uuid in contents) {
+        if ([NSUUID.alloc initWithUUIDString:uuid] == nil) continue;
+        NSString *containerPath = [rootPath stringByAppendingPathComponent:uuid];
+        NSString *metadataPath = [containerPath stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
+
+        NSData *data = [NSData dataWithContentsOfFile:metadataPath];
+        if (!data) continue;
+
+        NSDictionary *plist = [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:nil];
+        if (![plist isKindOfClass:[NSDictionary class]]) continue;
+
+        NSString *containerBundleID = plist[@"MCMMetadataIdentifier"];
+        if ([containerBundleID isEqualToString:bundleID]) {
+            return containerPath;
+        }
+    }
+    return nil;
+}
+
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
-    static const uint64_t kClass = 0x2;
-    static const uint64_t kFlags = 0x900000000;
+    // Release previous handle if any
+    if (gLastContainerHandle >= 0) {
+        bad_query_release(gLastContainerHandle);
+        gLastContainerHandle = -1;
+    }
 
-    NSString *sid = getSigningID();
-    if (![sid isEqualToString:@"com.apple.mobile.MobileHouseArrest"]) {
-        if (outErr) *outErr = [NSString stringWithFormat:@"Signing ID: '%@'", sid];
+    NSString *appDataRoot = @"/var/mobile/Containers/Data/Application";
+
+    // Step 1: Grant access to the root for enumeration
+    char rootPathC[1024];
+    strlcpy(rootPathC, appDataRoot.UTF8String, sizeof(rootPathC));
+    int64_t rootHandle = bad_query(rootPathC, true, NULL, false);
+
+    // Step 2: Enumerate and find the container
+    NSString *foundPath = findContainerByBundleID(appDataRoot, bundleID);
+
+    // Release the root handle after enumeration
+    if (rootHandle >= 0) {
+        bad_query_release(rootHandle);
+    }
+
+    if (!foundPath) {
+        if (outErr) *outErr = [NSString stringWithFormat:@"No encontrado '%@' root_handle=%lld", bundleID, rootHandle];
+        DavizinMCMLog([NSString stringWithFormat:@"MCM %@: no encontrado root=%lld", bundleID, rootHandle]);
         return nil;
     }
 
-    API *api = getAPI();
-    if (!api->create || !api->getSingle || !api->getPath) {
-        if (outErr) *outErr = @"containermanager no disponible";
-        return nil;
+    // Step 3: Grant access to the specific container (keep handle alive)
+    char containerC[1024];
+    strlcpy(containerC, foundPath.UTF8String, sizeof(containerC));
+    gLastContainerHandle = bad_query(containerC, true, NULL, false);
+
+    DavizinMCMLog([NSString stringWithFormat:@"MCM %@: path=%@ handle=%lld",
+                   bundleID, foundPath.lastPathComponent, gLastContainerHandle]);
+
+    if (gLastContainerHandle < 0) {
+        if (outErr) *outErr = [NSString stringWithFormat:@"bad_query failed handle=%lld", gLastContainerHandle];
     }
 
-    void *query = api->create();
-    if (!query) { if (outErr) *outErr = @"query NULL"; return nil; }
-
-    api->setClass(query, kClass);
-    if (api->xpcStr && api->setIds) {
-        xpc_obj_t xid = api->xpcStr(bundleID.UTF8String);
-        if (xid) api->setIds(query, xid);
-    }
-    api->setFlags(query, kFlags);
-
-    void *obj = api->getSingle(query);
-    if (!obj) {
-        int p = 0; const char *m = NULL;
-        void *e = api->getErr ? api->getErr(query) : NULL;
-        if (e) { if (api->posix) p = api->posix(e); if (api->msg) m = api->msg(e); }
-        if (outErr) *outErr = [NSString stringWithFormat:@"No encontrado '%@' posix=%d %s", bundleID, p, m?:""];
-        api->freeQ(query);
-        return nil;
-    }
-
-    const char *raw = api->getPath(obj);
-    NSString *path = raw ? @(raw) : nil;
-    if (!path || !path.isAbsolutePath) {
-        if (outErr) *outErr = @"Path inválido";
-        if (api->freeObj) api->freeObj(obj);
-        api->freeQ(query);
-        return nil;
-    }
-
-    if ([path hasPrefix:@"/var/"])
-        path = [@"/private" stringByAppendingString:path];
-
-    if (api->getToken && api->sbConsume) {
-        char *tok = api->getToken(obj);
-        if (tok && tok[0]) api->sbConsume(tok);
-        if (tok) free(tok);
-    }
-
-    if (api->freeObj) api->freeObj(obj);
-    api->freeQ(query);
-    return path;
+    return foundPath;
 }
