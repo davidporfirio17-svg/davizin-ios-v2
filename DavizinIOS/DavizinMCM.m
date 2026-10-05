@@ -15,6 +15,7 @@ typedef void  (*cm_query_set_xpc_fn)(void *, xpc_obj_t);
 typedef void  (*cm_query_set_part_fn)(void *, uint64_t);
 typedef void  (*cm_query_set_domain_fn)(void *, const char *);
 typedef void *(*cm_query_single_fn)(void *);
+typedef int   (*cm_query_iterate_fn)(void *, void *, void *);
 typedef void *(*cm_query_err_fn)(void *);
 typedef void  (*cm_query_free_fn)(void *);
 typedef const char *(*cm_path_fn)(void *);
@@ -29,10 +30,12 @@ typedef struct {
     cm_query_create_fn     create;
     cm_query_set_u64_fn    setClass;
     cm_query_set_xpc_fn    setIds;
+    cm_query_set_xpc_fn    setGroupIds;
     cm_query_set_u64_fn    setFlags;
     cm_query_set_part_fn   setPart;
     cm_query_set_domain_fn setDomain;
     cm_query_single_fn     getSingle;
+    cm_query_iterate_fn    iterate;
     cm_query_err_fn        getErr;
     cm_query_free_fn       freeQ;
     cm_path_fn             getPath;
@@ -60,10 +63,12 @@ static API *getAPI(void) {
         G(h,  create,       "container_query_create");
         G(h,  setClass,     "container_query_set_class");
         G(h,  setIds,       "container_query_set_identifiers");
+        G(h,  setGroupIds,  "container_query_set_group_identifiers");
         G(h,  setFlags,     "container_query_operation_set_flags");
         G(h,  setPart,      "container_query_operation_set_part");
         G(h,  setDomain,    "container_query_operation_set_part_domain");
         G(h,  getSingle,    "container_query_get_single_result");
+        G(h,  iterate,      "container_query_iterate_results_sync");
         G(h,  getErr,       "container_query_get_last_error");
         G(h,  freeQ,        "container_query_free");
         G(h,  getPath,      "container_object_get_path");
@@ -121,40 +126,42 @@ static void DavizinMCMLog(NSString *message) {
     [defaults setObject:values forKey:@"nyxel.activity.log"];
 }
 
-NSString *DavizinPrepareInjectionQuery(NSString *bundleID, NSString **outErr) {
-    static const uint64_t kClass = 0x6;
-    static const uint64_t kPart = 0x3;
-    static const uint64_t kFlags = 0x7;
+typedef struct {
+    NSString **outErr;
+    NSString *resultPath;
+    API *api;
+} IterateContext;
 
-    API *api = getAPI();
-    if (!api->create || !api->getSingle) return nil;
+static int iterateCallback(void *obj, void *ctx) {
+    if (!obj || !ctx) return -1;
+    IterateContext *context = (IterateContext *)ctx;
+    API *api = context->api;
 
-    void *query = api->create();
-    if (!query) return nil;
+    const char *raw = api->getPath ? api->getPath(obj) : NULL;
+    NSString *path = raw ? @(raw) : nil;
 
-    api->setClass(query, kClass);
-    if (api->xpcStr && api->setIds) {
-        xpc_obj_t xid = api->xpcStr(bundleID.UTF8String);
-        if (xid) api->setIds(query, xid);
+    if (path && path.isAbsolutePath) {
+        if ([path hasPrefix:@"/var/"])
+            path = [@"/private" stringByAppendingString:path];
+
+        if (api->getToken && api->sbConsume) {
+            char *tok = api->getToken(obj);
+            if (tok && tok[0]) api->sbConsume(tok);
+            if (tok) free(tok);
+        }
+
+        context->resultPath = path;
+        if (api->freeObj) api->freeObj(obj);
+        return 1;
     }
-    if (api->setPart) api->setPart(query, kPart);
-    if (api->setDomain) api->setDomain(query, "");
-    api->setFlags(query, kFlags);
 
-    void *obj = api->getSingle(query);
-    if (obj && api->getToken && api->sbConsume && api->freeObj) {
-        char *tok = api->getToken(obj);
-        if (tok && tok[0]) api->sbConsume(tok);
-        if (tok) free(tok);
-        api->freeObj(obj);
-    }
-    api->freeQ(query);
-    return bundleID;
+    if (api->freeObj) api->freeObj(obj);
+    return 0;
 }
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
-    static const uint64_t kClass = 2;
-    static const uint64_t kFlags = 0x900000000ULL;
+    static const uint64_t kClass = 0x2;
+    static const uint64_t kFlags = 0x900000000;
 
     NSString *sid = getSigningID();
     if (![sid isEqualToString:@"com.apple.mobile.MobileHouseArrest"]) {
@@ -163,7 +170,7 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     }
 
     API *api = getAPI();
-    if (!api->create || !api->getSingle || !api->getPath) {
+    if (!api->create || !api->iterate || !api->getPath) {
         if (outErr) *outErr = @"containermanager no disponible";
         return nil;
     }
@@ -178,8 +185,10 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     }
     api->setFlags(query, kFlags);
 
-    void *obj = api->getSingle(query);
-    if (!obj) {
+    IterateContext context = {outErr, nil, api};
+    int iterResult = api->iterate(query, &iterateCallback, &context);
+
+    if (!context.resultPath) {
         int p = 0; const char *m = NULL;
         void *e = api->getErr ? api->getErr(query) : NULL;
         if (e) { if (api->posix) p = api->posix(e); if (api->msg) m = api->msg(e); }
@@ -188,25 +197,6 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
         return nil;
     }
 
-    const char *raw = api->getPath(obj);
-    NSString *path = raw ? @(raw) : nil;
-    if (!path || !path.isAbsolutePath) {
-        if (outErr) *outErr = @"Path inválido";
-        if (api->freeObj) api->freeObj(obj);
-        api->freeQ(query);
-        return nil;
-    }
-
-    if ([path hasPrefix:@"/var/"])
-        path = [@"/private" stringByAppendingString:path];
-
-    if (api->getToken && api->sbConsume) {
-        char *tok = api->getToken(obj);
-        if (tok && tok[0]) api->sbConsume(tok);
-        if (tok) free(tok);
-    }
-
-    if (api->freeObj) api->freeObj(obj);
     api->freeQ(query);
-    return path;
+    return context.resultPath;
 }
