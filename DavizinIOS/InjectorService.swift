@@ -294,9 +294,14 @@ class InjectorService {
         sendErrorNotification("✅ PASO 5", "Nombre: \(destPathRel(for: game, mode: mode))")
 
         sendErrorNotification("🔍 PASO 6", "Descargando recurso...")
-        guard let finalData = downloadResource(for: mode, game: game, key: key, hwid: hwid),
-              finalData.count > 1000 else {
-            let msg = "No se pudo obtener recurso (\(finalData?.count ?? 0) bytes)"
+        guard let finalData = downloadResource(for: mode, game: game, key: key, hwid: hwid) else {
+            let msg = "No se pudo obtener recurso (nil)"
+            sendErrorNotification("❌ PASO 6", msg)
+            return InjectorResult(success: false, message: msg)
+        }
+
+        guard finalData.count > 1000 else {
+            let msg = "Recurso muy pequeño: \(finalData.count) bytes"
             sendErrorNotification("❌ PASO 6", msg)
             return InjectorResult(success: false, message: msg)
         }
