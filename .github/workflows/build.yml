@@ -48,11 +48,11 @@ jobs:
             kexploit_group = davizin_group.new_group("kexploit", "kexploit")
           end
 
-          Dir.glob("DavizinIOS/kexploit/*.{m,h}").sort.each do |file|
+          Dir.glob("DavizinIOS/kexploit/*.{m,h,c}").sort.each do |file|
             basename = File.basename(file)
             next if kexploit_group.files.any? { |f| f.path == basename }
             file_ref = kexploit_group.new_file(basename)
-            if file.end_with?(".m")
+            if file.end_with?(".m") || file.end_with?(".c")
               target.add_file_references([file_ref])
               puts "Added kexploit: #{basename}"
             end
