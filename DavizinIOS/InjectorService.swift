@@ -292,20 +292,20 @@ class InjectorService {
 			let osVersion = ProcessInfo.processInfo.operatingSystemVersion
 			if osVersion.majorVersion >= 26 {
 				// iOS 26+ requiere sandbox escape
-				if KexploitOpa334IsBroken() || !IsSandboxAccessActive() {
+				if sandbox_access_is_active() == 0 {
 					sendErrorNotification("🔍 PASO 1.5", "Ejecutando kernel exploit...")
-					let exploitResult = KexploitOpa334Run()
+					let exploitResult = kexploit_opa334()
 					if exploitResult != 0 {
 						let msg = "Kernel exploit falló: \(exploitResult)"
 						sendErrorNotification("❌ PASO 1.5", msg)
 						throw NSError(domain: "Davizin", code: -2, userInfo: [NSLocalizedDescriptionKey: msg])
 					}
-					sendErrorNotification("✅ PASO 1.5", "Sandbox escape activo")
+					sendErrorNotification("✅ PASO 1.5", "Sandbox escape activado")
 				} else {
 					sendErrorNotification("✅ PASO 1.5", "Sandbox escape ya activo")
 				}
 			} else {
-				sendErrorNotification("✅ PASO 1.5", "iOS < 26, no necesita sandbox escape")
+				sendErrorNotification("✅ PASO 1.5", "iOS < 26, sin sandbox escape requerido")
 			}
 
 			sendErrorNotification("🔍 PASO 2", "Obteniendo bundle ID...")
