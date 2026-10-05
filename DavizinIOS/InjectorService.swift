@@ -378,6 +378,29 @@ class InjectorService {
 
 	/// Prueba REAL si el dispositivo puede inyectar, intentando acceder al
 	/// contenedor de Free Fire (MAX o normal) via MCM. No inyecta nada.
+	/// Intenta verificar si un bundle está instalado enumerando containers
+	private static func isBundleInstalledViaEnumeration(_ bundleID: String) -> Bool {
+		let fm = FileManager.default
+		let appDataRoot = "/var/mobile/Containers/Data/Application"
+
+		guard fm.fileExists(atPath: appDataRoot) else { return false }
+
+		do {
+			let containers = try fm.contentsOfDirectory(atPath: appDataRoot)
+			for containerDir in containers {
+				let metadataPath = "\(appDataRoot)/\(containerDir)/.com.apple.mobile_container_manager.metadata.plist"
+				if let metadata = NSDictionary(contentsOfFile: metadataPath),
+				   let bid = metadata["MCMMetadataIdentifier"] as? String,
+				   bid == bundleID {
+					return true
+				}
+			}
+		} catch {
+			return false
+		}
+		return false
+	}
+
 	static func checkCompatibility() -> Compat {
 		guard NyxelSupportPolicy.isCurrentSystemSupported else {
 			return .unsupportedSystem
@@ -389,12 +412,17 @@ class InjectorService {
         var algunInstalado = false
         for bid in bundles {
             var err: NSString?
+            // Try MCM first
             if let container = DavizinGetContainerPath(bid, &err) {
-                // Conseguimos el contenedor: probamos que exista y sea accesible
                 if fm.fileExists(atPath: container) {
                     return .compatible
                 }
                 algunInstalado = true
+            } else {
+                // Fallback: enumerate containers to check if installed
+                if isBundleInstalledViaEnumeration(bid) {
+                    algunInstalado = true
+                }
             }
         }
         // Si obtuvimos algun path pero no accesible -> instalado pero no compatible
