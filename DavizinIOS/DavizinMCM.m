@@ -184,6 +184,7 @@ static BOOL gExploitSucceeded = NO;
 
 static BOOL ensureSandboxEscape(void) {
     if (sandbox_access_is_active() == 1) {
+        DavizinMCMLog(@"sandbox: ya escapeado");
         return YES;
     }
 
@@ -192,27 +193,27 @@ static BOOL ensureSandboxEscape(void) {
     }
     gExploitAttempted = YES;
 
-    DavizinMCMLog(@"kexploit: iniciando (10-30s)...");
+    DavizinMCMLog(@"kexploit: iniciando (10-30s, iOS 27 puede no ser soportado)...");
     int ret = kexploit_opa334();
     if (ret != 0) {
-        DavizinMCMLog([NSString stringWithFormat:@"kexploit: FAIL ret=%d", ret]);
-        gExploitSucceeded = NO;
-        return NO;
+        DavizinMCMLog([NSString stringWithFormat:@"kexploit: no soportado (ret=%d), continuando sin escape...", ret]);
+        gExploitSucceeded = YES; // Continue anyway - bad_query might still work
+        return YES;
     }
 
     uint64_t selfProc = proc_self();
     if (selfProc == 0) {
-        DavizinMCMLog(@"kexploit: proc_self=0");
-        gExploitSucceeded = NO;
-        return NO;
+        DavizinMCMLog(@"kexploit: proc_self=0, continuando...");
+        gExploitSucceeded = YES;
+        return YES;
     }
 
     int sbxRet = sandbox_escape(selfProc);
-    gExploitSucceeded = (sbxRet == 0 && sandbox_access_is_active() == 1);
+    int active = sandbox_access_is_active();
+    gExploitSucceeded = (sbxRet == 0 && active == 1);
 
-    DavizinMCMLog([NSString stringWithFormat:@"kexploit: sbx=%d ok=%d",
-                   sbxRet, gExploitSucceeded]);
-    return gExploitSucceeded;
+    DavizinMCMLog([NSString stringWithFormat:@"kexploit: escape ret=%d active=%d", sbxRet, active]);
+    return YES; // Always continue to bad_query
 }
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
@@ -222,11 +223,8 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
     }
 
     // Run kernel exploit + sandbox escape first (iOS 26+)
-    BOOL sandboxOK = ensureSandboxEscape();
-    if (!sandboxOK) {
-        if (outErr) *outErr = @"Sandbox escape falló";
-        return nil;
-    }
+    // Even if it fails, bad_query will try anyway
+    ensureSandboxEscape();
 
     NSString *appDataRoot = @"/var/mobile/Containers/Data/Application";
 
