@@ -117,6 +117,11 @@ class InjectorService {
     }
 
     private static func writeToContainer(_ data: Data, relPath: String, container: String, bundleID: String) -> Swift.Error? {
+        // CRITICAL: Obtener grant ACTIVO ANTES de escribir. El grant se mantiene durante todo el defer.
+        // Este patrón es IGUAL al de External en iOS 26+ y es NECESARIO para iOS 27.
+        let handle = DavizinGrantContainerAccess(container)
+        defer { DavizinReleaseContainerGrant(handle) }
+
         var airliftNote = "AirLift: sin registro de pairing guardado"
         if NixelAirLiftFileChannel.isAvailable {
             switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
@@ -135,6 +140,11 @@ class InjectorService {
     }
 
     private static func readFromContainer(relPath: String, container: String, bundleID: String) -> Data? {
+        // CRITICAL: Obtener grant ACTIVO ANTES de leer. El grant se mantiene durante todo el defer.
+        // Este patrón es IGUAL al de External en iOS 26+ y es NECESARIO para iOS 27.
+        let handle = DavizinGrantContainerAccess(container)
+        defer { DavizinReleaseContainerGrant(handle) }
+
         if NixelAirLiftFileChannel.isAvailable {
             if case .success(let data) = NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
                 return data
