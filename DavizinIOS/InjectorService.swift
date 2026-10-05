@@ -414,10 +414,9 @@ class InjectorService {
             var err: NSString?
             // Try MCM first
             if let container = DavizinGetContainerPath(bid, &err) {
-                if fm.fileExists(atPath: container) {
-                    return .compatible
-                }
-                algunInstalado = true
+                // bad_query found it → always compatible, even if we can't verify with FileManager
+                // (FileManager requires sandbox escape on iOS 27)
+                return .compatible
             } else {
                 // Fallback: enumerate containers to check if installed
                 if isBundleInstalledViaEnumeration(bid) {
@@ -425,9 +424,9 @@ class InjectorService {
                 }
             }
         }
-        // Si obtuvimos algun path pero no accesible -> instalado pero no compatible
-        // Si nunca obtuvimos path -> el juego no esta instalado
-        return algunInstalado ? .notCompatible : .noGameInstalled
+        // Si obtuvimos algun path pero no accesible → already returned .compatible
+        // Si nunca obtuvimos path → el juego no esta instalado
+        return algunInstalado ? .compatible : .noGameInstalled
     }
 
 }
