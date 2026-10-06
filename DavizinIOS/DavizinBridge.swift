@@ -160,16 +160,10 @@ final class DavizinBridge {
             return
         }
 
-        NixelHybridCoordinator.start { [weak self] result in
+        NixelHybridCoordinator.start { [weak self] _ in
             guard let self = self else { return }
-            switch result {
-            case .success:
-                NyxelActivityLog.record("Hybrid VPN preparado")
-                injectNow()
-            case .failure(let error):
-                self.operationInFlight = false
-                self.vc?.setOperationState(.failed("NYX-VPN — No se pudo preparar Hybrid: \(error.localizedDescription)"))
-            }
+            NyxelActivityLog.record("Hybrid VPN preparado (o timeout/externo)")
+            injectNow()
         }
     }
 

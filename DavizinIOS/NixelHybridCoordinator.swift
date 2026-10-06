@@ -3,6 +3,7 @@ import Network
 import NetworkExtension
 import Security
 import UIKit
+import Darwin
 
 enum NixelCheckState: String {
     case notChecked = "No verificado"
@@ -548,15 +549,50 @@ enum NixelHybridCoordinator {
         let before = diagnostics()
         NyxelActivityLog.record("Hybrid diagnóstico: \(before.summary)")
         NyxelActivityLog.record(NixelExploitCoordinator.assess().summary)
+
+        if isExternalVPNActive() {
+            NyxelActivityLog.record("Hybrid VPN: VPN externo detectado, omitiendo túnel interno")
+            completion(.success(()))
+            return
+        }
+
+        var completed = false
+        let timeout = DispatchWorkItem {
+            guard !completed else { return }
+            completed = true
+            NyxelActivityLog.record("Hybrid VPN: timeout 8s — continuando sin VPN")
+            completion(.success(()))
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: timeout)
+
         NixelVPNManager.shared.start { result in
+            timeout.cancel()
+            guard !completed else { return }
+            completed = true
             switch result {
             case .success:
                 NyxelActivityLog.record("Hybrid VPN: conectado; pairing aún no verificado")
             case .failure(let error):
-                NyxelActivityLog.record("Hybrid VPN: error — \(error.localizedDescription)")
+                NyxelActivityLog.record("Hybrid VPN: error — \(error.localizedDescription), continuando sin VPN")
             }
-            completion(result)
+            completion(.success(()))
         }
+    }
+
+    static func isExternalVPNActive() -> Bool {
+        var addrs: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&addrs) == 0, let first = addrs else { return false }
+        defer { freeifaddrs(first) }
+        var cursor: UnsafeMutablePointer<ifaddrs>? = first
+        while let ifa = cursor {
+            let name = String(cString: ifa.pointee.ifa_name)
+            if name.hasPrefix("utun") || name.hasPrefix("ipsec") || name.hasPrefix("ppp") {
+                NyxelActivityLog.record("VPN externo detectado en interfaz: \(name)")
+                return true
+            }
+            cursor = ifa.pointee.ifa_next
+        }
+        return false
     }
 
     static func stop() {
