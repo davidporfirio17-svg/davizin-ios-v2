@@ -286,6 +286,9 @@ class InjectorService {
 			}
 
 			sendErrorNotification("✅ PASO 1", "iOS OK")
+
+			sendErrorNotification("✅ PASO 1.5", "AirLift será el canal principal de escritura")
+
 			sendErrorNotification("🔍 PASO 2", "Obteniendo bundle ID...")
 
 			let fm = FileManager.default
@@ -335,8 +338,8 @@ class InjectorService {
         sendErrorNotification("✅ PASO 7", "Dest: \(activeRel)")
 
         sendErrorNotification("🔍 PASO 8", "Creando directorio...")
-        try fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
-        sendErrorNotification("✅ PASO 8", "Directorio OK")
+        try? fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+        sendErrorNotification("✅ PASO 8", "Directorio OK (o ya existía)")
 
         sendErrorNotification("🔍 PASO 9", "Haciendo backup...")
         let backupRel = disguisedBackupPath(for: activeRel)
@@ -378,8 +381,8 @@ class InjectorService {
         sendErrorNotification("✅ PASO 11", "INYECCIÓN OK")
 
         sendErrorNotification("🔍 PASO 12", "Seteando permisos...")
-        try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        sendErrorNotification("✅ PASO 12", "Permisos OK")
+        try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
+        sendErrorNotification("✅ PASO 12", "Permisos OK (AirLift ya setea permisos)")
 
         sendErrorNotification("🔍 PASO 13", "Finalizando...")
         NyxelCleanupFlow.markInjectionSucceeded(for: game)

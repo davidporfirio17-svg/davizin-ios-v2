@@ -63,6 +63,7 @@
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_remotepairing-pairable-host._tcp</string>
+		<string>_remotepairing._tcp</string>
 		<string>_3105airlift._tcp</string>
 	</array>
 	<key>UIBackgroundModes</key>
