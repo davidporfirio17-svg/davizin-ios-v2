@@ -5,6 +5,7 @@
 #import <stdlib.h>
 #import <xpc/xpc.h>
 #import <fcntl.h>
+#import <os/lock.h>
 
 #pragma mark - C API types (container_query_* from libsystem_containermanager)
 
@@ -69,6 +70,34 @@ static MCMAPI *MCMGetAPI(void) {
     return &api;
 }
 
+#pragma mark - Lease storage (C-based, avoids NSMutableDictionary crash on iOS 27)
+
+typedef struct {
+    void *query;
+    void *activation;
+    char  bundleID[256];
+    char  path[1024];
+    bool  active;
+} MCMLease;
+
+#define MAX_LEASES 4
+static MCMLease sLeases[MAX_LEASES];
+static os_unfair_lock sLeaseLock = OS_UNFAIR_LOCK_INIT;
+
+static MCMLease *findLease(const char *bundleID) {
+    for (int i = 0; i < MAX_LEASES; i++) {
+        if (sLeases[i].active && strcmp(sLeases[i].bundleID, bundleID) == 0)
+            return &sLeases[i];
+    }
+    return NULL;
+}
+
+static MCMLease *allocLease(void) {
+    for (int i = 0; i < MAX_LEASES; i++) {
+        if (!sLeases[i].active) return &sLeases[i];
+    }
+    return &sLeases[0];
+}
 
 #pragma mark - Logging
 
@@ -112,11 +141,11 @@ void DavizinReleaseContainerGrant(int64_t handle) {
     }
 }
 
-#pragma mark - Container path lookup (direct C API — bypasses MCMActivateContainerPath crash)
+#pragma mark - Container path lookup (direct C API with persistent lease)
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     static const NSString *kRequiredID = @"com.apple.mobile.MobileHouseArrest";
-    static const uint64_t kFlags = 0x100000000ULL;
+    static const uint64_t kFlags = 0x900000000ULL;
     static const uint64_t kClass = 2;
 
     if (!bundleID || bundleID.length == 0) {
@@ -128,17 +157,27 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     if (![currentID isEqualToString:(NSString *)kRequiredID]) {
         if (outError) *outError = [NSString stringWithFormat:
             @"Bundle ID: '%@'", currentID];
-        DavizinMCMLog([NSString stringWithFormat:@"Bundle ID mismatch: '%@' vs '%@'", currentID, kRequiredID]);
         return nil;
     }
+
+    const char *bid = bundleID.UTF8String;
+
+    os_unfair_lock_lock(&sLeaseLock);
+    MCMLease *existing = findLease(bid);
+    if (existing && existing->path[0]) {
+        NSString *cachedPath = [NSString stringWithUTF8String:existing->path];
+        os_unfair_lock_unlock(&sLeaseLock);
+        return cachedPath;
+    }
+    os_unfair_lock_unlock(&sLeaseLock);
 
     MCMAPI *api = MCMGetAPI();
     if (!api->queryCreate || !api->queryGetSingle || !api->objectGetPath) {
         if (outError) *outError = @"containermanager no disponible";
-        DavizinMCMLog(@"container_query API no disponible");
         return nil;
     }
 
+    // Single query with activation flags — matches MCMRetainedLease pattern exactly
     void *query = api->queryCreate();
     if (!query) {
         if (outError) *outError = @"query_create devolvió NULL";
@@ -146,13 +185,13 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     }
 
     api->querySetClass(query, kClass);
-    xpc_object_t xpcID = xpc_string_create(bundleID.UTF8String);
+    xpc_object_t xpcID = xpc_string_create(bid);
     api->querySetIdentifiers(query, xpcID);
     api->querySetFlags(query, kFlags);
     if (api->querySetPart) api->querySetPart(query, 0);
 
-    void *object = api->queryGetSingle(query);
-    if (!object) {
+    void *result = api->queryGetSingle(query);
+    if (!result) {
         void *qErr = api->queryGetLastError ? api->queryGetLastError(query) : NULL;
         int posix = qErr && api->errorGetPOSIX ? api->errorGetPOSIX(qErr) : 0;
         const char *msg = qErr && api->errorGetMessage ? api->errorGetMessage(qErr) : NULL;
@@ -163,12 +202,11 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
         return nil;
     }
 
-    const char *rawPath = api->objectGetPath(object);
+    const char *rawPath = api->objectGetPath(result);
     NSString *path = rawPath ? [NSString stringWithUTF8String:rawPath] : nil;
 
     if (path.length == 0 || !path.isAbsolutePath) {
         if (outError) *outError = @"Path inválido";
-        DavizinMCMLog([NSString stringWithFormat:@"Path inválido para %@", bundleID]);
         api->queryFree(query);
         return nil;
     }
@@ -176,15 +214,39 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     if ([path isEqualToString:@"/var"] || [path hasPrefix:@"/var/"])
         path = [@"/private" stringByAppendingString:path];
 
-    void *copy = api->objectCopy ? api->objectCopy(object) : NULL;
-    if (copy) {
-        char *token = api->objectCopyToken ? api->objectCopyToken(copy) : NULL;
-        if (token && token[0] != '\0') api->objectActivate(copy, false);
+    // Activate sandbox extension and keep it alive (same as MCMRetainedLease.activate)
+    void *activation = api->objectCopy ? api->objectCopy(result) : NULL;
+    if (activation) {
+        char *token = api->objectCopyToken ? api->objectCopyToken(activation) : NULL;
+        bool activated = false;
+        if (token && token[0] != '\0') {
+            activated = api->objectActivate(activation, false);
+        }
         free(token);
-        if (api->objectFree) api->objectFree(copy);
+
+        if (activated) {
+            os_unfair_lock_lock(&sLeaseLock);
+            MCMLease *lease = allocLease();
+            if (lease->active && lease->query) {
+                if (lease->activation && api->objectFree) api->objectFree(lease->activation);
+                api->queryFree(lease->query);
+            }
+            lease->query = query;
+            lease->activation = activation;
+            strlcpy(lease->bundleID, bid, sizeof(lease->bundleID));
+            strlcpy(lease->path, path.UTF8String, sizeof(lease->path));
+            lease->active = true;
+            os_unfair_lock_unlock(&sLeaseLock);
+
+            DavizinMCMLog([NSString stringWithFormat:@"Lease ACTIVADA para %@: %@", bundleID, path]);
+            return path;
+        } else {
+            if (api->objectFree) api->objectFree(activation);
+        }
     }
 
-    DavizinMCMLog([NSString stringWithFormat:@"Container encontrado para %@: %@", bundleID, path]);
+    // Activation failed but path is valid — keep query alive anyway, bad_query might work
+    DavizinMCMLog([NSString stringWithFormat:@"Container encontrado (sin lease) para %@: %@", bundleID, path]);
     api->queryFree(query);
     return path;
 }
@@ -196,5 +258,5 @@ NSString *DavizinPrepareInjectionQuery(NSString *bundleID, NSString **outErr) {
 }
 
 NSString *DavizinMCMLastDiagnostic(void) {
-    return @"Using direct container_query C API";
+    return @"Using direct container_query C API with persistent lease";
 }
