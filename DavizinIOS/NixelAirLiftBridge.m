@@ -8,7 +8,6 @@
 #import <sys/socket.h>
 #import <sys/select.h>
 #import <unistd.h>
-#import <sys/sysctl.h>
 
 struct NyxelResolveContext {
     struct sockaddr_storage address;
