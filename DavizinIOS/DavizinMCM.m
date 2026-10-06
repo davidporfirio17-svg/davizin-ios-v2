@@ -4,7 +4,6 @@
 #import <dlfcn.h>
 #import <stdlib.h>
 #import <xpc/xpc.h>
-#import <Security/Security.h>
 #import <fcntl.h>
 
 #pragma mark - C API types (container_query_* from libsystem_containermanager)
@@ -68,29 +67,6 @@ static MCMAPI *MCMGetAPI(void) {
     return &api;
 }
 
-static NSString *MCMSigningIdentifier(void) {
-    static NSString *identifier;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        typedef CFTypeRef (*SecTaskCreateFromSelf_t)(CFAllocatorRef);
-        typedef CFStringRef (*SecTaskCopySigningID_t)(CFTypeRef, CFErrorRef *);
-        void *secFw = dlopen("/usr/lib/libSystem.B.dylib", RTLD_LAZY);
-        SecTaskCreateFromSelf_t createSelf = (SecTaskCreateFromSelf_t)dlsym(secFw, "SecTaskCreateFromSelf");
-        SecTaskCopySigningID_t  copyID     = (SecTaskCopySigningID_t)dlsym(secFw, "SecTaskCopySigningIdentifier");
-        if (createSelf && copyID) {
-            CFTypeRef task = createSelf(kCFAllocatorDefault);
-            if (task) {
-                CFErrorRef err = NULL;
-                CFStringRef value = copyID(task, &err);
-                if (value) identifier = [(__bridge NSString *)value copy];
-                if (value) CFRelease(value);
-                if (err)   CFRelease(err);
-                CFRelease(task);
-            }
-        }
-    });
-    return identifier;
-}
 
 #pragma mark - Logging
 
@@ -146,11 +122,11 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
         return nil;
     }
 
-    NSString *signingID = MCMSigningIdentifier();
-    if (![signingID isEqualToString:(NSString *)kRequiredID]) {
+    NSString *currentID = NSBundle.mainBundle.bundleIdentifier;
+    if (![currentID isEqualToString:(NSString *)kRequiredID]) {
         if (outError) *outError = [NSString stringWithFormat:
-            @"Signing ID: '%@'", signingID];
-        DavizinMCMLog([NSString stringWithFormat:@"Signing ID mismatch: '%@' vs '%@'", signingID, kRequiredID]);
+            @"Bundle ID: '%@'", currentID];
+        DavizinMCMLog([NSString stringWithFormat:@"Bundle ID mismatch: '%@' vs '%@'", currentID, kRequiredID]);
         return nil;
     }
 
