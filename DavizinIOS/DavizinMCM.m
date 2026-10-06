@@ -55,19 +55,28 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outErr) {
         return nil;
     }
 
-    // Try MCMActivateContainerPath first - grants write access via file descriptor
-    // This is what External uses for actual file operations
-    NSString *path = MCMActivateContainerPath(2, bundleID, NO, outErr);
-    if (path) {
-        DavizinMCMLog([NSString stringWithFormat:@"Container ACTIVADO para %@: %@", bundleID, path]);
-        return path;
+    @try {
+        NSString *path = MCMActivateContainerPath(2, bundleID, NO, outErr);
+        if (path) {
+            DavizinMCMLog([NSString stringWithFormat:@"Container ACTIVADO para %@: %@", bundleID, path]);
+            return path;
+        }
+    } @catch (NSException *exception) {
+        DavizinMCMLog([NSString stringWithFormat:@"MCMActivateContainerPath EXCEPCIÓN para %@: %@ — %@",
+                       bundleID, exception.name, exception.reason]);
+        if (outErr) *outErr = [NSString stringWithFormat:@"MCM activate exception: %@", exception.reason];
     }
 
-    // Fallback: get path without activation (read-only)
-    path = MCMContainerPathForIdentifier(2, bundleID, NO, outErr);
-    if (path) {
-        DavizinMCMLog([NSString stringWithFormat:@"Container encontrado (read-only) para %@: %@", bundleID, path]);
-        return path;
+    @try {
+        NSString *path = MCMContainerPathForIdentifier(2, bundleID, NO, outErr);
+        if (path) {
+            DavizinMCMLog([NSString stringWithFormat:@"Container encontrado (read-only) para %@: %@", bundleID, path]);
+            return path;
+        }
+    } @catch (NSException *exception) {
+        DavizinMCMLog([NSString stringWithFormat:@"MCMContainerPathForIdentifier EXCEPCIÓN para %@: %@ — %@",
+                       bundleID, exception.name, exception.reason]);
+        if (outErr) *outErr = [NSString stringWithFormat:@"MCM lookup exception: %@", exception.reason];
     }
 
     if (outErr) {
