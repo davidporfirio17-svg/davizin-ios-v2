@@ -28,6 +28,7 @@ typedef struct {
     MCMQuerySetU64_t    querySetClass;
     MCMQuerySetXPC_t    querySetIdentifiers;
     MCMQuerySetU64_t    querySetFlags;
+    MCMQuerySetU64_t    querySetPart;
     MCMQueryGetSingle_t queryGetSingle;
     MCMQueryGetError_t  queryGetLastError;
     MCMQueryFree_t      queryFree;
@@ -60,6 +61,7 @@ static MCMAPI *MCMGetAPI(void) {
         LOAD(objectCopyToken,    "container_copy_sandbox_token");
         LOAD(objectActivate,     "container_object_sandbox_extension_activate");
         LOAD(objectFree,         "container_object_free");
+        LOAD(querySetPart,       "container_query_operation_set_part");
         LOAD(errorGetPOSIX,      "container_error_get_posix_errno");
         LOAD(errorGetMessage,    "container_error_get_message");
 #undef LOAD
@@ -114,7 +116,7 @@ void DavizinReleaseContainerGrant(int64_t handle) {
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     static const NSString *kRequiredID = @"com.apple.mobile.MobileHouseArrest";
-    static const uint64_t kFlags = 0x900000000ULL;
+    static const uint64_t kFlags = 0x100000000ULL;
     static const uint64_t kClass = 2;
 
     if (!bundleID || bundleID.length == 0) {
@@ -147,6 +149,7 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     xpc_object_t xpcID = xpc_string_create(bundleID.UTF8String);
     api->querySetIdentifiers(query, xpcID);
     api->querySetFlags(query, kFlags);
+    if (api->querySetPart) api->querySetPart(query, 0);
 
     void *object = api->queryGetSingle(query);
     if (!object) {
@@ -180,16 +183,6 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
         free(token);
         if (api->objectFree) api->objectFree(copy);
     }
-
-    int fd = open(path.fileSystemRepresentation, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
-    if (fd < 0) {
-        if (outError) *outError = [NSString stringWithFormat:
-            @"Sin acceso errno=%d path=%@", errno, path];
-        DavizinMCMLog([NSString stringWithFormat:@"Sin acceso a %@ errno=%d", path, errno]);
-        api->queryFree(query);
-        return nil;
-    }
-    close(fd);
 
     DavizinMCMLog([NSString stringWithFormat:@"Container encontrado para %@: %@", bundleID, path]);
     api->queryFree(query);
