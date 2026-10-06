@@ -138,7 +138,7 @@ final class DavizinBridge {
                         _ = sandbox_escape(selfProc)
                         NyxelActivityLog.record("Exploit pre-inyección completado, sandbox activo: \(sandbox_access_is_active() != 0)")
                     } else {
-                        NyxelActivityLog.record("Exploit pre-inyección falló (\(exploitResult)), continuando con bad_query")
+                        NyxelActivityLog.record("Exploit pre-inyección falló (KXP-\(abs(exploitResult)): \(Self.kxpDetail(abs(exploitResult)))), continuando con bad_query")
                     }
                 }
 
@@ -257,10 +257,12 @@ final class DavizinBridge {
                 NyxelActivityLog.record("Iniciando kexploit_opa334...")
                 let exploitResult = kexploit_opa334()
                 guard exploitResult == 0 else {
-                    NyxelActivityLog.record("kexploit_opa334 falló: \(exploitResult)")
+                    let code = abs(exploitResult)
+                    let detail = Self.kxpDetail(code)
+                    NyxelActivityLog.record("kexploit_opa334 falló: code \(code) — \(detail)")
                     DispatchQueue.main.async {
                         self.operationInFlight = false
-                        self.vc?.setOperationState(.failed("KXP-\(abs(exploitResult)) — No se pudo preparar el entorno."))
+                        self.vc?.setOperationState(.failed("KXP-\(code) — \(detail)"))
                     }
                     return
                 }
@@ -393,6 +395,34 @@ final class DavizinBridge {
             return AppTheme.accentWarm
         } else {                                // mas de 1 dia -> verde
             return AppTheme.success
+        }
+    }
+
+    static func kxpDetail(_ code: Int32) -> String {
+        switch code {
+        case 2:  return "Versión iOS no soportada"
+        case 11: return "IOSurface create falló"
+        case 12: return "Memory entry falló"
+        case 13: return "VM map falló (phys)"
+        case 21: return "VM alloc falló (pe_v1)"
+        case 22: return "Memory entry falló (pe_v1)"
+        case 23: return "Port dealloc falló (pe_v1)"
+        case 31: return "VM alloc falló (pe_v2)"
+        case 32: return "VM alloc search falló (pe_v2)"
+        case 33: return "Memory entry falló (pe_v2)"
+        case 41: return "Socket corrupt getsockopt falló"
+        case 51: return "Control setsockopt falló"
+        case 52: return "Target setsockopt falló"
+        case 53: return "Dirección kernel inválida"
+        case 54: return "Lectura excede tamaño"
+        case 55: return "Lectura kernel getsockopt falló"
+        case 56: return "Escritura kernel setsockopt falló"
+        case 61: return "Socket addr no encontrado"
+        case 62: return "Kernel base no encontrado (scan agotado)"
+        case 71: return "Race thread VM map falló"
+        case 81: return "OOB read VM map falló"
+        case 82: return "OOB write VM map falló"
+        default: return "No se pudo preparar el entorno"
         }
     }
 
