@@ -8,6 +8,51 @@
 #import <sys/socket.h>
 #import <sys/select.h>
 #import <unistd.h>
+#import <setjmp.h>
+#import <signal.h>
+
+#pragma mark - Crash guard for Rust FFI calls (panic = "abort" → SIGABRT)
+
+static sigjmp_buf nyxel_crash_jmpbuf;
+static volatile sig_atomic_t nyxel_crash_guard_armed = 0;
+static struct sigaction nyxel_prev_sigabrt;
+static struct sigaction nyxel_prev_sigsegv;
+static struct sigaction nyxel_prev_sigbus;
+static volatile int nyxel_airlift_rsd_disabled = 0;
+
+static void nyxel_crash_guard_handler(int sig) {
+    if (nyxel_crash_guard_armed) {
+        nyxel_crash_guard_armed = 0;
+        siglongjmp(nyxel_crash_jmpbuf, sig);
+    }
+    struct sigaction *prev = (sig == SIGABRT) ? &nyxel_prev_sigabrt
+                           : (sig == SIGSEGV) ? &nyxel_prev_sigsegv
+                           : &nyxel_prev_sigbus;
+    if (prev->sa_handler && prev->sa_handler != SIG_DFL && prev->sa_handler != SIG_IGN) {
+        prev->sa_handler(sig);
+    } else {
+        signal(sig, SIG_DFL);
+        raise(sig);
+    }
+}
+
+static void nyxel_crash_guard_install(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = nyxel_crash_guard_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGABRT, &sa, &nyxel_prev_sigabrt);
+    sigaction(SIGSEGV, &sa, &nyxel_prev_sigsegv);
+    sigaction(SIGBUS, &sa, &nyxel_prev_sigbus);
+}
+
+static void nyxel_crash_guard_restore(void) {
+    sigaction(SIGABRT, &nyxel_prev_sigabrt, NULL);
+    sigaction(SIGSEGV, &nyxel_prev_sigsegv, NULL);
+    sigaction(SIGBUS, &nyxel_prev_sigbus, NULL);
+    nyxel_crash_guard_armed = 0;
+}
 
 struct NyxelResolveContext {
     struct sockaddr_storage address;
@@ -330,6 +375,11 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         return -1;
     }
 
+    if (nyxel_airlift_rsd_disabled) {
+        if (error_message) *error_message = strdup("AirLift RSD deshabilitado tras un crash anterior en esta sesión.");
+        return -51;
+    }
+
     char normalizedPath[1024];
     if (relative_path[0] == '/') {
         snprintf(normalizedPath, sizeof(normalizedPath), "%s", relative_path);
@@ -337,12 +387,14 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         snprintf(normalizedPath, sizeof(normalizedPath), "/%s", relative_path);
     }
 
+    NSLog(@"[AirLift] Descubriendo _remotepairing._tcp (timeout=%.0fs)...", discover_timeout_seconds);
     struct sockaddr_storage address = {0};
     socklen_t addressLength = 0;
     if (nyxel_discover_remotepairing(&address, &addressLength, discover_timeout_seconds) != 0) {
         if (error_message) *error_message = strdup("No se encontró \"_remotepairing._tcp\" del dispositivo. ¿Sigue emparejado en Modo desarrollador?");
         return -2;
     }
+    NSLog(@"[AirLift] Servicio descubierto. Parseando registro de pairing...");
 
     void *pairingFile = NULL;
     IdeviceFfiError *err = rp_pairing_file_from_bytes(pairing_record, record_len, &pairingFile);
@@ -352,16 +404,41 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         return -3;
     }
 
+    // All subsequent calls are Rust FFI (panic = "abort") — guard against crashes
+    nyxel_crash_guard_install();
+    int crashed_sig = sigsetjmp(nyxel_crash_jmpbuf, 1);
+    if (crashed_sig != 0) {
+        nyxel_crash_guard_restore();
+        nyxel_airlift_rsd_disabled = 1;
+        NSLog(@"[AirLift] CRASH INTERCEPTADO (señal %d) — RSD deshabilitado para esta sesión", crashed_sig);
+        if (error_message) {
+            char buf[256];
+            snprintf(buf, sizeof(buf),
+                     "El túnel RSD crasheó (señal %d). Incompatible con esta versión de iOS o el registro de pairing es inválido. "
+                     "Usando método directo.",
+                     crashed_sig);
+            *error_message = strdup(buf);
+        }
+        return -50;
+    }
+    nyxel_crash_guard_armed = 1;
+
+    NSLog(@"[AirLift] Creando túnel RSD (tunnel_create_rppairing)...");
     void *adapter = NULL;
     void *handshake = NULL;
     err = tunnel_create_rppairing((const struct sockaddr *)&address, addressLength, "Nyxel",
-                                  pairingFile, NULL, NULL, &adapter, &handshake);
+                                  pairingFile, nyxel_pin_callback, (void *)"000000",
+                                  &adapter, &handshake);
     rp_pairing_file_free(pairingFile);
+    pairingFile = NULL;
     if (err) {
+        nyxel_crash_guard_armed = 0;
+        nyxel_crash_guard_restore();
         if (error_message) *error_message = strdup("No se pudo abrir el túnel RSD. Puede requerir re-emparejar.");
         idevice_error_free(err);
         return -4;
     }
+    NSLog(@"[AirLift] Túnel RSD abierto. Conectando House Arrest...");
 
     int result = -99;
     HouseArrestClientHandle *houseArrest = NULL;
@@ -373,35 +450,39 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         if (error_message) *error_message = strdup("House Arrest no disponible por este túnel RSD en esta versión de iOS.");
         idevice_error_free(err);
         result = -5;
-        goto cleanup;
+        goto guarded_cleanup;
     }
+    NSLog(@"[AirLift] House Arrest conectado. Obteniendo contenedor %s...", bundle_id);
 
     err = house_arrest_vend_container(houseArrest, bundle_id, &afc);
-    houseArrest = NULL; // vend_container toma posesión del handle
+    houseArrest = NULL;
     if (err) {
         if (error_message) *error_message = strdup("No se pudo acceder al contenedor de esa app.");
         idevice_error_free(err);
         result = -6;
-        goto cleanup;
+        goto guarded_cleanup;
     }
+    NSLog(@"[AirLift] Contenedor obtenido. Abriendo archivo %s...", normalizedPath);
 
     err = afc_file_open(afc, normalizedPath, write_mode ? NyxelAfcWrOnly : NyxelAfcRdOnly, &file);
     if (err) {
         if (error_message) *error_message = strdup("No se pudo abrir el archivo remoto.");
         idevice_error_free(err);
         result = -7;
-        goto cleanup;
+        goto guarded_cleanup;
     }
 
     if (write_mode) {
+        NSLog(@"[AirLift] Escribiendo %zu bytes...", in_len);
         err = afc_file_write(file, in_data, in_len);
         if (err) {
             if (error_message) *error_message = strdup("Falló la escritura remota.");
             idevice_error_free(err);
             result = -8;
-            goto cleanup;
+            goto guarded_cleanup;
         }
     } else {
+        NSLog(@"[AirLift] Leyendo archivo...");
         unsigned char *bytes = NULL;
         size_t length = 0;
         err = afc_file_read_entire(file, &bytes, &length);
@@ -409,20 +490,25 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
             if (error_message) *error_message = strdup("Falló la lectura remota.");
             idevice_error_free(err);
             result = -9;
-            goto cleanup;
+            goto guarded_cleanup;
         }
         if (out_data) *out_data = bytes; else idevice_data_free(bytes, length);
         if (out_len) *out_len = length;
     }
 
     result = 0;
+    NSLog(@"[AirLift] Operación completada OK");
 
-cleanup:
+guarded_cleanup:
     if (file) afc_file_close(file);
     if (afc) afc_client_free(afc);
     if (houseArrest) house_arrest_client_free(houseArrest);
+    if (pairingFile) rp_pairing_file_free(pairingFile);
     if (adapter) adapter_free(adapter);
     if (handshake) rsd_handshake_free(handshake);
+
+    nyxel_crash_guard_armed = 0;
+    nyxel_crash_guard_restore();
     return result;
 }
 

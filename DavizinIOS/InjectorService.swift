@@ -117,10 +117,15 @@ class InjectorService {
     }
 
     private static func writeToContainer(_ data: Data, relPath: String, container: String, bundleID: String) -> Swift.Error? {
-        // CRITICAL: Obtener grant ACTIVO ANTES de escribir. El grant se mantiene durante todo el defer.
-        // Este patrón es IGUAL al de External en iOS 26+ y es NECESARIO para iOS 27.
-        let handle = DavizinGrantContainerAccess(container)
-        defer { DavizinReleaseContainerGrant(handle) }
+        let fullPath = container + "/" + relPath
+        let destDir = (fullPath as NSString).deletingLastPathComponent
+
+        let handleContainer = DavizinGrantContainerAccess(container)
+        let handleDir = DavizinGrantContainerAccess(destDir)
+        defer {
+            DavizinReleaseContainerGrant(handleContainer)
+            DavizinReleaseContainerGrant(handleDir)
+        }
 
         var airliftNote = "AirLift: sin registro de pairing guardado"
         if NixelAirLiftFileChannel.isAvailable {
@@ -131,26 +136,34 @@ class InjectorService {
                 NyxelActivityLog.record("AirLift write falló (\(relPath)): \(error.message); usando método directo")
             }
         }
+
         do {
-            try data.write(to: URL(fileURLWithPath: container + "/" + relPath), options: .atomic)
+            try data.write(to: URL(fileURLWithPath: fullPath), options: .atomic)
             return nil
         } catch {
-            return ContainerWriteError(airliftNote: airliftNote, directError: error)
+            let grantInfo = "grants: container=\(handleContainer) dir=\(handleDir)"
+            NyxelActivityLog.record("Escritura directa falló (\(relPath)): \(error.localizedDescription) [\(grantInfo)]")
+            return ContainerWriteError(airliftNote: "\(airliftNote); \(grantInfo)", directError: error)
         }
     }
 
     private static func readFromContainer(relPath: String, container: String, bundleID: String) -> Data? {
-        // CRITICAL: Obtener grant ACTIVO ANTES de leer. El grant se mantiene durante todo el defer.
-        // Este patrón es IGUAL al de External en iOS 26+ y es NECESARIO para iOS 27.
-        let handle = DavizinGrantContainerAccess(container)
-        defer { DavizinReleaseContainerGrant(handle) }
+        let fullPath = container + "/" + relPath
+        let destDir = (fullPath as NSString).deletingLastPathComponent
+
+        let handleContainer = DavizinGrantContainerAccess(container)
+        let handleDir = DavizinGrantContainerAccess(destDir)
+        defer {
+            DavizinReleaseContainerGrant(handleContainer)
+            DavizinReleaseContainerGrant(handleDir)
+        }
 
         if NixelAirLiftFileChannel.isAvailable {
             if case .success(let data) = NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
                 return data
             }
         }
-        return try? Data(contentsOf: URL(fileURLWithPath: container + "/" + relPath))
+        return try? Data(contentsOf: URL(fileURLWithPath: fullPath))
     }
 
     /// Comprueba si el bundle está instalado y accesible en el sistema verificado.
