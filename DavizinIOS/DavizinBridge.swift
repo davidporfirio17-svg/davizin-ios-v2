@@ -130,6 +130,18 @@ final class DavizinBridge {
         let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
+                if sandbox_access_is_active() == 0 {
+                    NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
+                    let exploitResult = kexploit_opa334()
+                    if exploitResult == 0 {
+                        let selfProc = proc_self()
+                        _ = sandbox_escape(selfProc)
+                        NyxelActivityLog.record("Exploit pre-inyección completado, sandbox activo: \(sandbox_access_is_active() != 0)")
+                    } else {
+                        NyxelActivityLog.record("Exploit pre-inyección falló (\(exploitResult)), continuando con bad_query")
+                    }
+                }
+
                 let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
                 if result.success && mode.oneTime {
                     self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
@@ -230,9 +242,42 @@ final class DavizinBridge {
 
         case .runExploit:
             vc?.setOperationState(.running)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-                self?.operationInFlight = false
-                self?.vc?.setOperationState(.succeeded("Sistema listo ✓"))
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self else { return }
+
+                if sandbox_access_is_active() != 0 {
+                    NyxelActivityLog.record("Sandbox ya activo, exploit innecesario")
+                    DispatchQueue.main.async {
+                        self.operationInFlight = false
+                        self.vc?.setOperationState(.succeeded("Sandbox ya activo ✓"))
+                    }
+                    return
+                }
+
+                NyxelActivityLog.record("Iniciando kexploit_opa334...")
+                let exploitResult = kexploit_opa334()
+                guard exploitResult == 0 else {
+                    NyxelActivityLog.record("kexploit_opa334 falló: \(exploitResult)")
+                    DispatchQueue.main.async {
+                        self.operationInFlight = false
+                        self.vc?.setOperationState(.failed("KXP-\(abs(exploitResult)) — No se pudo preparar el entorno."))
+                    }
+                    return
+                }
+
+                NyxelActivityLog.record("kexploit exitoso, ejecutando sandbox_escape...")
+                let selfProc = proc_self()
+                _ = sandbox_escape(selfProc)
+                let active = sandbox_access_is_active() != 0
+                NyxelActivityLog.record("sandbox_escape completado, activo: \(active)")
+
+                DispatchQueue.main.async {
+                    self.operationInFlight = false
+                    self.hapticFeedback(success: active)
+                    self.vc?.setOperationState(active
+                        ? .succeeded("Sistema preparado ✓")
+                        : .failed("SBX-001 — Sandbox escape no verificado."))
+                }
             }
 
         case .inject:
