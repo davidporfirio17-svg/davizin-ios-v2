@@ -65,8 +65,11 @@ final class DavizinBridge {
         vc?.setLoginChecking(true)
 
         let upperKey = key.uppercased()
+        NSLog("[DavizinBridge] handleLogin iniciado — build=%@", KeyValidator.getAppBuild())
 
         KeyValidator.validate(key: upperKey) { [weak self] success, message, remaining, notice in
+            NSLog("[DavizinBridge] Resultado: success=%d, remaining=%d, msg=%@",
+                  success ? 1 : 0, remaining, message ?? "(nil)")
             self?.vc?.setLoginChecking(false)
 
             if success && remaining > 0 {
@@ -75,15 +78,11 @@ final class DavizinBridge {
                 self?.remainingSeconds = remaining
                 self?.vc?.setAccountSession(key: upperKey, remainingSeconds: remaining, countryCode: KeyValidator.lastCountryCode)
 
-                // Guardar credenciales para las descargas de cache_res
                 self?.sessionKey = upperKey
                 self?.sessionHWID = KeyValidator.getDeviceHWID()
 
                 self?.startCountdown()
 
-                // Los modos ya se guardaron en DavizinModeCatalog dentro de
-                // KeyValidator.validate() (lee resp.data.modes del /check real),
-                // asi que aqui solo falta mostrar el aviso si hay uno.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     if let notice = notice, !notice.isEmpty {
                         self?.vc?.showNotice(notice) {
@@ -94,7 +93,13 @@ final class DavizinBridge {
                     }
                 }
             } else {
-                self?.vc?.setLoginStatus(message ?? "Key invalida", success: false)
+                if KeyValidator.lastValidationWasVersionUnavailable {
+                    NSLog("[DavizinBridge] Build %@ rechazado por el Worker — actualizar allowed_app_builds", KeyValidator.getAppBuild())
+                    self?.vc?.setLoginStatus("Versión no disponible", success: false)
+                    self?.showVersionUnavailableAlert()
+                } else {
+                    self?.vc?.setLoginStatus(message ?? "Key invalida", success: false)
+                }
             }
         }
     }
@@ -294,6 +299,17 @@ final class DavizinBridge {
             } else {
                 performInjection(game: game, mode: mode, key: key, hwid: hwid)
             }
+    }
+
+    private func showVersionUnavailableAlert() {
+        let build = KeyValidator.getAppBuild()
+        let alert = UIAlertController(
+            title: "Versión no disponible",
+            message: "Esta versión de la app (build \(build)) no está autorizada por el servidor. Ve a la configuración del Worker → Builds permitidos y agrega el build \(build).",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Entendido", style: .default))
+        vc?.present(alert, animated: true)
     }
 
     // MARK: - Countdown
