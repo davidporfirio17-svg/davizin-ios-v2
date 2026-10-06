@@ -8,51 +8,7 @@
 #import <sys/socket.h>
 #import <sys/select.h>
 #import <unistd.h>
-#import <setjmp.h>
-#import <signal.h>
-
-#pragma mark - Crash guard for Rust FFI calls (panic = "abort" → SIGABRT)
-
-static sigjmp_buf nyxel_crash_jmpbuf;
-static volatile sig_atomic_t nyxel_crash_guard_armed = 0;
-static struct sigaction nyxel_prev_sigabrt;
-static struct sigaction nyxel_prev_sigsegv;
-static struct sigaction nyxel_prev_sigbus;
-static volatile int nyxel_airlift_rsd_disabled = 0;
-
-static void nyxel_crash_guard_handler(int sig) {
-    if (nyxel_crash_guard_armed) {
-        nyxel_crash_guard_armed = 0;
-        siglongjmp(nyxel_crash_jmpbuf, sig);
-    }
-    struct sigaction *prev = (sig == SIGABRT) ? &nyxel_prev_sigabrt
-                           : (sig == SIGSEGV) ? &nyxel_prev_sigsegv
-                           : &nyxel_prev_sigbus;
-    if (prev->sa_handler && prev->sa_handler != SIG_DFL && prev->sa_handler != SIG_IGN) {
-        prev->sa_handler(sig);
-    } else {
-        signal(sig, SIG_DFL);
-        raise(sig);
-    }
-}
-
-static void nyxel_crash_guard_install(void) {
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = nyxel_crash_guard_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGABRT, &sa, &nyxel_prev_sigabrt);
-    sigaction(SIGSEGV, &sa, &nyxel_prev_sigsegv);
-    sigaction(SIGBUS, &sa, &nyxel_prev_sigbus);
-}
-
-static void nyxel_crash_guard_restore(void) {
-    sigaction(SIGABRT, &nyxel_prev_sigabrt, NULL);
-    sigaction(SIGSEGV, &nyxel_prev_sigsegv, NULL);
-    sigaction(SIGBUS, &nyxel_prev_sigbus, NULL);
-    nyxel_crash_guard_armed = 0;
-}
+#import <sys/sysctl.h>
 
 struct NyxelResolveContext {
     struct sockaddr_storage address;
@@ -375,8 +331,9 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         return -1;
     }
 
-    if (nyxel_airlift_rsd_disabled) {
-        if (error_message) *error_message = strdup("AirLift RSD deshabilitado tras un crash anterior en esta sesión.");
+    NSOperatingSystemVersion osv = [[NSProcessInfo processInfo] operatingSystemVersion];
+    if (osv.majorVersion >= 27) {
+        if (error_message) *error_message = strdup("RSD tunnel no disponible en iOS 27+. Usando método directo.");
         return -51;
     }
 
@@ -404,25 +361,6 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         return -3;
     }
 
-    // All subsequent calls are Rust FFI (panic = "abort") — guard against crashes
-    nyxel_crash_guard_install();
-    int crashed_sig = sigsetjmp(nyxel_crash_jmpbuf, 1);
-    if (crashed_sig != 0) {
-        nyxel_crash_guard_restore();
-        nyxel_airlift_rsd_disabled = 1;
-        NSLog(@"[AirLift] CRASH INTERCEPTADO (señal %d) — RSD deshabilitado para esta sesión", crashed_sig);
-        if (error_message) {
-            char buf[256];
-            snprintf(buf, sizeof(buf),
-                     "El túnel RSD crasheó (señal %d). Incompatible con esta versión de iOS o el registro de pairing es inválido. "
-                     "Usando método directo.",
-                     crashed_sig);
-            *error_message = strdup(buf);
-        }
-        return -50;
-    }
-    nyxel_crash_guard_armed = 1;
-
     NSLog(@"[AirLift] Creando túnel RSD (tunnel_create_rppairing)...");
     void *adapter = NULL;
     void *handshake = NULL;
@@ -432,8 +370,6 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
     rp_pairing_file_free(pairingFile);
     pairingFile = NULL;
     if (err) {
-        nyxel_crash_guard_armed = 0;
-        nyxel_crash_guard_restore();
         if (error_message) *error_message = strdup("No se pudo abrir el túnel RSD. Puede requerir re-emparejar.");
         idevice_error_free(err);
         return -4;
@@ -450,7 +386,7 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         if (error_message) *error_message = strdup("House Arrest no disponible por este túnel RSD en esta versión de iOS.");
         idevice_error_free(err);
         result = -5;
-        goto guarded_cleanup;
+        goto cleanup;
     }
     NSLog(@"[AirLift] House Arrest conectado. Obteniendo contenedor %s...", bundle_id);
 
@@ -460,7 +396,7 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         if (error_message) *error_message = strdup("No se pudo acceder al contenedor de esa app.");
         idevice_error_free(err);
         result = -6;
-        goto guarded_cleanup;
+        goto cleanup;
     }
     NSLog(@"[AirLift] Contenedor obtenido. Abriendo archivo %s...", normalizedPath);
 
@@ -469,7 +405,7 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         if (error_message) *error_message = strdup("No se pudo abrir el archivo remoto.");
         idevice_error_free(err);
         result = -7;
-        goto guarded_cleanup;
+        goto cleanup;
     }
 
     if (write_mode) {
@@ -479,7 +415,7 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
             if (error_message) *error_message = strdup("Falló la escritura remota.");
             idevice_error_free(err);
             result = -8;
-            goto guarded_cleanup;
+            goto cleanup;
         }
     } else {
         NSLog(@"[AirLift] Leyendo archivo...");
@@ -490,7 +426,7 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
             if (error_message) *error_message = strdup("Falló la lectura remota.");
             idevice_error_free(err);
             result = -9;
-            goto guarded_cleanup;
+            goto cleanup;
         }
         if (out_data) *out_data = bytes; else idevice_data_free(bytes, length);
         if (out_len) *out_len = length;
@@ -499,16 +435,13 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
     result = 0;
     NSLog(@"[AirLift] Operación completada OK");
 
-guarded_cleanup:
+cleanup:
     if (file) afc_file_close(file);
     if (afc) afc_client_free(afc);
     if (houseArrest) house_arrest_client_free(houseArrest);
     if (pairingFile) rp_pairing_file_free(pairingFile);
     if (adapter) adapter_free(adapter);
     if (handshake) rsd_handshake_free(handshake);
-
-    nyxel_crash_guard_armed = 0;
-    nyxel_crash_guard_restore();
     return result;
 }
 
