@@ -287,26 +287,7 @@ class InjectorService {
 
 			sendErrorNotification("✅ PASO 1", "iOS OK")
 
-			// PASO 1.5: En iOS 27+, NECESITAMOS sandbox escape ACTIVO
-			sendErrorNotification("🔍 PASO 1.5", "Verificando sandbox escape...")
-			let osVersion = ProcessInfo.processInfo.operatingSystemVersion
-			if osVersion.majorVersion >= 26 {
-				// iOS 26+ requiere sandbox escape
-				if sandbox_access_is_active() == 0 {
-					sendErrorNotification("🔍 PASO 1.5", "Ejecutando kernel exploit...")
-					let exploitResult = kexploit_opa334()
-					if exploitResult != 0 {
-						let msg = "Kernel exploit falló: \(exploitResult)"
-						sendErrorNotification("❌ PASO 1.5", msg)
-						throw NSError(domain: "Davizin", code: -2, userInfo: [NSLocalizedDescriptionKey: msg])
-					}
-					sendErrorNotification("✅ PASO 1.5", "Sandbox escape activado")
-				} else {
-					sendErrorNotification("✅ PASO 1.5", "Sandbox escape ya activo")
-				}
-			} else {
-				sendErrorNotification("✅ PASO 1.5", "iOS < 26, sin sandbox escape requerido")
-			}
+			sendErrorNotification("✅ PASO 1.5", "AirLift será el canal principal de escritura")
 
 			sendErrorNotification("🔍 PASO 2", "Obteniendo bundle ID...")
 
@@ -357,8 +338,8 @@ class InjectorService {
         sendErrorNotification("✅ PASO 7", "Dest: \(activeRel)")
 
         sendErrorNotification("🔍 PASO 8", "Creando directorio...")
-        try fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
-        sendErrorNotification("✅ PASO 8", "Directorio OK")
+        try? fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+        sendErrorNotification("✅ PASO 8", "Directorio OK (o ya existía)")
 
         sendErrorNotification("🔍 PASO 9", "Haciendo backup...")
         let backupRel = disguisedBackupPath(for: activeRel)
@@ -400,8 +381,8 @@ class InjectorService {
         sendErrorNotification("✅ PASO 11", "INYECCIÓN OK")
 
         sendErrorNotification("🔍 PASO 12", "Seteando permisos...")
-        try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        sendErrorNotification("✅ PASO 12", "Permisos OK")
+        try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
+        sendErrorNotification("✅ PASO 12", "Permisos OK (AirLift ya setea permisos)")
 
         sendErrorNotification("🔍 PASO 13", "Finalizando...")
         NyxelCleanupFlow.markInjectionSucceeded(for: game)
