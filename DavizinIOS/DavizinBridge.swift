@@ -117,6 +117,13 @@ final class DavizinBridge {
 
     // MARK: - Operaciones
 
+    /// External usa Remote Pairing/RSD/AirLift como ruta primaria en iOS 27.
+    /// Tener un registro guardado no es una elevación de privilegios: solo indica
+    /// que el canal soportado para operaciones de archivos puede intentarse.
+    private static var airLiftRouteAvailable: Bool {
+        NixelAirLiftFileChannel.isAvailable
+    }
+
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
         vc?.setOperationState(.injecting)
 
@@ -130,7 +137,9 @@ final class DavizinBridge {
         let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                if sandbox_access_is_active() == 0 {
+                if Self.airLiftRouteAvailable {
+                    NyxelActivityLog.record("AirLift disponible: omitiendo kexploit experimental y usando Remote Pairing/RSD para la escritura")
+                } else if sandbox_access_is_active() == 0 {
                     NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
                     let exploitResult = kexploit_opa334()
                     if exploitResult == 0 {
@@ -238,6 +247,15 @@ final class DavizinBridge {
             vc?.setOperationState(.running)
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self else { return }
+
+                if Self.airLiftRouteAvailable {
+                    NyxelActivityLog.record("Remote Pairing/AirLift disponible: Prepare Environment no requiere kexploit en iOS 27")
+                    DispatchQueue.main.async {
+                        self.operationInFlight = false
+                        self.vc?.setOperationState(.succeeded("Remote Pairing/AirLift listo ✓"))
+                    }
+                    return
+                }
 
                 if sandbox_access_is_active() != 0 {
                     NyxelActivityLog.record("Sandbox ya activo, exploit innecesario")
