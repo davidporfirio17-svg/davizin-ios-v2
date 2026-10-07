@@ -357,7 +357,9 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
     NSLog(@"[AirLift] Creando túnel RSD (tunnel_create_rppairing)...");
     void *adapter = NULL;
     void *handshake = NULL;
-    err = tunnel_create_rppairing((const struct sockaddr *)&address, addressLength, "Nyxel",
+    // El registro se genera en nyxel_pairable_host_start con nombre 2424.
+    // tunnel_create_rppairing debe recibir exactamente el mismo hostname.
+    err = tunnel_create_rppairing((const struct sockaddr *)&address, addressLength, "2424",
                                   pairingFile, nyxel_pin_callback, (void *)"000000",
                                   &adapter, &handshake);
     rp_pairing_file_free(pairingFile);

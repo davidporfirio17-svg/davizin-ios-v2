@@ -369,7 +369,7 @@ final class NixelExternalPairingAuthenticator: NixelPairingAuthenticator {
                 guard let base = rawBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -20 }
                 return service.name.withCString { name in
                     service.regType.withCString { regType in
-                        "Nyxel".withCString { hostname in
+                        "2424".withCString { hostname in
                             pin.withCString { pinValue in
                                 nyxel_pair_rppairing(name, regType, hostname, pinValue, base, storedRecord.count, nil)
                             }
@@ -503,9 +503,9 @@ final class NixelPairingSession {
             switch result {
             case .authenticated(let record):
                 do {
-                    try NixelPairingRecordStore.shared.save(record, deviceID: service.name)
-                    self.update(.paired(service.name), onState: onState)
-                    self.update(.developerModeRequired(service.name), onState: onState)
+                    try NixelPairingRecordStore.shared.save(record, deviceID: "2424")
+                    self.update(.paired("2424"), onState: onState)
+                    self.update(.developerModeRequired("2424"), onState: onState)
                 } catch {
                     self.update(.failed("No se pudo guardar el registro autenticado: \(error.localizedDescription)"), onState: onState)
                 }
