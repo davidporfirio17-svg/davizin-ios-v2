@@ -330,12 +330,6 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
         return -1;
     }
 
-    NSOperatingSystemVersion osv = [[NSProcessInfo processInfo] operatingSystemVersion];
-    if (osv.majorVersion >= 27) {
-        if (error_message) *error_message = strdup("RSD tunnel no disponible en iOS 27+. Usando método directo.");
-        return -51;
-    }
-
     char normalizedPath[1024];
     if (relative_path[0] == '/') {
         snprintf(normalizedPath, sizeof(normalizedPath), "%s", relative_path);

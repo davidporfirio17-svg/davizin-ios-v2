@@ -249,10 +249,10 @@ final class DavizinBridge {
                 guard let self else { return }
 
                 if Self.airLiftRouteAvailable {
-                    NyxelActivityLog.record("Remote Pairing/AirLift disponible: Prepare Environment no requiere kexploit en iOS 27")
+                    NyxelActivityLog.record("Remote Pairing guardado: se usará el túnel RSD/AirLift real; no se ejecuta kexploit en iOS 27")
                     DispatchQueue.main.async {
                         self.operationInFlight = false
-                        self.vc?.setOperationState(.succeeded("Remote Pairing/AirLift listo ✓"))
+                        self.vc?.setOperationState(.succeeded("Remote Pairing guardado ✓ — AirLift se validará al escribir"))
                     }
                     return
                 }
