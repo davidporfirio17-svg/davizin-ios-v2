@@ -18,6 +18,19 @@ struct NyxelResolveContext {
     int error;
 };
 
+struct NyxelFfiErrorView {
+    int32_t code;
+    int32_t sub_code;
+    const char *message;
+};
+
+static NSString *nyxel_ffi_error_text(IdeviceFfiError *error) {
+    if (!error) return @"sin error";
+    const struct NyxelFfiErrorView *view = (const struct NyxelFfiErrorView *)error;
+    NSString *message = view->message ? [NSString stringWithUTF8String:view->message] : @"sin mensaje";
+    return [NSString stringWithFormat:@"code=%d subcode=%d %@", view->code, view->sub_code, message];
+}
+
 static void nyxel_resolve_callback(DNSServiceRef sdRef, DNSServiceFlags flags, uint32_t interfaceIndex,
                                    DNSServiceErrorType errorCode, const char *fullname,
                                    const char *hosttarget, uint16_t port, uint16_t txtLen,
@@ -76,7 +89,11 @@ int nyxel_pair_rppairing(const char *service_name, const char *reg_type, const c
                                     pairing, nyxel_pin_callback, (void *)(pin ?: "000000"),
                                     &adapter, &handshake);
     rp_pairing_file_free(pairing);
-    if (error) return -11;
+    if (error) {
+        NSLog(@"[AirLift] pair_rppairing falló: %@", nyxel_ffi_error_text(error));
+        idevice_error_free(error);
+        return -11;
+    }
     if (adapter) adapter_free(adapter);
     if (handshake) rsd_handshake_free(handshake);
     return 0;
@@ -365,7 +382,8 @@ int nyxel_airlift_container_io(const unsigned char *pairing_record, size_t recor
     rp_pairing_file_free(pairingFile);
     pairingFile = NULL;
     if (err) {
-        if (error_message) *error_message = strdup("No se pudo abrir el túnel RSD. Puede requerir re-emparejar.");
+        NSString *detail = [NSString stringWithFormat:@"No se pudo abrir el túnel RSD (%@). Puede requerir re-emparejar.", nyxel_ffi_error_text(err)];
+        if (error_message) *error_message = strdup(detail.UTF8String);
         idevice_error_free(err);
         return -4;
     }
