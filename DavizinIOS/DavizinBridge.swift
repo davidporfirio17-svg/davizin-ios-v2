@@ -415,10 +415,14 @@ final class DavizinBridge {
         case 56: return "Escritura kernel setsockopt falló"
         case 61: return "Socket addr no encontrado"
         case 62: return "Kernel base no encontrado (scan agotado)"
-        case 71: return "Race thread VM map falló"
         case 81: return "OOB read VM map falló"
         case 82: return "OOB write VM map falló"
-        default: return "No se pudo preparar el entorno"
+        default:
+            if code >= 7100 && code < 7200 {
+                let kr = code - 7100
+                return "Race VM map falló (kr=\(kr))"
+            }
+            return "No se pudo preparar el entorno"
         }
     }
 
