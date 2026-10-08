@@ -171,7 +171,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER="com.apple.mobile.MobileHouseArrest";
 				PRODUCT_NAME="$(TARGET_NAME)";
 				SDKROOT=iphoneos;
-				OTHER_LDFLAGS="-force_load /tmp/airlift/libairlift_ffi.a -force_load /tmp/idevice-ffi/libidevice_ffi.a -framework Security -framework Network";
+				OTHER_LDFLAGS="-force_load /tmp/airlift/libairlift_ffi.a -framework Security -framework Network";
 				SWIFT_OBJC_BRIDGING_HEADER="DavizinIOS/DavizinIOS-Bridging-Header.h";
 				SWIFT_VERSION=5.0;
 				TARGETED_DEVICE_FAMILY="1,2";
@@ -195,7 +195,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER="com.apple.mobile.MobileHouseArrest";
 				PRODUCT_NAME="$(TARGET_NAME)";
 				SDKROOT=iphoneos;
-				OTHER_LDFLAGS="-force_load /tmp/airlift/libairlift_ffi.a -force_load /tmp/idevice-ffi/libidevice_ffi.a -framework Security -framework Network";
+				OTHER_LDFLAGS="-force_load /tmp/airlift/libairlift_ffi.a -framework Security -framework Network";
 				SWIFT_OBJC_BRIDGING_HEADER="DavizinIOS/DavizinIOS-Bridging-Header.h";
 				SWIFT_VERSION=5.0;
 				TARGETED_DEVICE_FAMILY="1,2";
