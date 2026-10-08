@@ -634,7 +634,7 @@ enum NixelHybridCoordinator {
 
         let vpn = NixelVPNManager.shared
         if vpn.status == .connected {
-            verifyRSDLoopback(completion: completion)
+            completion(.success(()))
             return
         }
         if vpn.status == .connecting || vpn.status == .reasserting || vpn.status == .disconnecting {
@@ -643,8 +643,8 @@ enum NixelHybridCoordinator {
         }
 
         if isExternalVPNActive() {
-            NyxelActivityLog.record("Hybrid VPN: se detectó una interfaz VPN externa; comprobando el endpoint RSD antes de inyectar")
-            verifyRSDLoopback(completion: completion)
+            NyxelActivityLog.record("Hybrid VPN: VPN externo detectado; pairing puede continuar sin exigir RSD")
+            completion(.success(()))
             return
         }
 
@@ -663,12 +663,25 @@ enum NixelHybridCoordinator {
         }
     }
 
+    /// El flujo de Developer Mode solo necesita que la preparación del VPN
+    /// termine; RSD se valida después, en la ruta de inyección AirLift.
+    static func startForAirLift(completion: @escaping (Result<Void, Error>) -> Void) {
+        start { result in
+            switch result {
+            case .success:
+                verifyRSDLoopback(completion: completion)
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+
     private static func waitForVPNConnected(
         until deadline: Date,
         completion: @escaping (Result<Void, Error>) -> Void
     ) {
         if NixelVPNManager.shared.status == .connected {
-            verifyRSDLoopback(completion: completion)
+            completion(.success(()))
             return
         }
         guard Date() < deadline else {

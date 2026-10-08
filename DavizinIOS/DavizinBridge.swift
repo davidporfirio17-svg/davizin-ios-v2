@@ -170,7 +170,7 @@ final class DavizinBridge {
             return
         }
 
-        NixelHybridCoordinator.start { [weak self] result in
+        NixelHybridCoordinator.startForAirLift { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .success:

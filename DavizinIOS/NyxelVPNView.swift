@@ -208,16 +208,7 @@ final class NyxelVPNView: UIView {
 
     @objc private func beginPairing() {
         pairingLogLabel.text = ""
-        NixelHybridCoordinator.start { [weak self] result in
-            DispatchQueue.main.async {
-                if case .failure(let error) = result {
-                    self?.pairingLabel.text = "VPN no disponible: \(error.localizedDescription)"
-                    self?.pairingLabel.textColor = AppTheme.failure
-                    return
-                }
-                self?.startPairingSession()
-            }
-        }
+        startPairingSession()
     }
 
     private func startPairingSession() {
