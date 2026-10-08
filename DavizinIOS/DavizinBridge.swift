@@ -256,7 +256,7 @@ final class DavizinBridge {
                     NyxelActivityLog.record("kexploit_opa334 falló: code \(code) — \(detail)")
                     DispatchQueue.main.async {
                         self.operationInFlight = false
-                        self.vc?.setOperationState(.failed("KXP-\(code) — \(detail)"))
+                        self.vc?.setOperationState(.failed("KXP-\(code) — \(detail)\nLa inyección puede funcionar sin exploit via bad_query. Pulsa Inyectar directamente."))
                     }
                     return
                 }
