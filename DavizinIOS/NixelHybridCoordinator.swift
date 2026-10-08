@@ -403,7 +403,7 @@ enum NixelPairingSessionState {
     var message: String {
         switch self {
         case .idle: return "Pairing sin iniciar"
-        case .searching: return "Publicando host AirLift para que el iPad lo detecte…"
+        case .searching: return "Solicitando acceso a la red local y preparando el host AirLift…"
         case .serviceDetected(let name): return "Host local publicado: \(name); esperando que el iPad lo detecte…"
         case .transportReachable(let name): return "Transporte accesible: \(name)"
         case .pairingRecordFound(let name): return "Registro local encontrado para \(name); autenticación pendiente"
@@ -416,6 +416,64 @@ enum NixelPairingSessionState {
     }
 }
 
+/// Solicita el permiso de red local antes de publicar el PairableHost.
+/// Sigue el preflight de test1-main: un listener y un browser Bonjour activos
+/// durante un breve intervalo hacen que iOS presente el permiso en contexto.
+private final class NixelPairingLocalNetworkAuthorization {
+    private var listener: NWListener?
+    private var browser: NWBrowser?
+    private var timeoutWorkItem: DispatchWorkItem?
+    private var completion: (() -> Void)?
+
+    func request(completion: @escaping () -> Void) {
+        stop()
+        self.completion = completion
+
+        let parameters = NWParameters.tcp
+        parameters.includePeerToPeer = true
+
+        let listener = try? NWListener(using: parameters)
+        listener?.service = NWListener.Service(name: "SupportPatchProbe", type: "_aircardprobe._tcp")
+        listener?.newConnectionHandler = { $0.cancel() }
+        self.listener = listener
+
+        let browser = NWBrowser(for: .bonjour(type: "_aircardprobe._tcp", domain: nil), using: parameters)
+        browser.stateUpdateHandler = { state in
+            if case .failed(let error) = state {
+                NyxelActivityLog.record("Pairing local-network preflight: browser failed — \(error.localizedDescription)")
+            }
+        }
+        self.browser = browser
+        listener?.start(queue: .main)
+        browser.start(queue: .main)
+
+        let work = DispatchWorkItem { [weak self] in self?.finishRequest() }
+        timeoutWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+    }
+
+    func stop() {
+        timeoutWorkItem?.cancel()
+        timeoutWorkItem = nil
+        browser?.cancel()
+        browser = nil
+        listener?.cancel()
+        listener = nil
+        completion = nil
+    }
+
+    private func finishRequest() {
+        guard let completion else { return }
+        self.completion = nil
+        timeoutWorkItem = nil
+        browser?.cancel()
+        browser = nil
+        listener?.cancel()
+        listener = nil
+        completion()
+    }
+}
+
 /// Orquesta el flujo de External: publica primero un PairableHost local para
 /// que el iPad lo descubra. El backend FFI acepta la conexión iniciada por iOS,
 /// entrega el PIN y devuelve el registro RPairing solo tras un handshake real.
@@ -424,13 +482,13 @@ final class NixelPairingSession {
     private(set) var state: NixelPairingSessionState = .idle
     private var service: NixelRemotePairingService?
     private let authenticator: NixelPairingAuthenticator = NixelExternalPairingAuthenticator()
+    private let localNetworkAuthorization = NixelPairingLocalNetworkAuthorization()
     private var hostObservers: [NSObjectProtocol] = []
 
     private init() {}
 
     func begin(onState: @escaping (NixelPairingSessionState) -> Void) {
         stop()
-        NixelPairingKeepAlive.start()
         update(.searching, onState: onState)
         let center = NotificationCenter.default
         hostObservers = [
@@ -465,15 +523,20 @@ final class NixelPairingSession {
                 self?.update(.failed(note.userInfo?["message"] as? String ?? "Falló el host PairableHost."), onState: onState)
             }
         ]
-        let result = "SupportPatch".withCString { name in
-            "iPhone".withCString { model in nyxel_pairable_host_start(name, model) }
-        }
-        if result != 0 {
-            update(.failed("No se pudo publicar el host Remote Pairing (código \(result))."), onState: onState)
+        localNetworkAuthorization.request { [weak self] in
+            guard let self else { return }
+            NixelPairingKeepAlive.start()
+            let result = "SupportPatch".withCString { name in
+                "iPhone".withCString { model in nyxel_pairable_host_start(name, model) }
+            }
+            if result != 0 {
+                self.update(.failed("No se pudo publicar el host Remote Pairing (código \(result))."), onState: onState)
+            }
         }
     }
 
     func stop() {
+        localNetworkAuthorization.stop()
         NixelPairingProbe.shared.stop()
         hostObservers.forEach { NotificationCenter.default.removeObserver($0) }
         hostObservers.removeAll()

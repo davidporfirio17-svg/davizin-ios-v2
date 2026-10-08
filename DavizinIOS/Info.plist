@@ -65,6 +65,7 @@
 		<string>_remotepairing-pairable-host._tcp</string>
 		<string>_remotepairing._tcp</string>
 		<string>_3105airlift._tcp</string>
+		<string>_aircardprobe._tcp</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

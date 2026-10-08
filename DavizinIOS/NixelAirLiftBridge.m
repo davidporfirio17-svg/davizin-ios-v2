@@ -181,7 +181,13 @@ static void nyxel_pairing_ready_callback(void *context, const char *service_id,
                                                                               name:serviceName
                                                                               port:(int32_t)port];
                 nyxel_pairing_host_service.delegate = nyxel_pairing_service_delegate;
-                [nyxel_pairing_host_service setTXTRecord:txtRecord];
+                if (![nyxel_pairing_host_service setTXTRecordData:txtRecord]) {
+                    [nyxel_pairing_host_service stop];
+                    nyxel_pairing_host_service = nil;
+                    nyxel_pairing_service_delegate = nil;
+                    nyxel_pairing_post(@"NyxelPairingHostFailed", @{ @"message": @"NSNetService rechazó el registro TXT de AirLift." });
+                    return;
+                }
                 [nyxel_pairing_host_service publish];
             } @catch (NSException *exception) {
                 nyxel_pairing_post(@"NyxelPairingHostFailed", @{
