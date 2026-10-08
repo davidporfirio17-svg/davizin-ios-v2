@@ -127,7 +127,7 @@ class InjectorService {
         }
     }
 
-    private static func getContainerPathWithTimeout(bundleID: String, timeout: TimeInterval, error: inout NSString?) -> NSString? {
+    private static func getContainerPathWithTimeout(bundleID: String, timeout: TimeInterval, error: inout String?) -> String? {
         let completed = DispatchSemaphore(value: 0)
         let result = MCMContainerLookupResult()
         mcmLookupQueue.async {
@@ -138,13 +138,13 @@ class InjectorService {
         }
 
         guard completed.wait(timeout: .now() + timeout) == .success else {
-            error = "MCM container lookup timed out after \(Int(timeout)) seconds" as NSString
+            error = "MCM container lookup timed out after \(Int(timeout)) seconds"
             NyxelActivityLog.record("PASO 3: MCM timeout tras \(Int(timeout))s; se cancela antes de inyectar")
             return nil
         }
         let value = result.snapshot()
-        error = value.error as NSString?
-        return value.path as NSString?
+        error = value.error
+        return value.path
     }
 
     /// Escribe en el contenedor del juego. Si hay un registro de pairing
@@ -419,9 +419,9 @@ class InjectorService {
 
         sendErrorNotification("🔍 PASO 3", "Activando container MCM...")
 
-        var mcmErr: NSString?
+        var mcmErr: String?
         guard let container = Self.getContainerPathWithTimeout(bundleID: bundleID, timeout: 25, error: &mcmErr) else {
-            let msg = (mcmErr as String?) ?? "MCM falló - container nil"
+            let msg = mcmErr ?? "MCM falló - container nil"
             sendErrorNotification("❌ PASO 3", msg)
             return InjectorResult(success: false, message: msg)
         }
