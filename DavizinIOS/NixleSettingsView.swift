@@ -86,12 +86,13 @@ final class NixleSettingsView: UIView {
     private func makeConnectionCard() -> UIView {
         let card = DavizinCardView()
         let title = sectionTitle("Pairing & Tunnel")
-        configureStatus(tunnelValue); configureStatus(pairingValue)
+        configureStatus(tunnelValue); configureStatus(pairingValue); configureStatus(pluginValue)
         let tunnel = makeStatusRow("Tunnel connection", value: tunnelValue)
         let pairing = makeStatusRow("Pairing status", value: pairingValue)
+        let plugin = makeStatusRow("ExternalTunnel plugin", value: pluginValue)
         pairingMessage.text = "En iOS 27, el pairing directo depende del build y del handshake real. Las demás versiones pueden importar un pairing file."
         pairingMessage.font = AppTheme.bodyFont(); pairingMessage.textColor = AppTheme.secondaryText; pairingMessage.numberOfLines = 0
-        let content = UIStackView(arrangedSubviews: [title, tunnel, pairing, pairingMessage, pairButton, importButton, deleteButton])
+        let content = UIStackView(arrangedSubviews: [title, tunnel, pairing, plugin, pairingMessage, pairButton, importButton, deleteButton])
         content.axis = .vertical; content.spacing = 10
         card.addContent(content)
         return card
@@ -144,6 +145,9 @@ final class NixleSettingsView: UIView {
             let ready = NixelPairingRecordStore.shared.load(deviceID: "2424") != nil
             self.pairingValue.text = ready ? "● Ready" : "○ Missing"
             self.pairingValue.textColor = ready ? AppTheme.success : AppTheme.warm
+            let pluginReady = manager.tunnelPluginPresent
+            self.pluginValue.text = pluginReady ? "● Present" : "○ Missing"
+            self.pluginValue.textColor = pluginReady ? AppTheme.success : AppTheme.failure
             let supported = NyxelSupportPolicy.isCurrentSystemSupported
             self.compatibilityValue.text = supported ? "● Supported by policy" : "○ Build not verified"
             self.compatibilityValue.textColor = supported ? AppTheme.success : AppTheme.failure
@@ -154,9 +158,27 @@ final class NixleSettingsView: UIView {
 
     @objc private func pairTapped() {
         pairingMessage.text = "Publicando host 2424 y esperando el handshake…"
-        NixelPairingSession.shared.begin { [weak self] state in
-            self?.pairingMessage.text = state.message
-            self?.refresh()
+        let begin = { [weak self] in
+            NixelPairingSession.shared.begin { state in
+                self?.pairingMessage.text = state.message
+                self?.refresh()
+            }
+        }
+        let manager = NixelVPNManager.shared
+        if manager.status == .connected || NixelHybridCoordinator.isExternalVPNActive() {
+            begin()
+        } else {
+            pairingMessage.text = "Activando el túnel antes de publicar 2424…"
+            manager.start { [weak self] result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success: begin()
+                    case .failure(let error):
+                        self?.pairingMessage.text = "No se pudo activar el túnel: \(error.localizedDescription)"
+                        self?.refresh()
+                    }
+                }
+            }
         }
     }
 
