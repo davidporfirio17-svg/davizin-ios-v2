@@ -586,6 +586,24 @@ final class NixelPairingSession {
 /// interpreta por sí sola como jailbreak exitoso. Pairing y Developer Mode
 /// quedan expresamente sin verificar hasta integrar el transporte con el iPad.
 enum NixelHybridCoordinator {
+    struct TransportDiagnostic {
+        let tunnel: String
+        let plugin: String
+        let pairing: String
+        let bonjour: String
+        let transport: String
+
+        var summary: String {
+            [
+                "VPN: \(tunnel)",
+                "Plugin: \(plugin)",
+                "Pairing 2424: \(pairing)",
+                "Bonjour: \(bonjour)",
+                "Transporte: \(transport)"
+            ].joined(separator: "\n")
+        }
+    }
+
     static func diagnostics() -> NixelHybridDiagnostics {
         let device = UIDevice.current
         let vpn = NixelVPNManager.shared
@@ -599,6 +617,37 @@ enum NixelHybridCoordinator {
             pairing: .notChecked,
             developerMode: .notChecked
         )
+    }
+
+    /// Diagnóstico de solo lectura. No ejecuta exploit, no solicita PIN y no
+    /// lee ni escribe el contenedor de ninguna aplicación externa.
+    static func runTransportDiagnostics(completion: @escaping (TransportDiagnostic) -> Void) {
+        let vpn = NixelVPNManager.shared
+        let tunnel = vpn.status == .connected || isExternalVPNActive()
+            ? "conectada (\(NixelVPNManager.statusText(vpn.status)))"
+            : "no conectada (\(NixelVPNManager.statusText(vpn.status)))"
+        let plugin = vpn.tunnelPluginPresent ? "presente" : "ausente"
+        let pairingReady = NixelPairingRecordStore.shared.load(deviceID: "2424") != nil
+        let pairing = pairingReady ? "registro guardado" : "registro ausente"
+
+        NixelPairingProbe.shared.scan(timeout: 6) { result in
+            switch result {
+            case .servicesFound(let services):
+                let names = services.map(\.name).joined(separator: ", ")
+                NixelPairingProbe.shared.probeTransport(service: services[0], timeout: 4) { transportResult in
+                    let transport: String
+                    switch transportResult {
+                    case .reachable(let name): transport = "alcanzable (\(name))"
+                    case .unreachable(let message): transport = "inalcanzable (\(message))"
+                    }
+                    completion(TransportDiagnostic(tunnel: tunnel, plugin: plugin, pairing: pairing, bonjour: "servicios: \(names)", transport: transport))
+                }
+            case .noService:
+                completion(TransportDiagnostic(tunnel: tunnel, plugin: plugin, pairing: pairing, bonjour: "sin servicio Remote Pairing/AirLift visible", transport: "no probado"))
+            case .unavailable(let message):
+                completion(TransportDiagnostic(tunnel: tunnel, plugin: plugin, pairing: pairing, bonjour: "no disponible: \(message)", transport: "no probado"))
+            }
+        }
     }
 
     static func start(completion: @escaping (Result<Void, Error>) -> Void) {

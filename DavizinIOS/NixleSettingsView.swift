@@ -12,7 +12,9 @@ final class NixleSettingsView: UIView {
     private let compatibilityValue = UILabel()
     private let pluginValue = UILabel()
     private let pairingMessage = UILabel()
+    private let diagnosticsMessage = UILabel()
     private let pairButton = DavizinButton(title: "Pair on this iPhone", style: .secondary)
+    private let diagnosticsButton = DavizinButton(title: "Run transport diagnostics", style: .secondary)
     private let importButton = DavizinButton(title: "Import pairing file", style: .secondary)
     private let deleteButton = DavizinButton(title: "Delete pairing file", style: .destructive)
     private var documentPicker: UIDocumentPickerViewController?
@@ -55,6 +57,7 @@ final class NixleSettingsView: UIView {
         stack.addArrangedSubview(makeSocialCard())
 
         pairButton.addTarget(self, action: #selector(pairTapped), for: .touchUpInside)
+        diagnosticsButton.addTarget(self, action: #selector(diagnosticsTapped), for: .touchUpInside)
         importButton.addTarget(self, action: #selector(importTapped), for: .touchUpInside)
         deleteButton.addTarget(self, action: #selector(deleteTapped), for: .touchUpInside)
         NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: .NEVPNStatusDidChange, object: nil)
@@ -92,7 +95,9 @@ final class NixleSettingsView: UIView {
         let plugin = makeStatusRow("ExternalTunnel plugin", value: pluginValue)
         pairingMessage.text = "En iOS 27, el pairing directo depende del build y del handshake real. Las demás versiones pueden importar un pairing file."
         pairingMessage.font = AppTheme.bodyFont(); pairingMessage.textColor = AppTheme.secondaryText; pairingMessage.numberOfLines = 0
-        let content = UIStackView(arrangedSubviews: [title, tunnel, pairing, plugin, pairingMessage, pairButton, importButton, deleteButton])
+        diagnosticsMessage.text = "Diagnóstico de solo lectura: no ejecuta exploit ni escribe en otra app."
+        diagnosticsMessage.font = AppTheme.bodyFont(); diagnosticsMessage.textColor = AppTheme.secondaryText; diagnosticsMessage.numberOfLines = 0
+        let content = UIStackView(arrangedSubviews: [title, tunnel, pairing, plugin, pairingMessage, pairButton, importButton, deleteButton, diagnosticsButton, diagnosticsMessage])
         content.axis = .vertical; content.spacing = 10
         card.addContent(content)
         return card
@@ -193,6 +198,18 @@ final class NixleSettingsView: UIView {
         NixelPairingRecordStore.shared.remove(deviceID: "2424")
         pairingMessage.text = "Registro de pairing eliminado de este dispositivo."
         refresh()
+    }
+
+    @objc private func diagnosticsTapped() {
+        diagnosticsButton.isEnabled = false
+        diagnosticsMessage.text = "Comprobando VPN, plugin, pairing, Bonjour y transporte…"
+        NixelHybridCoordinator.runTransportDiagnostics { [weak self] result in
+            DispatchQueue.main.async {
+                self?.diagnosticsButton.isEnabled = true
+                self?.diagnosticsMessage.text = result.summary
+                self?.refresh()
+            }
+        }
     }
 
     private var owningViewController: UIViewController? {
