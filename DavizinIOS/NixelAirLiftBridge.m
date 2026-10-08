@@ -155,24 +155,42 @@ static void nyxel_pairing_ready_callback(void *context, const char *service_id,
         NSString *value = [NSString stringWithUTF8String:txt_vals[i]];
         if (key && value) records[key] = [value dataUsingEncoding:NSUTF8StringEncoding];
     }
-    NSData *txtRecord = [NSNetService dataFromTXTRecordDictionary:records];
-    if (!txtRecord) {
-        nyxel_pairing_post(@"NyxelPairingHostFailed", @{ @"message": @"No se pudo serializar el registro mDNS de AirLift." });
+    NSString *serviceName = [NSString stringWithUTF8String:service_id];
+    NSDictionary *copiedRecords = [records copy];
+    if (!serviceName.length || port == 0 || copiedRecords.count == 0) {
+        nyxel_pairing_post(@"NyxelPairingHostFailed", @{ @"message": @"AirLift devolvió un nombre, puerto o TXT inválido." });
         return;
     }
-    nyxel_pairing_host_local_port = port;
-    // Tekezuna anuncia el puerto exacto que abrió al_pairing_run_host.
-    // No se usa NWListener/proxy: el dispositivo debe negociar RPPairing
-    // directamente con el servicio Bonjour publicado por NSNetService.
-    [nyxel_pairing_host_service stop];
-    nyxel_pairing_service_delegate = [NyxelPairingNetServiceDelegate new];
-    nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@"local."
-                                                                  type:@"_remotepairing-pairable-host._tcp."
-                                                                  name:[NSString stringWithUTF8String:service_id]
-                                                                  port:(int32_t)port];
-    nyxel_pairing_host_service.delegate = nyxel_pairing_service_delegate;
-    [nyxel_pairing_host_service setTXTRecord:txtRecord];
-    [nyxel_pairing_host_service publish];
+    // Los punteros del callback FFI solo viven durante esta llamada; conservar
+    // copias Objective-C antes de saltar al hilo principal. NSNetService debe
+    // publicarse allí para usar un run loop activo, como hace Tekezuna.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            @try {
+                NSData *txtRecord = [NSNetService dataFromTXTRecordDictionary:copiedRecords];
+                if (!txtRecord) {
+                    nyxel_pairing_post(@"NyxelPairingHostFailed", @{ @"message": @"No se pudo serializar el registro mDNS de AirLift." });
+                    return;
+                }
+                nyxel_pairing_host_local_port = port;
+                // Publicar el puerto exacto abierto por al_pairing_run_host.
+                [nyxel_pairing_host_service stop];
+                nyxel_pairing_service_delegate = [NyxelPairingNetServiceDelegate new];
+                nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@"local."
+                                                                              type:@"_remotepairing-pairable-host._tcp."
+                                                                              name:serviceName
+                                                                              port:(int32_t)port];
+                nyxel_pairing_host_service.delegate = nyxel_pairing_service_delegate;
+                [nyxel_pairing_host_service setTXTRecord:txtRecord];
+                [nyxel_pairing_host_service publish];
+            } @catch (NSException *exception) {
+                nyxel_pairing_post(@"NyxelPairingHostFailed", @{
+                    @"message": [NSString stringWithFormat:@"NSNetService lanzó %@: %@",
+                                 exception.name, exception.reason ?: @"sin detalle"]
+                });
+            }
+        }
+    });
 }
 
 static void nyxel_pairing_run_airlift(void) {
