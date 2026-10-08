@@ -147,14 +147,12 @@ final class DavizinBridge {
             || mode.label.lowercased().contains("hybrid")
 
         let version = NyxelDeviceInfo.versionTuple
-        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+        let kernelOffsetsSupported = NyxelSupportPolicy.supportsKernelOffsets(
             major: version.major,
-            minor: version.minor,
-            patch: version.patch,
-            build: NyxelSupportPolicy.currentBuild
+            minor: version.minor
         )
-        guard !pairingRequired || Self.airLiftRouteAvailable else {
-            let message = "iOS 27 requiere un pairing AirLift guardado; no se ejecutó el exploit kernel con offsets no verificados."
+        guard kernelOffsetsSupported || Self.airLiftRouteAvailable else {
+            let message = "Offsets de kernel validados solo hasta iOS 26.0.x; agrega pairing AirLift para iOS \(version.major).\(version.minor)."
             NyxelActivityLog.record(message)
             DispatchQueue.main.async {
                 self.operationInFlight = false
@@ -171,12 +169,28 @@ final class DavizinBridge {
                 } else if sandbox_access_is_active() == 0 {
                     NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
                     let exploitResult = kexploit_opa334()
-                    if exploitResult == 0 {
-                        let selfProc = proc_self()
-                        _ = sandbox_escape(selfProc)
-                        NyxelActivityLog.record("Exploit pre-inyección completado, sandbox activo: \(sandbox_access_is_active() != 0)")
-                    } else {
-                        NyxelActivityLog.record("Exploit pre-inyección falló (KXP-\(abs(exploitResult)): \(Self.kxpDetail(abs(exploitResult)))), continuando con bad_query")
+                    guard exploitResult == 0 else {
+                        let code = abs(exploitResult)
+                        let message = "KXP-\(code) — \(Self.kxpDetail(code))"
+                        NyxelActivityLog.record("Exploit pre-inyección falló (\(message)); se detiene antes de MCM/bad_query")
+                        DispatchQueue.main.async {
+                            self.operationInFlight = false
+                            self.vc?.setOperationState(.failed(message))
+                        }
+                        return
+                    }
+
+                    let selfProc = proc_self()
+                    let escapeResult = sandbox_escape(selfProc)
+                    let sandboxActive = sandbox_access_is_active() != 0
+                    NyxelActivityLog.record("Exploit pre-inyección: sandbox_escape=\(escapeResult), activo=\(sandboxActive)")
+                    guard escapeResult == 0 && sandboxActive else {
+                        let message = "SBX-001 — El exploit terminó, pero el sandbox escape no quedó activo (\(escapeResult))."
+                        DispatchQueue.main.async {
+                            self.operationInFlight = false
+                            self.vc?.setOperationState(.failed(message))
+                        }
+                        return
                     }
                 }
 
@@ -299,13 +313,11 @@ final class DavizinBridge {
                 }
 
                 let version = NyxelDeviceInfo.versionTuple
-                if NyxelSupportPolicy.requiresPairingTunnel(
+                if !NyxelSupportPolicy.supportsKernelOffsets(
                     major: version.major,
-                    minor: version.minor,
-                    patch: version.patch,
-                    build: NyxelSupportPolicy.currentBuild
+                    minor: version.minor
                 ) {
-                    let message = "iOS 27 requiere pairing AirLift; se detuvo antes de usar offsets kernel no verificados."
+                    let message = "Offsets de kernel validados solo hasta iOS 26.0.x; no se ejecutó el exploit en iOS \(version.major).\(version.minor)."
                     NyxelActivityLog.record(message)
                     DispatchQueue.main.async {
                         self.operationInFlight = false
@@ -338,9 +350,9 @@ final class DavizinBridge {
 
                 NyxelActivityLog.record("kexploit exitoso, ejecutando sandbox_escape...")
                 let selfProc = proc_self()
-                _ = sandbox_escape(selfProc)
+                let escapeResult = sandbox_escape(selfProc)
                 let active = sandbox_access_is_active() != 0
-                NyxelActivityLog.record("sandbox_escape completado, activo: \(active)")
+                NyxelActivityLog.record("sandbox_escape return=\(escapeResult), activo: \(active)")
 
                 DispatchQueue.main.async {
                     self.operationInFlight = false
