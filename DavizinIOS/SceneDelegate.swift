@@ -1,6 +1,7 @@
 import UIKit
+import UserNotifications
 
-final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+final class SceneDelegate: UIResponder, UIWindowSceneDelegate, UNUserNotificationCenterDelegate {
     var window: UIWindow?
     private var bridge: DavizinBridge?
 
@@ -10,6 +11,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         options connectionOptions: UIScene.ConnectionOptions
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
+        UNUserNotificationCenter.current().delegate = self
 
         let window = UIWindow(windowScene: windowScene)
 
@@ -49,4 +51,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneWillResignActive(_ scene: UIScene) {}
     func sceneDidBecomeActive(_ scene: UIScene) {}
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Sin esto, iOS suele ocultar el banner cuando el usuario todavía
+        // está dentro de Nixle y solo deja el evento en el centro de avisos.
+        completionHandler([.banner, .list, .sound])
+    }
 }

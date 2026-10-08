@@ -583,7 +583,10 @@ final class NixelPairingSession {
         }
         // El PIN no se persiste. El adaptador debe devolver un registro
         // autenticado antes de que se pueda marcar la sesión como paired.
-        let stored = NixelPairingRecordStore.shared.load(deviceID: service.name)
+        // El host se publica con el identificador lógico 2424 y todas las
+        // fases deben leer la misma cuenta de Keychain que usa el callback de
+        // finalización; service.name es un nombre Bonjour y puede cambiar.
+        let stored = NixelPairingRecordStore.shared.load(deviceID: "2424")
         authenticator.authenticate(service: service, pin: normalized, storedRecord: stored) { [weak self] result in
             guard let self else { return }
             switch result {
