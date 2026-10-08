@@ -109,7 +109,6 @@ jobs:
           BUILD_DIR=/tmp/davizin_build \
           LIBRARY_SEARCH_PATHS="/tmp/airlift /tmp/idevice-ffi" \
           FRAMEWORK_SEARCH_PATHS=/tmp/airlift \
-          OTHER_LDFLAGS="-force_load /tmp/airlift/libairlift_ffi.a -force_load /tmp/idevice-ffi/libidevice_ffi.a -framework Security -framework Network" \
           build > /tmp/build.log 2>&1
         status=$?
         set -e
