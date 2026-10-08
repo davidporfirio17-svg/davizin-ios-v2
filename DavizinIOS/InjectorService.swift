@@ -10,6 +10,7 @@ struct InjectorResult {
 // MARK: - Error Notifications
 fileprivate func sendErrorNotification(_ title: String, _ body: String) {
     NyxelActivityLog.record("\(title): \(body)")
+    NotificationCenter.default.post(name: .nyxelInjectionProgress, object: "\(title): \(body)")
     DispatchQueue.main.async {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
             guard granted else { return }

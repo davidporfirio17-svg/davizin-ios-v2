@@ -55,7 +55,6 @@ enum NyxelActivityLog {
         var values = entries
         values.insert(entry, at: 0)
         UserDefaults.standard.set(Array(values.prefix(limit)), forKey: key)
-        NotificationCenter.default.post(name: .nyxelInjectionProgress, object: message)
     }
 }
 
