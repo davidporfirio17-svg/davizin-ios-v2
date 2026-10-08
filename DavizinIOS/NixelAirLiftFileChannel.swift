@@ -16,7 +16,7 @@ enum NixelAirLiftFileChannel {
     static func validPairingRecord() -> Data? {
         guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424"), !record.isEmpty else { return nil }
         var handle: UnsafeMutableRawPointer?
-        let error = record.withUnsafeBytes { buffer -> IdeviceFfiError? in
+        let error = record.withUnsafeBytes { buffer in
             guard let base = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
             return rp_pairing_file_from_bytes(base, record.count, &handle)
         }
