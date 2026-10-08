@@ -147,9 +147,10 @@ final class NixleSettingsView: UIView {
             let connected = manager.status == .connected
             self.tunnelValue.text = connected ? "● Connected" : "○ \(NixelVPNManager.statusText(manager.status))"
             self.tunnelValue.textColor = connected ? AppTheme.success : AppTheme.warm
-            let ready = NixelPairingRecordStore.shared.load(deviceID: "2424") != nil
-            self.pairingValue.text = ready ? "● Ready" : "○ Missing"
-            self.pairingValue.textColor = ready ? AppTheme.success : AppTheme.warm
+            let hasRecord = NixelPairingRecordStore.shared.load(deviceID: "2424") != nil
+            let ready = NixelAirLiftFileChannel.validPairingRecord() != nil
+            self.pairingValue.text = ready ? "● Valid RPairing" : (hasRecord ? "○ Invalid RPairing" : "○ Missing")
+            self.pairingValue.textColor = ready ? AppTheme.success : AppTheme.failure
             let pluginReady = manager.tunnelPluginPresent
             self.pluginValue.text = pluginReady ? "● Present" : "○ Missing"
             self.pluginValue.textColor = pluginReady ? AppTheme.success : AppTheme.failure

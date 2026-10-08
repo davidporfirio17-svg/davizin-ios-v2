@@ -1,25 +1,38 @@
 import Foundation
+import CryptoKit
 
-/// Canal de archivos con permisos elevados hacia el contenedor de otra app,
-/// usando el registro de pairing ya guardado (fase 1) y el túnel RSD de
-/// AirLift (fase 2 — house_arrest/AFC). Es un camino ALTERNATIVO: cuando no
-/// hay un registro de pairing guardado, no se usa y el llamador debe seguir
-/// con su método normal.
+/// Canal AirLift con el mismo principio transaccional de test1: validar el
+/// registro, ejecutar una operación remota y poder verificar la lectura.
 enum NixelAirLiftFileChannel {
     struct ChannelError: LocalizedError {
         let message: String
         var errorDescription: String? { message }
     }
 
-    /// true solo si hay un registro de pairing guardado ("2424" es la clave
-    /// fija que usa NixelPairingSession al completar la fase 1).
-    static var isAvailable: Bool {
-        NixelPairingRecordStore.shared.load(deviceID: "2424") != nil
+    static var isAvailable: Bool { validPairingRecord() != nil }
+
+    /// El blob debe poder decodificarse por la misma API RPairing que consume
+    /// el túnel RSD; no basta con que exista un valor en Keychain.
+    static func validPairingRecord() -> Data? {
+        guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424"), !record.isEmpty else { return nil }
+        var handle: UnsafeMutableRawPointer?
+        let error = record.withUnsafeBytes { buffer -> IdeviceFfiError? in
+            guard let base = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
+            return rp_pairing_file_from_bytes(base, record.count, &handle)
+        }
+        if let error {
+            idevice_error_free(error)
+            NyxelActivityLog.record("AirLift: registro RPairing inválido")
+            return nil
+        }
+        guard let handle else { return nil }
+        rp_pairing_file_free(handle)
+        return record
     }
 
     static func write(_ data: Data, toRelativePath relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Void, ChannelError> {
-        guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
-            return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
+        guard let record = validPairingRecord() else {
+            return .failure(ChannelError(message: "No hay un registro RPairing válido."))
         }
         var errorPointer: UnsafeMutablePointer<CChar>?
         let status = record.withUnsafeBytes { recordBuf -> Int32 in
@@ -28,15 +41,7 @@ enum NixelAirLiftFileChannel {
                 let dataBase = dataBuf.baseAddress?.assumingMemoryBound(to: UInt8.self)
                 return bundleID.withCString { bid in
                     relativePath.withCString { path in
-                        nyxel_airlift_container_io(
-                            recordBase, record.count,
-                            bid, path,
-                            1,
-                            dataBase, data.count,
-                            nil, nil,
-                            discoverTimeout,
-                            &errorPointer
-                        )
+                        nyxel_airlift_container_io(recordBase, record.count, bid, path, 1, dataBase, data.count, nil, nil, discoverTimeout, &errorPointer)
                     }
                 }
             }
@@ -47,9 +52,27 @@ enum NixelAirLiftFileChannel {
         return .failure(ChannelError(message: message))
     }
 
+    /// Escribe y lee de nuevo para confirmar que el transporte aceptó los
+    /// mismos bytes, como la fase de verificación de la transacción de test1.
+    static func writeVerified(_ data: Data, toRelativePath relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Void, ChannelError> {
+        switch write(data, toRelativePath: relativePath, bundleID: bundleID, discoverTimeout: discoverTimeout) {
+        case .failure(let error): return .failure(error)
+        case .success:
+            switch read(relativePath: relativePath, bundleID: bundleID, discoverTimeout: discoverTimeout) {
+            case .failure(let error):
+                return .failure(ChannelError(message: "Escritura completada pero lectura de verificación falló: \(error.message)"))
+            case .success(let returned):
+                guard returned.sha256 == data.sha256 else {
+                    return .failure(ChannelError(message: "La lectura posterior no coincide con los bytes escritos."))
+                }
+                return .success(())
+            }
+        }
+    }
+
     static func read(relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Data, ChannelError> {
-        guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
-            return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
+        guard let record = validPairingRecord() else {
+            return .failure(ChannelError(message: "No hay un registro RPairing válido."))
         }
         var errorPointer: UnsafeMutablePointer<CChar>?
         var outData: UnsafeMutablePointer<UInt8>?
@@ -58,15 +81,7 @@ enum NixelAirLiftFileChannel {
             guard let recordBase = recordBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
             return bundleID.withCString { bid in
                 relativePath.withCString { path in
-                    nyxel_airlift_container_io(
-                        recordBase, record.count,
-                        bid, path,
-                        0,
-                        nil, 0,
-                        &outData, &outLen,
-                        discoverTimeout,
-                        &errorPointer
-                    )
+                    nyxel_airlift_container_io(recordBase, record.count, bid, path, 0, nil, 0, &outData, &outLen, discoverTimeout, &errorPointer)
                 }
             }
         }
@@ -79,4 +94,8 @@ enum NixelAirLiftFileChannel {
         if let errorPointer { nyxel_free_string(errorPointer) }
         return .failure(ChannelError(message: message))
     }
+}
+
+private extension Data {
+    var sha256: Data { Data(SHA256.hash(data: self)) }
 }
