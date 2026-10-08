@@ -111,6 +111,29 @@ extern void nyxel_nw_listener_start(const char *service_name, uint16_t raw_port,
                                     const unsigned char *txt, size_t txt_len);
 extern void nyxel_nw_listener_stop(void);
 
+@interface NyxelPairingNetServiceDelegate : NSObject <NSNetServiceDelegate>
+@end
+
+static NSNetService *nyxel_pairing_host_service;
+static NyxelPairingNetServiceDelegate *nyxel_pairing_service_delegate;
+
+@implementation NyxelPairingNetServiceDelegate
+- (void)netServiceDidPublish:(NSNetService *)sender {
+    nyxel_pairing_post(@"NyxelPairingHostReady", @{
+        @"name": sender.name ?: @"",
+        @"type": sender.type ?: @"",
+        @"domain": sender.domain ?: @"local.",
+        @"message": @"Servicio RPPairing de AirLift publicado directamente."
+    });
+}
+- (void)netService:(NSNetService *)sender didNotPublish:(NSDictionary<NSString *,NSNumber *> *)errorDict {
+    (void)sender;
+    nyxel_pairing_post(@"NyxelPairingHostFailed", @{
+        @"message": [NSString stringWithFormat:@"NSNetService no pudo publicar AirLift: %@", errorDict ?: @{}]
+    });
+}
+@end
+
 static void nyxel_pairing_pin_callback(const char *pin, void *context) {
     (void)context;
     NSString *value = pin ? [NSString stringWithUTF8String:pin] : @"";
@@ -138,9 +161,18 @@ static void nyxel_pairing_ready_callback(void *context, const char *service_id,
         return;
     }
     nyxel_pairing_host_local_port = port;
-    // El listener NW publica el puerto externo y proxifica hacia el listener
-    // TCP que abrió al_pairing_run_host, igual que en Tekezuna.
-    nyxel_nw_listener_start(service_id, port, txtRecord.bytes, txtRecord.length);
+    // Tekezuna anuncia el puerto exacto que abrió al_pairing_run_host.
+    // No se usa NWListener/proxy: el dispositivo debe negociar RPPairing
+    // directamente con el servicio Bonjour publicado por NSNetService.
+    [nyxel_pairing_host_service stop];
+    nyxel_pairing_service_delegate = [NyxelPairingNetServiceDelegate new];
+    nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@"local."
+                                                                  type:@"_remotepairing-pairable-host._tcp."
+                                                                  name:[NSString stringWithUTF8String:service_id]
+                                                                  port:(int32_t)port];
+    nyxel_pairing_host_service.delegate = nyxel_pairing_service_delegate;
+    [nyxel_pairing_host_service setTXTRecord:txtRecord];
+    [nyxel_pairing_host_service publish];
 }
 
 static void nyxel_pairing_run_airlift(void) {
@@ -150,8 +182,8 @@ static void nyxel_pairing_run_airlift(void) {
         if (!path) path = @"/tmp/airlift_pairing.plist";
         ALPairResult result = {0};
         nyxel_pairing_host_running = YES;
-        int32_t code = al_pairing_run_host("0.0.0.0", 0, "2424", "Mac17,7",
-                                           path.UTF8String, NULL,
+        int32_t code = al_pairing_run_host("0.0.0.0", 0, "SupportPatch", "iPhone",
+                                           path.UTF8String, "",
                                            nyxel_pairing_ready_callback,
                                            nyxel_pairing_pin_callback, NULL, &result);
         nyxel_pairing_host_running = NO;
@@ -189,6 +221,9 @@ uint16_t nyxel_pairable_host_local_port(void) {
 }
 
 void nyxel_pairable_host_stop(void) {
+    [nyxel_pairing_host_service stop];
+    nyxel_pairing_host_service = nil;
+    nyxel_pairing_service_delegate = nil;
     nyxel_nw_listener_stop();
     nyxel_pairing_host_running = NO;
     nyxel_pairing_host_local_port = 0;

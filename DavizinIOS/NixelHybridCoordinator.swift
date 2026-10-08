@@ -465,8 +465,8 @@ final class NixelPairingSession {
                 self?.update(.failed(note.userInfo?["message"] as? String ?? "Falló el host PairableHost."), onState: onState)
             }
         ]
-        let result = "2424".withCString { name in
-            "Mac17,7".withCString { model in nyxel_pairable_host_start(name, model) }
+        let result = "SupportPatch".withCString { name in
+            "iPhone".withCString { model in nyxel_pairable_host_start(name, model) }
         }
         if result != 0 {
             update(.failed("No se pudo publicar el host Remote Pairing (código \(result))."), onState: onState)

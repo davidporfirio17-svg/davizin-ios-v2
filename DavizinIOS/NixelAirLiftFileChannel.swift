@@ -1,82 +1,123 @@
 import Foundation
 
-/// Canal de archivos con permisos elevados hacia el contenedor de otra app,
-/// usando el registro de pairing ya guardado (fase 1) y el túnel RSD de
-/// AirLift (fase 2 — house_arrest/AFC). Es un camino ALTERNATIVO: cuando no
-/// hay un registro de pairing guardado, no se usa y el llamador debe seguir
-/// con su método normal.
+/// Canal AirLift basado en el flujo de Tekezuna.
+/// No usa House Arrest/AFC ni `tunnel_create_rppairing`: el núcleo AirLift
+/// resuelve el contenedor y abre su propio túnel RSD multihost para la operación.
 enum NixelAirLiftFileChannel {
     struct ChannelError: LocalizedError {
         let message: String
         var errorDescription: String? { message }
     }
 
-    /// true solo si hay un registro de pairing guardado ("2424" es la clave
-    /// fija que usa NixelPairingSession al completar la fase 1).
     static var isAvailable: Bool {
         NixelPairingRecordStore.shared.load(deviceID: "2424") != nil
+    }
+
+    private static func safeRelativePath(_ value: String) -> Bool {
+        value.hasPrefix("Documents/") &&
+        !value.contains("..") &&
+        !value.contains("//") &&
+        !value.hasPrefix("/")
+    }
+
+    private static func resolveContainer(pairingPath: String, bundleID: String) -> Result<String, ChannelError> {
+        var containerPointer: UnsafeMutablePointer<CChar>?
+        var errorPointer: UnsafeMutablePointer<CChar>?
+        let code = pairingPath.withCString { pairing in
+            bundleID.withCString { bundle in
+                al_find_app_container(pairing, bundle, nil, nil, &containerPointer, &errorPointer)
+            }
+        }
+        defer {
+            if let containerPointer { al_string_free(containerPointer) }
+            if let errorPointer { al_string_free(errorPointer) }
+        }
+        guard code == 0, let containerPointer else {
+            let detail = errorPointer.map { String(cString: $0) } ?? "No se pudo resolver el contenedor de la aplicación (AirLift: \(code))."
+            return .failure(ChannelError(message: detail))
+        }
+        let path = String(cString: containerPointer)
+        guard path.hasPrefix("/var/mobile/Containers/Data/Application/") else {
+            return .failure(ChannelError(message: "AirLift devolvió una ruta de contenedor no válida."))
+        }
+        return .success(path)
     }
 
     static func write(_ data: Data, toRelativePath relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Void, ChannelError> {
         guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
             return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
         }
-        var errorPointer: UnsafeMutablePointer<CChar>?
-        let status = record.withUnsafeBytes { recordBuf -> Int32 in
-            guard let recordBase = recordBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-            return data.withUnsafeBytes { dataBuf -> Int32 in
-                let dataBase = dataBuf.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                return bundleID.withCString { bid in
-                    relativePath.withCString { path in
-                        nyxel_airlift_container_io(
-                            recordBase, record.count,
-                            bid, path,
-                            1,
-                            dataBase, data.count,
-                            nil, nil,
-                            discoverTimeout,
-                            &errorPointer
-                        )
+        guard safeRelativePath(relativePath) else {
+            return .failure(ChannelError(message: "La ruta remota no es segura."))
+        }
+        let pairingURL = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-airlift-pairing-\(UUID().uuidString).plist")
+        do {
+            try record.write(to: pairingURL, options: .atomic)
+            defer { try? FileManager.default.removeItem(at: pairingURL) }
+            switch resolveContainer(pairingPath: pairingURL.path, bundleID: bundleID) {
+            case .failure(let error): return .failure(error)
+            case .success(let container):
+                let target = URL(fileURLWithPath: container, isDirectory: true).appendingPathComponent(relativePath)
+                let staging = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-airlift-write-\(UUID().uuidString)", isDirectory: true)
+                try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+                defer { try? FileManager.default.removeItem(at: staging) }
+                try data.write(to: staging.appendingPathComponent(target.lastPathComponent), options: .atomic)
+                var errorPointer: UnsafeMutablePointer<CChar>?
+                let code = pairingURL.path.withCString { pairing in
+                    staging.path.withCString { source in
+                        target.deletingLastPathComponent().path.withCString { destination in
+                            al_exploit_write_dir(pairing, source, destination, nil, nil, &errorPointer)
+                        }
                     }
                 }
+                let detail = errorPointer.map { String(cString: $0) }
+                if let errorPointer { al_string_free(errorPointer) }
+                guard code == 0 else {
+                    return .failure(ChannelError(message: detail ?? "AirLift no pudo escribir el archivo (\(code))."))
+                }
+                return .success(())
             }
+        } catch {
+            return .failure(ChannelError(message: "No se pudo preparar la escritura AirLift: \(error.localizedDescription)"))
         }
-        if status == 0 { return .success(()) }
-        let message = errorPointer.map { String(cString: $0) } ?? "Error desconocido del canal AirLift (\(status))."
-        if let errorPointer { nyxel_free_string(errorPointer) }
-        return .failure(ChannelError(message: message))
     }
 
     static func read(relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Data, ChannelError> {
         guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
             return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
         }
-        var errorPointer: UnsafeMutablePointer<CChar>?
-        var outData: UnsafeMutablePointer<UInt8>?
-        var outLen = 0
-        let status = record.withUnsafeBytes { recordBuf -> Int32 in
-            guard let recordBase = recordBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
-            return bundleID.withCString { bid in
-                relativePath.withCString { path in
-                    nyxel_airlift_container_io(
-                        recordBase, record.count,
-                        bid, path,
-                        0,
-                        nil, 0,
-                        &outData, &outLen,
-                        discoverTimeout,
-                        &errorPointer
-                    )
-                }
+        guard safeRelativePath(relativePath) else {
+            return .failure(ChannelError(message: "La ruta remota no es segura."))
+        }
+        let pairingURL = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-airlift-pairing-\(UUID().uuidString).plist")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-airlift-read-\(UUID().uuidString)")
+        do {
+            try record.write(to: pairingURL, options: .atomic)
+            defer {
+                try? FileManager.default.removeItem(at: pairingURL)
+                try? FileManager.default.removeItem(at: outputURL)
             }
+            switch resolveContainer(pairingPath: pairingURL.path, bundleID: bundleID) {
+            case .failure(let error): return .failure(error)
+            case .success(let container):
+                let target = URL(fileURLWithPath: container, isDirectory: true).appendingPathComponent(relativePath)
+                var errorPointer: UnsafeMutablePointer<CChar>?
+                let code = pairingURL.path.withCString { pairing in
+                    target.path.withCString { remote in
+                        outputURL.path.withCString { output in
+                            al_exploit_read_file(pairing, remote, output, nil, nil, &errorPointer)
+                        }
+                    }
+                }
+                let detail = errorPointer.map { String(cString: $0) }
+                if let errorPointer { al_string_free(errorPointer) }
+                guard code == 0 else {
+                    return .failure(ChannelError(message: detail ?? "AirLift no pudo leer el archivo (\(code))."))
+                }
+                return .success(try Data(contentsOf: outputURL, options: .mappedIfSafe))
+            }
+        } catch {
+            return .failure(ChannelError(message: "No se pudo preparar la lectura AirLift: \(error.localizedDescription)"))
         }
-        if status == 0, let outData {
-            let data = Data(bytes: outData, count: outLen)
-            nyxel_free_data(outData, outLen)
-            return .success(data)
-        }
-        let message = errorPointer.map { String(cString: $0) } ?? "Error desconocido del canal AirLift (\(status))."
-        if let errorPointer { nyxel_free_string(errorPointer) }
-        return .failure(ChannelError(message: message))
     }
 }
