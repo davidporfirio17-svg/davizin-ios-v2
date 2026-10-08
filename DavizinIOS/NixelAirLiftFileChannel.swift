@@ -1,38 +1,20 @@
 import Foundation
 import CryptoKit
 
-/// Canal AirLift con el mismo principio transaccional de test1: validar el
-/// registro, ejecutar una operación remota y poder verificar la lectura.
+/// Canal AirLift de lectura/escritura con verificación posterior opcional.
 enum NixelAirLiftFileChannel {
     struct ChannelError: LocalizedError {
         let message: String
         var errorDescription: String? { message }
     }
 
-    static var isAvailable: Bool { validPairingRecord() != nil }
-
-    /// El blob debe poder decodificarse por la misma API RPairing que consume
-    /// el túnel RSD; no basta con que exista un valor en Keychain.
-    static func validPairingRecord() -> Data? {
-        guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424"), !record.isEmpty else { return nil }
-        var handle: UnsafeMutableRawPointer?
-        let error = record.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
-            guard let base = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
-            return rp_pairing_file_from_bytes(base, record.count, &handle)
-        }
-        if let error {
-            idevice_error_free(error)
-            NyxelActivityLog.record("AirLift: registro RPairing inválido")
-            return nil
-        }
-        guard let handle else { return nil }
-        rp_pairing_file_free(handle)
-        return record
+    static var isAvailable: Bool {
+        NixelPairingRecordStore.shared.load(deviceID: "2424") != nil
     }
 
     static func write(_ data: Data, toRelativePath relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Void, ChannelError> {
-        guard let record = validPairingRecord() else {
-            return .failure(ChannelError(message: "No hay un registro RPairing válido."))
+        guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
+            return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
         }
         var errorPointer: UnsafeMutablePointer<CChar>?
         let status = record.withUnsafeBytes { recordBuf -> Int32 in
@@ -53,7 +35,7 @@ enum NixelAirLiftFileChannel {
     }
 
     /// Escribe y lee de nuevo para confirmar que el transporte aceptó los
-    /// mismos bytes, como la fase de verificación de la transacción de test1.
+    /// mismos bytes; no marca la operación como correcta sin esta comprobación.
     static func writeVerified(_ data: Data, toRelativePath relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Void, ChannelError> {
         switch write(data, toRelativePath: relativePath, bundleID: bundleID, discoverTimeout: discoverTimeout) {
         case .failure(let error): return .failure(error)
@@ -71,8 +53,8 @@ enum NixelAirLiftFileChannel {
     }
 
     static func read(relativePath: String, bundleID: String, discoverTimeout: TimeInterval = 20) -> Result<Data, ChannelError> {
-        guard let record = validPairingRecord() else {
-            return .failure(ChannelError(message: "No hay un registro RPairing válido."))
+        guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
+            return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
         }
         var errorPointer: UnsafeMutablePointer<CChar>?
         var outData: UnsafeMutablePointer<UInt8>?
