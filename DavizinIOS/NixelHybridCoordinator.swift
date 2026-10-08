@@ -605,12 +605,13 @@ enum NixelHybridCoordinator {
             case .vpnConnectionTimeout:
                 return "El VPN no llegó al estado Conectado dentro de 15 segundos. No se ejecutó la inyección."
             case .rsdEndpointUnreachable(let detail):
-                return "El VPN aparece activo, pero AirLift no alcanza RSD por TCP 49152 (\(detail)). Activa un loopback VPN compatible y vuelve a probar. No se ejecutó la inyección."
+                return "AirLift no pudo abrir RSD por TCP 49152 en ninguno de sus endpoints (\(detail)). Confirma que el pairing terminó y que RSD está disponible; el estado VPN activo no garantiza que RSD responda. No se ejecutó la inyección."
             }
         }
     }
 
-    private static let rsdProbeHosts = ["10.7.0.1", "10.7.0.2", "10.7.0.3"]
+    // Keep the preflight in the same order as airlift-rust-core/src/exploit.rs.
+    private static let rsdProbeHosts = ["127.0.0.1", "10.7.0.1", "10.7.0.2", "10.7.0.3"]
 
     static func diagnostics() -> NixelHybridDiagnostics {
         let device = UIDevice.current
