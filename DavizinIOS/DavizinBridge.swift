@@ -124,6 +124,31 @@ final class DavizinBridge {
         NixelAirLiftFileChannel.isAvailable
     }
 
+    /// iOS 26 usa la ruta local: MCM debe ejecutarse después de verificar el
+    /// sandbox escape. iOS 27 usa Remote Pairing/AirLift en vez de kexploit.
+    private static func prepareIOS26Access() -> String? {
+        let version = NyxelSupportPolicy.currentVersion
+        guard version.majorVersion == 26 else { return nil }
+        if sandbox_access_is_active() != 0 {
+            NyxelActivityLog.record("iOS 26: sandbox ya activo")
+            return nil
+        }
+        NyxelActivityLog.record("iOS 26: ejecutando kexploit antes de resolver MCM")
+        let exploitResult = kexploit_opa334()
+        guard exploitResult == 0 else {
+            let code = abs(exploitResult)
+            return "KXP-\(code) — \(Self.kxpDetail(code))"
+        }
+        let selfProc = proc_self()
+        guard selfProc != 0 else { return "SBX-001 — proc_self() devolvió 0" }
+        let escapeResult = sandbox_escape(selfProc)
+        guard escapeResult == 0, sandbox_access_is_active() != 0 else {
+            return "SBX-001 — el sandbox escape no quedó verificado"
+        }
+        NyxelActivityLog.record("iOS 26: sandbox activo y verificado")
+        return nil
+    }
+
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
         vc?.setOperationState(.injecting)
 
@@ -137,18 +162,15 @@ final class DavizinBridge {
         let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                if Self.airLiftRouteAvailable {
-                    NyxelActivityLog.record("AirLift disponible: omitiendo kexploit experimental y usando Remote Pairing/RSD para la escritura")
-                } else if sandbox_access_is_active() == 0 {
-                    NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
-                    let exploitResult = kexploit_opa334()
-                    if exploitResult == 0 {
-                        let selfProc = proc_self()
-                        _ = sandbox_escape(selfProc)
-                        NyxelActivityLog.record("Exploit pre-inyección completado, sandbox activo: \(sandbox_access_is_active() != 0)")
-                    } else {
-                        NyxelActivityLog.record("Exploit pre-inyección falló (KXP-\(abs(exploitResult)): \(Self.kxpDetail(abs(exploitResult)))), continuando con bad_query")
+                if let accessError = Self.prepareIOS26Access() {
+                    DispatchQueue.main.async {
+                        self.operationInFlight = false
+                        self.vc?.setOperationState(.failed("iOS 26 no preparado: \(accessError)"))
                     }
+                    return
+                }
+                if Self.airLiftRouteAvailable {
+                    NyxelActivityLog.record("AirLift disponible; se conservará como respaldo de escritura")
                 }
 
                 let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)

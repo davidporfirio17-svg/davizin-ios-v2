@@ -306,6 +306,13 @@ class InjectorService {
 				throw NSError(domain: "Davizin", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])
 			}
 
+			let systemVersion = NyxelSupportPolicy.currentVersion
+			if systemVersion.majorVersion == 26 && sandbox_access_is_active() == 0 {
+				let msg = "iOS 26: sandbox no preparado; ejecuta Run Exploit y vuelve a intentar."
+				sendErrorNotification("❌ PASO 1.5", msg)
+				return InjectorResult(success: false, message: msg)
+			}
+
 			sendErrorNotification("✅ PASO 1", "iOS OK")
 
 			sendErrorNotification("✅ PASO 1.5", "AirLift será el canal principal de escritura")
