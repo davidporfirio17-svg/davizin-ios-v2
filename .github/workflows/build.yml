@@ -110,6 +110,8 @@ jobs:
 
         echo "=== Checking for errors in log ==="
         grep -i "error:" /tmp/build.log | head -20 || echo "No errors found"
+        echo "=== Linker diagnostics ==="
+        grep -n -A120 -B20 -E "Undefined symbols|duplicate symbol|ld:|clang: error" /tmp/build.log | tail -180 || true
 
         if [ "$status" -ne 0 ]; then
           echo "=== Build FAILED (status $status); emitting annotations ==="
