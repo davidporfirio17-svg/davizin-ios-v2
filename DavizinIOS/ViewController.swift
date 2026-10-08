@@ -104,6 +104,10 @@ final class ViewController: UIViewController {
         }
     }
 
+    func setOperationProgress(_ message: String) {
+        operationView?.setProgressMessage(message)
+    }
+
     /// Actualiza el contador de tiempo restante en el header.
     func setCountdownText(_ text: String) {
         headerView.countdownText = text

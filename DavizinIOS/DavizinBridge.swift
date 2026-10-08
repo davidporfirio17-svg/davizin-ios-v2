@@ -7,6 +7,7 @@ final class DavizinBridge {
     private weak var vc: ViewController?
     private var countdownTimer: Timer?
     private var remainingSeconds: Int = 0
+    private var injectionProgressObserver: NSObjectProtocol?
 
     /// Modo elegido por el usuario. Define que cache_res se inyecta.
     private var selectedMode: DavizinMode?
@@ -21,6 +22,17 @@ final class DavizinBridge {
 
     func connect(to viewController: ViewController) {
         self.vc = viewController
+        if let injectionProgressObserver {
+            NotificationCenter.default.removeObserver(injectionProgressObserver)
+        }
+        injectionProgressObserver = NotificationCenter.default.addObserver(
+            forName: .nyxelInjectionProgress,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let message = notification.object as? String else { return }
+            self?.vc?.setOperationProgress(message)
+        }
         // Restaurar el ultimo juego y modo elegidos
         if let g = UserDefaults.standard.string(forKey: "dz_last_game"), let game = DavizinGame(rawValue: g) {
             selectedGame = game
@@ -133,6 +145,23 @@ final class DavizinBridge {
         let wantsHybrid = mode.accessTier.lowercased() == "hybrid"
             || mode.id.lowercased().contains("hybrid")
             || mode.label.lowercased().contains("hybrid")
+
+        let version = NyxelDeviceInfo.versionTuple
+        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch,
+            build: NyxelSupportPolicy.currentBuild
+        )
+        guard !pairingRequired || Self.airLiftRouteAvailable else {
+            let message = "iOS 27 requiere un pairing AirLift guardado; no se ejecutó el exploit kernel con offsets no verificados."
+            NyxelActivityLog.record(message)
+            DispatchQueue.main.async {
+                self.operationInFlight = false
+                self.vc?.setOperationState(.failed(message))
+            }
+            return
+        }
 
         let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
@@ -265,6 +294,22 @@ final class DavizinBridge {
                     DispatchQueue.main.async {
                         self.operationInFlight = false
                         self.vc?.setOperationState(.succeeded("Remote Pairing guardado ✓ — AirLift se validará al escribir"))
+                    }
+                    return
+                }
+
+                let version = NyxelDeviceInfo.versionTuple
+                if NyxelSupportPolicy.requiresPairingTunnel(
+                    major: version.major,
+                    minor: version.minor,
+                    patch: version.patch,
+                    build: NyxelSupportPolicy.currentBuild
+                ) {
+                    let message = "iOS 27 requiere pairing AirLift; se detuvo antes de usar offsets kernel no verificados."
+                    NyxelActivityLog.record(message)
+                    DispatchQueue.main.async {
+                        self.operationInFlight = false
+                        self.vc?.setOperationState(.failed(message))
                     }
                     return
                 }

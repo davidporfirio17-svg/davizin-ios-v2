@@ -1,6 +1,10 @@
 import Foundation
 import UIKit
 
+extension Notification.Name {
+    static let nyxelInjectionProgress = Notification.Name("nyxel.injection.progress")
+}
+
 enum NyxelErrorCode {
     static let unsupportedSystem = "NYX-001"
     static let workerUnavailable = "NYX-002"
@@ -51,6 +55,7 @@ enum NyxelActivityLog {
         var values = entries
         values.insert(entry, at: 0)
         UserDefaults.standard.set(Array(values.prefix(limit)), forKey: key)
+        NotificationCenter.default.post(name: .nyxelInjectionProgress, object: message)
     }
 }
 

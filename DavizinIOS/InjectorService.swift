@@ -9,6 +9,7 @@ struct InjectorResult {
 
 // MARK: - Error Notifications
 fileprivate func sendErrorNotification(_ title: String, _ body: String) {
+    NyxelActivityLog.record("\(title): \(body)")
     DispatchQueue.main.async {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
             guard granted else { return }
@@ -19,6 +20,25 @@ fileprivate func sendErrorNotification(_ title: String, _ body: String) {
             let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
             UNUserNotificationCenter.current().add(request)
         }
+    }
+}
+
+private final class MCMContainerLookupResult {
+    private let lock = NSLock()
+    private var storedPath: String?
+    private var storedError: String?
+
+    func store(path: String?, error: String?) {
+        lock.lock()
+        storedPath = path
+        storedError = error
+        lock.unlock()
+    }
+
+    func snapshot() -> (path: String?, error: String?) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (storedPath, storedError)
     }
 }
 
@@ -97,6 +117,7 @@ private func disguisedBackupPath(for relPath: String) -> String {
 private let kCacheBaseURL = "https://dz.davidporfirio17.workers.dev"
 
 class InjectorService {
+    private static let mcmLookupQueue = DispatchQueue(label: "com.davizin.mcm-container-lookup", qos: .userInitiated)
 
     /// Bundle ID del contenedor segun el juego.
     private static func bundleID(for game: DavizinGame) -> String {
@@ -104,6 +125,26 @@ class InjectorService {
         case .freeFireMax: return "com.dts.freefiremax"
         case .freeFire:    return "com.dts.freefireth"
         }
+    }
+
+    private static func getContainerPathWithTimeout(bundleID: String, timeout: TimeInterval, error: inout NSString?) -> NSString? {
+        let completed = DispatchSemaphore(value: 0)
+        let result = MCMContainerLookupResult()
+        mcmLookupQueue.async {
+            var lookupError: NSString?
+            let path = DavizinGetContainerPath(bundleID, &lookupError)
+            result.store(path: path as String?, error: lookupError as String?)
+            completed.signal()
+        }
+
+        guard completed.wait(timeout: .now() + timeout) == .success else {
+            error = "MCM container lookup timed out after \(Int(timeout)) seconds" as NSString
+            NyxelActivityLog.record("PASO 3: MCM timeout tras \(Int(timeout))s; se cancela antes de inyectar")
+            return nil
+        }
+        let value = result.snapshot()
+        error = value.error as NSString?
+        return value.path as NSString?
     }
 
     /// Escribe en el contenedor del juego. Si hay un registro de pairing
@@ -120,6 +161,32 @@ class InjectorService {
         let fullPath = container + "/" + relPath
         let parentDir = (fullPath as NSString).deletingLastPathComponent
 
+        let deviceVersion = NyxelDeviceInfo.versionTuple
+        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+            major: deviceVersion.major,
+            minor: deviceVersion.minor,
+            patch: deviceVersion.patch,
+            build: NyxelSupportPolicy.currentBuild
+        )
+        if pairingRequired {
+            guard NixelAirLiftFileChannel.isAvailable else {
+                return ContainerWriteError(
+                    airliftNote: "iOS 27 requiere un registro de pairing y túnel AirLift activos",
+                    directError: NSError(domain: "Davizin", code: -27, userInfo: [
+                        NSLocalizedDescriptionKey: "No hay un canal AirLift disponible para iOS 27."
+                    ])
+                )
+            }
+            switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
+            case .success:
+                return nil
+            case .failure(let error):
+                let note = "AirLift falló: \(error.message)"
+                NyxelActivityLog.record("AirLift write falló (\(relPath)): \(error.message)")
+                return ContainerWriteError(airliftNote: note, directError: error)
+            }
+        }
+
         let handleRoot = DavizinGrantContainerAccess(container)
         let handleDir = DavizinGrantContainerAccess(parentDir)
         let handleFile = DavizinGrantContainerAccess(fullPath)
@@ -129,13 +196,6 @@ class InjectorService {
             DavizinReleaseContainerGrant(handleRoot)
         }
 
-        let version = NyxelDeviceInfo.versionTuple
-        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
-            major: version.major,
-            minor: version.minor,
-            patch: version.patch,
-            build: NyxelSupportPolicy.currentBuild
-        )
         var airliftNote = "AirLift: sin registro de pairing guardado"
         if NixelAirLiftFileChannel.isAvailable {
             switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
@@ -174,6 +234,27 @@ class InjectorService {
         let fullPath = container + "/" + relPath
         let parentDir = (fullPath as NSString).deletingLastPathComponent
 
+        let deviceVersion = NyxelDeviceInfo.versionTuple
+        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+            major: deviceVersion.major,
+            minor: deviceVersion.minor,
+            patch: deviceVersion.patch,
+            build: NyxelSupportPolicy.currentBuild
+        )
+        if pairingRequired {
+            guard NixelAirLiftFileChannel.isAvailable else {
+                NyxelActivityLog.record("AirLift read omitido: falta pairing requerido")
+                return nil
+            }
+            switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
+            case .success(let data):
+                return data
+            case .failure(let error):
+                NyxelActivityLog.record("AirLift read falló (\(relPath)): \(error.message)")
+                return nil
+            }
+        }
+
         let handleRoot = DavizinGrantContainerAccess(container)
         let handleDir = DavizinGrantContainerAccess(parentDir)
         let handleFile = DavizinGrantContainerAccess(fullPath)
@@ -183,13 +264,6 @@ class InjectorService {
             DavizinReleaseContainerGrant(handleRoot)
         }
 
-        let version = NyxelDeviceInfo.versionTuple
-        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
-            major: version.major,
-            minor: version.minor,
-            patch: version.patch,
-            build: NyxelSupportPolicy.currentBuild
-        )
         if NixelAirLiftFileChannel.isAvailable {
             if case .success(let data) = NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
                 return data
@@ -346,7 +420,7 @@ class InjectorService {
         sendErrorNotification("🔍 PASO 3", "Activando container MCM...")
 
         var mcmErr: NSString?
-        guard let container = DavizinGetContainerPath(bundleID, &mcmErr) else {
+        guard let container = Self.getContainerPathWithTimeout(bundleID: bundleID, timeout: 25, error: &mcmErr) else {
             let msg = (mcmErr as String?) ?? "MCM falló - container nil"
             sendErrorNotification("❌ PASO 3", msg)
             return InjectorResult(success: false, message: msg)
@@ -354,9 +428,7 @@ class InjectorService {
 
         sendErrorNotification("✅ PASO 3", "Container: \(container)")
 
-        sendErrorNotification("🔍 PASO 4", "Preparando query...")
-        _ = DavizinPrepareInjectionQuery(bundleID, &mcmErr)
-        sendErrorNotification("✅ PASO 4", "Query lista")
+        sendErrorNotification("⏭️ PASO 4", "Se omite query MCM heredada: esta función está deshabilitada en la build")
 
         sendErrorNotification("🔍 PASO 5", "Refrescando nombre de archivo...")
         Self.refreshDestinationFileName(for: game, key: key, hwid: hwid)
