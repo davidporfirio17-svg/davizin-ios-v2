@@ -7,6 +7,7 @@ final class NyxelVPNView: UIView {
     private let stack = UIStackView()
     private let statusLabel = UILabel()
     private let toggleButton = DavizinButton(title: "Activar VPN", style: .primary)
+    private let connectorLabel = UILabel()
     private let pairingLabel = UILabel()
     private let pairingLogLabel = UILabel()
     private let pairButton = DavizinButton(title: "Emparejar (publicar 2424)", style: .secondary)
@@ -59,6 +60,7 @@ final class NyxelVPNView: UIView {
         stack.addArrangedSubview(category)
 
         stack.addArrangedSubview(makeStatusCard())
+        stack.addArrangedSubview(makeConnectorCard())
         stack.addArrangedSubview(makeStepsCard())
 
         toggleButton.addTarget(self, action: #selector(toggleVPN), for: .touchUpInside)
@@ -91,6 +93,7 @@ final class NyxelVPNView: UIView {
             self.statusLabel.text = NixelVPNManager.statusText(manager.status)
             self.statusLabel.textColor = manager.status == .connected ? AppTheme.success : AppTheme.warm
             self.toggleButton.setTitle(manager.isActive ? "Detener VPN" : "Activar VPN", for: .normal)
+            self.refreshConnectorStatus()
         }
     }
 
@@ -168,6 +171,41 @@ final class NyxelVPNView: UIView {
         return card
     }
 
+    private func makeConnectorCard() -> UIView {
+        let card = DavizinCardView()
+        let title = UILabel()
+        title.text = "Conector y plugin"
+        title.font = AppTheme.titleFont(18)
+        title.textColor = AppTheme.primaryText
+
+        connectorLabel.font = AppTheme.bodyFont()
+        connectorLabel.textColor = AppTheme.secondaryText
+        connectorLabel.numberOfLines = 0
+
+        let note = UILabel()
+        note.text = "El plugin debe estar dentro del .app; el pairing 2424 se guarda solo después de un handshake real."
+        note.font = AppTheme.bodyFont()
+        note.textColor = AppTheme.secondaryText
+        note.numberOfLines = 0
+
+        let inner = UIStackView(arrangedSubviews: [title, connectorLabel, note])
+        inner.axis = .vertical
+        inner.spacing = 8
+        card.addContent(inner)
+        refreshConnectorStatus()
+        return card
+    }
+
+    private func refreshConnectorStatus() {
+        let manager = NixelVPNManager.shared
+        let plugin = manager.tunnelPluginPresent ? "presente" : "ausente"
+        let configured = manager.isConfigured ? "configurado" : "sin configurar"
+        let externalVPN = NixelHybridCoordinator.isExternalVPNActive() ? "VPN externa detectada" : "sin VPN externa"
+        let pairing = NixelPairingRecordStore.shared.load(deviceID: "2424") != nil ? "registro 2424 listo" : "registro 2424 pendiente"
+        connectorLabel.text = "Plugin ExternalTunnel: \(plugin)\nConector VPN: \(configured) · \(externalVPN)\nPairing: \(pairing)"
+        connectorLabel.textColor = manager.tunnelPluginPresent ? AppTheme.success : AppTheme.warm
+    }
+
     @objc private func openSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
@@ -224,6 +262,7 @@ final class NyxelVPNView: UIView {
         NixelPairingSession.shared.begin { [weak self] state in
             guard let self else { return }
             self.pairingLabel.text = state.message
+            self.refreshConnectorStatus()
             switch state {
             case .failed:
                 self.pairingLabel.font = AppTheme.bodyFont()

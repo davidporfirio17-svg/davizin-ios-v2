@@ -102,6 +102,30 @@ enum NyxelSupportPolicy {
         (4, 2, "24A5390f")
     ]
 
+    /// Builds de explotación verificados en SupportPatch. El deployment target
+    /// de la app puede ser iOS 16, pero eso no convierte iOS 16 en un sistema
+    /// compatible con la inyección.
+    private static let verifiedBuilds: Set<String> = [
+        "17.0.0|21A329", "17.0.1|21A340", "17.0.2|21A350", "17.0.2|21A351",
+        "17.0.3|21A360", "17.1.0|21B74", "17.1.0|21B80", "17.1.1|21B91",
+        "17.1.2|21B101", "17.2.0|21C62", "17.2.1|21C66", "17.3.0|21D50",
+        "17.3.1|21D61", "17.4.0|21E219", "17.4.1|21E236", "17.4.1|21E237",
+        "17.5.0|21F79", "17.5.1|21F90", "17.6.0|21G80", "17.6.1|21G93",
+        "17.6.1|21G101", "17.7.0|21H16", "17.7.1|21H216", "17.7.2|21H221",
+        "18.0.0|22A3354", "18.0.1|22A3370", "18.1.0|22B83", "18.1.1|22B91",
+        "18.2.0|22C152", "18.2.1|22C161", "18.3.0|22D63", "18.3.1|22D72",
+        "18.3.2|22D82", "18.4.0|22E240", "18.4.1|22E252", "18.5.0|22F76",
+        "18.6.0|22G86", "18.6.1|22G90", "18.6.2|22G100", "18.7.0|22H20",
+        "18.7.1|22H31", "18.7.2|22H124", "18.7.3|22H217", "18.7.4|22H218",
+        "18.7.5|22H311", "18.7.6|22H320", "18.7.7|22H333", "18.7.7|22H340",
+        "18.7.8|22H352", "18.7.9|22H355", "18.7.10|22H374",
+        "26.0.0|23A341", "26.0.0|23A345", "26.0.1|23A355", "26.1.0|23B85",
+        "26.2.0|23C55", "26.2.1|23C71", "26.3.0|23D127", "26.3.1|23D8133",
+        "26.4.0|23E246", "26.4.1|23E254", "26.4.2|23E261", "26.5.0|23F77",
+        "26.5.1|23F81", "26.5.2|23F84", "26.6.0|23G71", "26.6.1|23G83",
+        "26.6.2|23G90", "26.7.0|23H24", "27.2.0|24B5084k", "27.2.0|24B5089g"
+    ]
+
     static var currentVersion: OperatingSystemVersion {
         ProcessInfo.processInfo.operatingSystemVersion
     }
@@ -130,7 +154,7 @@ enum NyxelSupportPolicy {
     }
 
     static func supportsVerifiedSystem(major: Int, minor: Int, patch: Int, build: String) -> Bool {
-        true
+        verifiedBuilds.contains("\(major).\(minor).\(patch)|\(build)")
     }
 
     static func isSupported(major: Int, minor: Int, patch: Int, build: String) -> Bool {
@@ -154,7 +178,7 @@ enum NyxelSupportPolicy {
     }
 
     static var supportedRangesDescription: String {
-        "iOS 17.0–17.7.x · iOS 18.0–18.7.1 · iOS 26.0–26.6.2 · iOS 27.0 builds verificados"
+        "iOS 17.0–17.7.2 · iOS 18.0–18.7.10 · iOS 26.0–26.7.0 · iOS 27.2 builds verificados"
     }
     
     // MARK: - Device Information
