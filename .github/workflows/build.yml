@@ -14,21 +14,31 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Build idevice-ffi transport backend
+    - name: Build AirLiftFFI transport backend
       run: |
         set -euo pipefail
-        rustup target add aarch64-apple-ios
+        rustup target add aarch64-apple-ios aarch64-apple-ios-sim
         cargo build \
-          --manifest-path Vendor/idevice/ffi/Cargo.toml \
+          --manifest-path airlift-rust-core/Cargo.toml \
           --release \
-          --target aarch64-apple-ios \
-          --no-default-features \
-          --features tunnel_tcp_stack,ring,house_arrest
-        test -f Vendor/idevice/target/aarch64-apple-ios/release/libidevice_ffi.a
-        test -f Vendor/idevice/ffi/idevice.h
-        mkdir -p /tmp/idevice-ffi
-        cp Vendor/idevice/target/aarch64-apple-ios/release/libidevice_ffi.a /tmp/idevice-ffi/
-        cp Vendor/idevice/ffi/idevice.h /tmp/idevice-ffi/
+          --target aarch64-apple-ios
+        cargo build \
+          --manifest-path airlift-rust-core/Cargo.toml \
+          --release \
+          --target aarch64-apple-ios-sim
+        test -f airlift-rust-core/target/aarch64-apple-ios/release/libairlift_ffi.a
+        test -f airlift-rust-core/target/aarch64-apple-ios-sim/release/libairlift_ffi.a
+        rm -rf /tmp/airlift /tmp/AirliftFFI.xcframework
+        mkdir -p /tmp/airlift
+        cp airlift-rust-core/target/aarch64-apple-ios/release/libairlift_ffi.a /tmp/airlift/
+        cp airlift-rust-core/include/airlift.h airlift-rust-core/include/module.modulemap /tmp/airlift/
+        xcodebuild -create-xcframework \
+          -library airlift-rust-core/target/aarch64-apple-ios/release/libairlift_ffi.a \
+          -headers airlift-rust-core/include \
+          -library airlift-rust-core/target/aarch64-apple-ios-sim/release/libairlift_ffi.a \
+          -headers airlift-rust-core/include \
+          -output /tmp/AirliftFFI.xcframework
+        cp -R /tmp/AirliftFFI.xcframework /tmp/airlift/
 
     - name: Add kexploit and mcm_bridge files to Xcode project
       run: |
@@ -88,8 +98,9 @@ jobs:
           ONLY_ACTIVE_ARCH=NO \
           ALWAYS_SEARCH_USER_PATHS=NO \
           BUILD_DIR=/tmp/davizin_build \
-          LIBRARY_SEARCH_PATHS=/tmp/idevice-ffi \
-          OTHER_LDFLAGS="-force_load /tmp/idevice-ffi/libidevice_ffi.a -framework Security -framework Network" \
+          LIBRARY_SEARCH_PATHS=/tmp/airlift \
+          FRAMEWORK_SEARCH_PATHS=/tmp/airlift \
+          OTHER_LDFLAGS="-force_load /tmp/airlift/libairlift_ffi.a -framework Security -framework Network" \
           build > /tmp/build.log 2>&1
         status=$?
         set -e

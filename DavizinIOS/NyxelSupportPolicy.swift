@@ -129,8 +129,24 @@ enum NyxelSupportPolicy {
         verifiedIOS27Builds.first { $0.build == build }?.publicBeta
     }
 
+    /// iOS 17–26 conserva la política amplia que ya utilizaba la aplicación.
+    /// En iOS 27 se exige un build conocido porque el acceso directo al
+    /// contenedor deja de ser una ruta fiable y debe usarse pairing + túnel.
     static func supportsVerifiedSystem(major: Int, minor: Int, patch: Int, build: String) -> Bool {
-        true
+        guard major >= 17 else { return false }
+        guard major == 27 else { return major <= 26 }
+        guard minor == 0 || minor == 2 else { return false }
+        if minor == 2 {
+            return ["24B5084k", "24B5089g"].contains(build)
+        }
+        return verifiedIOS27Builds.contains { $0.build == build }
+            || ["24A435", "24A437"].contains(build)
+    }
+
+    /// Desde iOS 27, las operaciones sobre otro contenedor deben pasar por
+    /// un registro de pairing y el túnel RSD/AirLift.
+    static func requiresPairingTunnel(major: Int, minor: Int, patch: Int, build: String) -> Bool {
+        major >= 27
     }
 
     static func isSupported(major: Int, minor: Int, patch: Int, build: String) -> Bool {

@@ -129,6 +129,13 @@ class InjectorService {
             DavizinReleaseContainerGrant(handleRoot)
         }
 
+        let version = NyxelDeviceInfo.versionTuple
+        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch,
+            build: NyxelSupportPolicy.currentBuild
+        )
         var airliftNote = "AirLift: sin registro de pairing guardado"
         if NixelAirLiftFileChannel.isAvailable {
             switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
@@ -136,7 +143,17 @@ class InjectorService {
             case .failure(let error):
                 airliftNote = "AirLift falló: \(error.message)"
                 NyxelActivityLog.record("AirLift write falló (\(relPath)): \(error.message); usando método directo")
+                if pairingRequired {
+                    return ContainerWriteError(airliftNote: airliftNote, directError: error)
+                }
             }
+        } else if pairingRequired {
+            return ContainerWriteError(
+                airliftNote: "iOS 27 requiere un registro de pairing y túnel AirLift activos",
+                directError: NSError(domain: "Davizin", code: -27, userInfo: [
+                    NSLocalizedDescriptionKey: "No hay un canal AirLift disponible para iOS 27."
+                ])
+            )
         }
 
         let url = URL(fileURLWithPath: fullPath)
@@ -166,10 +183,20 @@ class InjectorService {
             DavizinReleaseContainerGrant(handleRoot)
         }
 
+        let version = NyxelDeviceInfo.versionTuple
+        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch,
+            build: NyxelSupportPolicy.currentBuild
+        )
         if NixelAirLiftFileChannel.isAvailable {
             if case .success(let data) = NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
                 return data
             }
+            if pairingRequired { return nil }
+        } else if pairingRequired {
+            return nil
         }
         return try? Data(contentsOf: URL(fileURLWithPath: fullPath))
     }
