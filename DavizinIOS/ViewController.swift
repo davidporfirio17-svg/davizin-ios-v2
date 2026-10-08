@@ -355,7 +355,7 @@ final class ViewController: UIViewController {
         runCompatibilityCheck()
     }
 
-    /// Prueba si el dispositivo puede inyectar y pinta el estado en el login.
+	/// Comprueba si MCM localiza el contenedor; no valida por sí sola permisos de escritura.
 	private func runCompatibilityCheck() {
 		guard NyxelSupportPolicy.isCurrentSystemSupported else {
 			headerView.setSystemCompatibility(
@@ -375,14 +375,30 @@ final class ViewController: UIViewController {
                 guard let self = self else { return }
                 switch result {
 				case .compatible:
+					let version = NyxelSupportPolicy.currentVersion
+					let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+						major: version.majorVersion,
+						minor: version.minorVersion,
+						patch: version.patchVersion,
+						build: NyxelSupportPolicy.currentBuild
+					)
+					let kernelOffsetsAvailable = NyxelSupportPolicy.supportsKernelOffsets(
+						major: version.majorVersion,
+						minor: version.minorVersion
+					)
 					self.headerView.setSystemCompatibility(
-						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • Compatible",
-						color: AppTheme.success
+						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • Contenedor detectado · escritura pendiente",
+						color: AppTheme.accentWarm
 					)
-					self.loginView?.setCompatibility(
-						"✅ Compatible — \(NyxelSupportPolicy.currentSystemDescription)",
-						color: AppTheme.success
-					)
+					let message: String
+					if pairingRequired {
+						message = "⚠️ MCM encontró el contenedor; no confirmó escritura. iOS 27 requiere pairing/AirLift y Apple Books; kernel/offsets no verificados para este build."
+					} else if kernelOffsetsAvailable {
+						message = "⚠️ MCM encontró el contenedor; eso no confirma permiso de escritura. La ruta depende de que kernel y sandbox estén activos."
+					} else {
+						message = "⚠️ MCM encontró el contenedor; no hay una ruta de escritura validada para este build."
+					}
+					self.loginView?.setCompatibility(message, color: AppTheme.accentWarm)
 				case .notCompatible:
 					self.headerView.setSystemCompatibility(
 						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • Sin acceso",
