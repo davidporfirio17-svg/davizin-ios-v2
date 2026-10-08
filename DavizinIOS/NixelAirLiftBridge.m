@@ -1,6 +1,6 @@
 #import "NixelAirLiftBridge.h"
 #import "NixelIdeviceFFI.h"
-#import "../airlift-rust-core/include/airlift.h"
+#import "NixelAirLiftC.h"
 #import <Foundation/Foundation.h>
 #import <dns_sd.h>
 #import <netdb.h>
