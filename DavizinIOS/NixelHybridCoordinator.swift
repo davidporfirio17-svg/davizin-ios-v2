@@ -593,6 +593,25 @@ final class NixelPairingSession {
 /// interpreta por sí sola como jailbreak exitoso. Pairing y Developer Mode
 /// quedan expresamente sin verificar hasta integrar el transporte con el iPad.
 enum NixelHybridCoordinator {
+    private enum StartError: LocalizedError {
+        case vpnStart(String)
+        case vpnConnectionTimeout
+        case rsdEndpointUnreachable(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .vpnStart(let detail):
+                return "No se pudo iniciar el VPN local: \(detail). No se ejecutó la inyección."
+            case .vpnConnectionTimeout:
+                return "El VPN no llegó al estado Conectado dentro de 15 segundos. No se ejecutó la inyección."
+            case .rsdEndpointUnreachable(let detail):
+                return "El VPN aparece activo, pero AirLift no alcanza RSD por TCP 49152 (\(detail)). Activa un loopback VPN compatible y vuelve a probar. No se ejecutó la inyección."
+            }
+        }
+    }
+
+    private static let rsdProbeHosts = ["10.7.0.1", "10.7.0.2", "10.7.0.3"]
+
     static func diagnostics() -> NixelHybridDiagnostics {
         let device = UIDevice.current
         let vpn = NixelVPNManager.shared
@@ -613,33 +632,113 @@ enum NixelHybridCoordinator {
         NyxelActivityLog.record("Hybrid diagnóstico: \(before.summary)")
         NyxelActivityLog.record(NixelExploitCoordinator.assess().summary)
 
-        if isExternalVPNActive() {
-            NyxelActivityLog.record("Hybrid VPN: VPN externo detectado, omitiendo túnel interno")
-            completion(.success(()))
+        let vpn = NixelVPNManager.shared
+        if vpn.status == .connected {
+            verifyRSDLoopback(completion: completion)
+            return
+        }
+        if vpn.status == .connecting || vpn.status == .reasserting || vpn.status == .disconnecting {
+            waitForVPNConnected(until: Date().addingTimeInterval(15), completion: completion)
             return
         }
 
-        var completed = false
-        let timeout = DispatchWorkItem {
-            guard !completed else { return }
-            completed = true
-            NyxelActivityLog.record("Hybrid VPN: timeout 8s — continuando sin VPN")
-            completion(.success(()))
+        if isExternalVPNActive() {
+            NyxelActivityLog.record("Hybrid VPN: se detectó una interfaz VPN externa; comprobando el endpoint RSD antes de inyectar")
+            verifyRSDLoopback(completion: completion)
+            return
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: timeout)
 
-        NixelVPNManager.shared.start { result in
-            timeout.cancel()
-            guard !completed else { return }
-            completed = true
-            switch result {
-            case .success:
-                NyxelActivityLog.record("Hybrid VPN: conectado; pairing aún no verificado")
-            case .failure(let error):
-                NyxelActivityLog.record("Hybrid VPN: error — \(error.localizedDescription), continuando sin VPN")
+        let deadline = Date().addingTimeInterval(15)
+        vpn.start { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    NyxelActivityLog.record("Hybrid VPN: solicitud aceptada; esperando estado Conectado")
+                    waitForVPNConnected(until: deadline, completion: completion)
+                case .failure(let error):
+                    NyxelActivityLog.record("Hybrid VPN: error de inicio — \(error.localizedDescription)")
+                    completion(.failure(StartError.vpnStart(error.localizedDescription)))
+                }
             }
-            completion(.success(()))
         }
+    }
+
+    private static func waitForVPNConnected(
+        until deadline: Date,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        if NixelVPNManager.shared.status == .connected {
+            verifyRSDLoopback(completion: completion)
+            return
+        }
+        guard Date() < deadline else {
+            NyxelActivityLog.record("Hybrid VPN: no llegó a Conectado en 15s")
+            completion(.failure(StartError.vpnConnectionTimeout))
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            waitForVPNConnected(until: deadline, completion: completion)
+        }
+    }
+
+    private static func verifyRSDLoopback(completion: @escaping (Result<Void, Error>) -> Void) {
+        probeRSDLoopback(at: 0, failures: [], completion: completion)
+    }
+
+    private static func probeRSDLoopback(
+        at index: Int,
+        failures: [String],
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        guard index < rsdProbeHosts.count,
+              let port = NWEndpoint.Port(rawValue: 49152) else {
+            let detail = failures.joined(separator: "; ")
+            NyxelActivityLog.record("Hybrid VPN: ningún endpoint RSD respondió: \(detail)")
+            completion(.failure(StartError.rsdEndpointUnreachable(detail)))
+            return
+        }
+
+        let host = rsdProbeHosts[index]
+        let connection = NWConnection(host: NWEndpoint.Host(host), port: port, using: .tcp)
+        var finished = false
+        let timeout = DispatchWorkItem {
+            guard !finished else { return }
+            finished = true
+            connection.cancel()
+            probeRSDLoopback(
+                at: index + 1,
+                failures: failures + ["\(host): timeout"],
+                completion: completion
+            )
+        }
+
+        connection.stateUpdateHandler = { state in
+            guard !finished else { return }
+            switch state {
+            case .ready:
+                finished = true
+                timeout.cancel()
+                connection.cancel()
+                NyxelActivityLog.record("Hybrid VPN: endpoint RSD TCP 49152 reachable at \(host)")
+                completion(.success(()))
+            case .failed(let error):
+                finished = true
+                timeout.cancel()
+                connection.cancel()
+                let failure = "\(host): \(error.localizedDescription)"
+                NyxelActivityLog.record("Hybrid VPN: probe RSD falló — \(failure)")
+                probeRSDLoopback(
+                    at: index + 1,
+                    failures: failures + [failure],
+                    completion: completion
+                )
+            default:
+                break
+            }
+        }
+
+        connection.start(queue: .main)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.25, execute: timeout)
     }
 
     static func isExternalVPNActive() -> Bool {

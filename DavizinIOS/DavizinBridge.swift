@@ -164,15 +164,27 @@ final class DavizinBridge {
             }
         }
 
-        guard wantsHybrid else {
+        let requiresRSDLoopback = wantsHybrid || Self.airLiftRouteAvailable
+        guard requiresRSDLoopback else {
             injectNow()
             return
         }
 
-        NixelHybridCoordinator.start { [weak self] _ in
+        NixelHybridCoordinator.start { [weak self] result in
             guard let self = self else { return }
-            NyxelActivityLog.record("Hybrid VPN preparado (o timeout/externo)")
-            injectNow()
+            switch result {
+            case .success:
+                NyxelActivityLog.record("Hybrid VPN verificado; ruta TCP RSD alcanzable")
+                injectNow()
+            case .failure(let error):
+                let message = "Inyección detenida: el loopback VPN/RSD no está listo. \(error.localizedDescription)"
+                NyxelActivityLog.record(message)
+                DispatchQueue.main.async {
+                    self.hapticFeedback(success: false)
+                    self.operationInFlight = false
+                    self.vc?.setOperationState(.failed(message))
+                }
+            }
         }
     }
 

@@ -1,5 +1,14 @@
 import Foundation
 
+private let nyxelAirliftLogCallback: ALLogCallback = { _, message in
+    guard let message else { return }
+    let line = String(cString: message).trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !line.isEmpty else { return }
+    DispatchQueue.main.async {
+        NyxelActivityLog.record("AirLift: \(line)")
+    }
+}
+
 /// Canal AirLift basado en el flujo de Tekezuna.
 /// No usa House Arrest/AFC ni `tunnel_create_rppairing`: el núcleo AirLift
 /// resuelve el contenedor y abre su propio túnel RSD multihost para la operación.
@@ -25,7 +34,7 @@ enum NixelAirLiftFileChannel {
         var errorPointer: UnsafeMutablePointer<CChar>?
         let code = pairingPath.withCString { pairing in
             bundleID.withCString { bundle in
-                al_find_app_container(pairing, bundle, nil, nil, &containerPointer, &errorPointer)
+                al_find_app_container(pairing, bundle, nyxelAirliftLogCallback, nil, &containerPointer, &errorPointer)
             }
         }
         defer {
@@ -66,7 +75,7 @@ enum NixelAirLiftFileChannel {
                 let code = pairingURL.path.withCString { pairing in
                     staging.path.withCString { source in
                         target.deletingLastPathComponent().path.withCString { destination in
-                            al_exploit_write_dir(pairing, source, destination, nil, nil, &errorPointer)
+                            al_exploit_write_dir(pairing, source, destination, nyxelAirliftLogCallback, nil, &errorPointer)
                         }
                     }
                 }
@@ -105,7 +114,7 @@ enum NixelAirLiftFileChannel {
                 let code = pairingURL.path.withCString { pairing in
                     target.path.withCString { remote in
                         outputURL.path.withCString { output in
-                            al_exploit_read_file(pairing, remote, output, nil, nil, &errorPointer)
+                            al_exploit_read_file(pairing, remote, output, nyxelAirliftLogCallback, nil, &errorPointer)
                         }
                     }
                 }
