@@ -96,6 +96,7 @@ private final class ProfileDisclosureSection: UIView {
 
 final class ProfileView: UIView {
     weak var delegate: ProfileViewDelegate?
+    var onSettingsRequested: (() -> Void)?
     var onRefreshRequested: (() -> Void)?
     var onAppearanceChanged: (() -> Void)?
 
@@ -121,6 +122,7 @@ final class ProfileView: UIView {
     private let biometricSwitch = UISwitch()
     private let activationVoiceSwitch = UISwitch()
     private let refreshButton = UIButton(type: .system)
+    private let settingsButton = DavizinButton(title: "AJUSTES DEL DISPOSITIVO", style: .secondary)
     private let logoutButton = DavizinButton(title: "CERRAR SESIÓN", style: .destructive)
     private let scrollView = UIScrollView()
     private let progressTrack = CAShapeLayer()
@@ -285,7 +287,7 @@ final class ProfileView: UIView {
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
         let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [historyLabel, activityLabel], expanded: false)
-        let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, logoutButton])
+        let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, settingsButton, logoutButton])
         stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: heroStack)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -299,6 +301,7 @@ final class ProfileView: UIView {
         scrollView.addSubview(card)
 
         refreshButton.addTarget(self, action: #selector(refreshTapped), for: .touchUpInside)
+        settingsButton.addTarget(self, action: #selector(settingsTapped), for: .touchUpInside)
         logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
@@ -313,6 +316,7 @@ final class ProfileView: UIView {
             card.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -22),
             card.leadingAnchor.constraint(greaterThanOrEqualTo: scrollView.leadingAnchor, constant: 22), card.trailingAnchor.constraint(lessThanOrEqualTo: scrollView.trailingAnchor, constant: -22),
             card.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 680 : AppTheme.contentMaximumWidth), stack.widthAnchor.constraint(greaterThanOrEqualToConstant: 240),
+            settingsButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             logoutButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
         ])
         refresh()
@@ -334,6 +338,11 @@ final class ProfileView: UIView {
             self?.refreshButton.setTitle("↻  ACTUALIZAR PERFIL", for: .normal)
             self?.refresh()
         }
+    }
+
+    @objc private func settingsTapped() {
+        SoundService.shared.playClick()
+        onSettingsRequested?()
     }
 
     @objc private func logoutTapped() { SoundService.shared.playClick(); delegate?.profileViewDidTapLogout(self) }

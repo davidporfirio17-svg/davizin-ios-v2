@@ -484,6 +484,16 @@ final class ViewController: UIViewController {
         display(NyxelVPNView(), animated: animated)
     }
 
+    private func showDeviceSettings(animated: Bool) {
+        stageBeforeProfile = currentStage == .profile ? stageBeforeProfile : currentStage
+        currentStage = .profile
+        setBottomNavigation(visible: true, selected: .profile)
+        headerView.title = "Settings"
+        headerView.showsBackButton = true
+        headerView.showsAvatarButton = false
+        display(NixleSettingsView(), animated: animated)
+    }
+
     /// Perfil: accesible desde el avatar del header en cualquier pantalla (excepto login).
     private func showProfile(animated: Bool) {
         stageBeforeProfile = currentStage == .profile ? stageBeforeProfile : currentStage
@@ -499,6 +509,9 @@ final class ViewController: UIViewController {
         screen.onAppearanceChanged = { [weak self] in
             self?.overrideUserInterfaceStyle = NyxelAppearanceStore.uiStyle
             self?.showProfile(animated: true)
+        }
+        screen.onSettingsRequested = { [weak self] in
+            self?.showDeviceSettings(animated: true)
         }
         screen.onRefreshRequested = { [weak self, weak screen] in
             guard let self, let key = self.activeKey, !key.isEmpty else { return }
