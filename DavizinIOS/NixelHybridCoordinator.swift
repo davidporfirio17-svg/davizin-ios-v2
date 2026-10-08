@@ -5,6 +5,50 @@ import Security
 import UIKit
 import Darwin
 
+/// Fuerza el flujo de autorización de Red local antes de publicar 2424.
+/// iOS no siempre muestra el permiso solo porque se cree un listener; el ZIP
+/// de SupportPatch combina listener y browser Bonjour para activar ese flujo.
+final class NixelLocalNetworkAuthorization {
+    static let shared = NixelLocalNetworkAuthorization()
+    private var listener: NWListener?
+    private var browser: NWBrowser?
+    private var completion: (() -> Void)?
+
+    private init() {}
+
+    func request(completion: @escaping () -> Void) {
+        stop()
+        self.completion = completion
+        let parameters = NWParameters.tcp
+        parameters.includePeerToPeer = true
+
+        let listener = try? NWListener(using: parameters)
+        listener?.service = NWListener.Service(name: "2424NetworkProbe", type: "_aircardprobe._tcp")
+        listener?.newConnectionHandler = { connection in connection.cancel() }
+        self.listener = listener
+
+        let browser = NWBrowser(for: .bonjour(type: "_aircardprobe._tcp", domain: nil), using: parameters)
+        self.browser = browser
+        listener?.start(queue: .main)
+        browser.start(queue: .main)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self else { return }
+            let finish = self.completion
+            self.stop()
+            finish?()
+        }
+    }
+
+    func stop() {
+        browser?.cancel()
+        browser = nil
+        listener?.cancel()
+        listener = nil
+        completion = nil
+    }
+}
+
 enum NixelCheckState: String {
     case notChecked = "No verificado"
     case unavailable = "No disponible desde la API pública"
@@ -425,6 +469,7 @@ final class NixelPairingSession {
     private var service: NixelRemotePairingService?
     private let authenticator: NixelPairingAuthenticator = NixelExternalPairingAuthenticator()
     private var hostObservers: [NSObjectProtocol] = []
+    private var isStartingHost = false
 
     private init() {}
 
@@ -432,6 +477,15 @@ final class NixelPairingSession {
         stop()
         NixelPairingKeepAlive.start()
         update(.searching, onState: onState)
+        isStartingHost = true
+        NixelLocalNetworkAuthorization.shared.request { [weak self] in
+            guard let self, self.isStartingHost else { return }
+            self.isStartingHost = false
+            self.startPairableHost(onState: onState)
+        }
+    }
+
+    private func startPairableHost(onState: @escaping (NixelPairingSessionState) -> Void) {
         let center = NotificationCenter.default
         hostObservers = [
             center.addObserver(forName: NSNotification.Name("NyxelPairingHostListenerReady"), object: nil, queue: .main) { [weak self] note in
@@ -474,6 +528,8 @@ final class NixelPairingSession {
     }
 
     func stop() {
+        isStartingHost = false
+        NixelLocalNetworkAuthorization.shared.stop()
         NixelPairingProbe.shared.stop()
         hostObservers.forEach { NotificationCenter.default.removeObserver($0) }
         hostObservers.removeAll()
