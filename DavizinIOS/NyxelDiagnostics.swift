@@ -41,20 +41,62 @@ enum NyxelRemoteConfigStore {
     static func recordFailure(_ message: String) { UserDefaults.standard.set(message, forKey: statusKey) }
 }
 
-/// Historial local breve; nunca almacena keys, tokens ni HWID.
+/// Historial técnico local acotado; redacta posibles credenciales antes de guardar/exportar.
 enum NyxelActivityLog {
     private static let key = "nyxel.activity.log"
-    private static let limit = 6
+    private static let limit = 1_600
+    private static let lock = NSRecursiveLock()
 
-    static var entries: [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+    static var entries: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return UserDefaults.standard.stringArray(forKey: key) ?? []
+    }
+
+    static var recentEntries: [String] { Array(entries.prefix(100)) }
+
+    static var exportText: String {
+        let values = entries
+        guard !values.isEmpty else { return "Sin eventos técnicos registrados." }
+        let chronological = values.reversed().map { sanitized($0) }.joined(separator: "\n")
+        return "NYXEL DIAGNÓSTICO · \(values.count) eventos\n\(chronological)\n"
+    }
+
+    static func exportFileURL() throws -> URL {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let name = "nyxel-diagnostics-\(formatter.string(from: Date())).txt"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try exportText.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
 
     static func record(_ message: String) {
+        lock.lock()
+        defer { lock.unlock() }
         let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        let entry = "\(formatter.string(from: Date()))  \(message)"
-        var values = entries
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        let entry = "\(formatter.string(from: Date()))  \(sanitized(message))"
+        var values = UserDefaults.standard.stringArray(forKey: key) ?? []
         values.insert(entry, at: 0)
         UserDefaults.standard.set(Array(values.prefix(limit)), forKey: key)
+    }
+
+    static func clear() {
+        lock.lock()
+        defer { lock.unlock() }
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
+    private static func sanitized(_ value: String) -> String {
+        let patterns = [
+            #"(?i)(["']?(?:authorization|api[_ -]?key|session[_ -]?key|access[_ -]?token|refresh[_ -]?token|password|secret|hwid|token|grappa|pairing[_ -]?(?:key|secret|token))["']?)\s*[:=]\s*("[^"]*"|'[^']*'|[^,;\s}\]]+)"#
+        ]
+        return patterns.reduce(value) { result, pattern in
+            result.replacingOccurrences(of: pattern, with: "$1=[REDACTED]", options: .regularExpression)
+        }
     }
 }
 

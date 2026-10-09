@@ -4,9 +4,7 @@ private let nyxelAirliftLogCallback: ALLogCallback = { _, message in
     guard let message else { return }
     let line = String(cString: message).trimmingCharacters(in: .whitespacesAndNewlines)
     guard !line.isEmpty else { return }
-    DispatchQueue.main.async {
-        NyxelActivityLog.record("AirLift: \(line)")
-    }
+    NyxelActivityLog.record("AirLift: \(line)")
 }
 
 /// Canal AirLift basado en el flujo de Tekezuna.
@@ -30,6 +28,8 @@ enum NixelAirLiftFileChannel {
     }
 
     private static func resolveContainer(pairingPath: String, bundleID: String) -> Result<String, ChannelError> {
+        let startedAt = Date()
+        NyxelActivityLog.record("DIAG AirLift container lookup started bundleID=\(bundleID)")
         var containerPointer: UnsafeMutablePointer<CChar>?
         var errorPointer: UnsafeMutablePointer<CChar>?
         let code = pairingPath.withCString { pairing in
@@ -43,9 +43,11 @@ enum NixelAirLiftFileChannel {
         }
         guard code == 0, let containerPointer else {
             let detail = errorPointer.map { String(cString: $0) } ?? "No se pudo resolver el contenedor de la aplicación (AirLift: \(code))."
+            NyxelActivityLog.record("DIAG AirLift container lookup failed code=\(code) elapsed_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000)) detail=\(detail)")
             return .failure(ChannelError(message: detail))
         }
         let path = String(cString: containerPointer)
+        NyxelActivityLog.record("DIAG AirLift container lookup succeeded elapsed_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000)) path=\(path)")
         guard path.hasPrefix("/var/mobile/Containers/Data/Application/") else {
             return .failure(ChannelError(message: "AirLift devolvió una ruta de contenedor no válida."))
         }
@@ -54,11 +56,15 @@ enum NixelAirLiftFileChannel {
 
     static func write(_ data: Data, toRelativePath relativePath: String, bundleID: String) -> Result<Void, ChannelError> {
         guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
+            NyxelActivityLog.record("DIAG AirLift write stopped: pairing record missing for deviceID=2424")
             return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
         }
         guard safeRelativePath(relativePath) else {
+            NyxelActivityLog.record("DIAG AirLift write stopped: unsafe relative path")
             return .failure(ChannelError(message: "La ruta remota no es segura."))
         }
+        let startedAt = Date()
+        NyxelActivityLog.record("DIAG AirLift write started bundleID=\(bundleID) relativePath=\(relativePath) payloadBytes=\(data.count) pairingRecordBytes=\(record.count)")
         let pairingURL = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-airlift-pairing-\(UUID().uuidString).plist")
         do {
             try record.write(to: pairingURL, options: .atomic)
@@ -67,6 +73,7 @@ enum NixelAirLiftFileChannel {
             case .failure(let error): return .failure(error)
             case .success(let container):
                 let target = URL(fileURLWithPath: container, isDirectory: true).appendingPathComponent(relativePath)
+                NyxelActivityLog.record("DIAG AirLift target resolved; targetPath=\(target.path); ATC transfer not started yet")
                 let staging = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-airlift-write-\(UUID().uuidString)", isDirectory: true)
                 try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
                 defer { try? FileManager.default.removeItem(at: staging) }
@@ -81,6 +88,7 @@ enum NixelAirLiftFileChannel {
                 }
                 let detail = errorPointer.map { String(cString: $0) }
                 if let errorPointer { al_string_free(errorPointer) }
+                NyxelActivityLog.record("DIAG AirLift write FFI returned code=\(code) elapsed_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000)) detail=\(detail ?? "none")")
                 guard code == 0 else {
                     return .failure(ChannelError(message: detail ?? "AirLift no pudo escribir el archivo (\(code))."))
                 }

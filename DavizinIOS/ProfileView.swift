@@ -114,6 +114,8 @@ final class ProfileView: UIView {
     private let activityLabel = UILabel()
     private let gamesLabel = UILabel()
     private let historyLabel = UILabel()
+    private let copyLogsButton = UIButton(type: .system)
+    private let downloadLogsButton = UIButton(type: .system)
     private let deviceLabel = UILabel()
     private let rankProgressLabel = UILabel()
     private let themeControl = UISegmentedControl(items: ["Auto", "Claro", "Oscuro"])
@@ -169,7 +171,10 @@ final class ProfileView: UIView {
         diagnosticsLabel.text = diagnosticText()
         gamesLabel.text = NyxelInstalledGames.statusText()
         let history = NyxelActivityLog.entries
-        historyLabel.text = history.isEmpty ? "HISTORIAL\nSin actividad registrada" : "HISTORIAL\n" + history.joined(separator: "\n")
+        let visibleHistory = NyxelActivityLog.recentEntries
+        historyLabel.text = history.isEmpty ? "HISTORIAL\nSin actividad registrada" : "HISTORIAL · últimos \(visibleHistory.count) de \(history.count) eventos\n" + visibleHistory.joined(separator: "\n")
+        copyLogsButton.setTitle("COPIAR LOGS TÉCNICOS · \(history.count) EVENTOS", for: .normal)
+        downloadLogsButton.setTitle("DESCARGAR / COMPARTIR LOGS (.TXT)", for: .normal)
         let formatter = DateFormatter(); formatter.dateFormat = "HH:mm:ss"
         activityLabel.text = "Última actividad  •  Perfil consultado a las \(formatter.string(from: Date()))"
         updateProgressRing()
@@ -239,6 +244,18 @@ final class ProfileView: UIView {
         historyLabel.font = AppTheme.monoFont(10)
         historyLabel.textColor = AppTheme.tertiaryText
         historyLabel.numberOfLines = 0
+        copyLogsButton.setTitleColor(AppTheme.accent, for: .normal)
+        copyLogsButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .heavy)
+        copyLogsButton.contentHorizontalAlignment = .leading
+        copyLogsButton.titleLabel?.numberOfLines = 0
+        copyLogsButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 38).isActive = true
+        copyLogsButton.addTarget(self, action: #selector(copyLogsTapped), for: .touchUpInside)
+        downloadLogsButton.setTitleColor(AppTheme.accent, for: .normal)
+        downloadLogsButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .heavy)
+        downloadLogsButton.contentHorizontalAlignment = .leading
+        downloadLogsButton.titleLabel?.numberOfLines = 0
+        downloadLogsButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 38).isActive = true
+        downloadLogsButton.addTarget(self, action: #selector(downloadLogsTapped), for: .touchUpInside)
         deviceLabel.font = AppTheme.monoFont(10)
         deviceLabel.textColor = AppTheme.secondaryText
         deviceLabel.numberOfLines = 0
@@ -284,7 +301,7 @@ final class ProfileView: UIView {
         let securitySection = ProfileDisclosureSection(title: "SEGURIDAD", views: [biometricRow])
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
         let diagnosticSection = ProfileDisclosureSection(title: "DIAGNÓSTICO", views: [serviceStatusLabel, diagnosticsLabel, gamesLabel], expanded: false)
-        let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD", views: [historyLabel, activityLabel], expanded: false)
+        let activitySection = ProfileDisclosureSection(title: "ACTIVIDAD / LOGS", views: [copyLogsButton, downloadLogsButton, historyLabel, activityLabel], expanded: false)
         let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, appearanceSection, securitySection, audioSection, diagnosticSection, activitySection, refreshButton, logoutButton])
         stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: heroStack)
@@ -337,6 +354,47 @@ final class ProfileView: UIView {
     }
 
     @objc private func logoutTapped() { SoundService.shared.playClick(); delegate?.profileViewDidTapLogout(self) }
+
+    @objc private func copyLogsTapped() {
+        let text = NyxelActivityLog.exportText
+        UIPasteboard.general.string = text
+        let count = NyxelActivityLog.entries.count
+        copyLogsButton.setTitle("COPIADOS · \(count) EVENTOS", for: .normal)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            self?.refresh()
+        }
+    }
+
+    @objc private func downloadLogsTapped() {
+        do {
+            let url = try NyxelActivityLog.exportFileURL()
+            let controller = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            if let popover = controller.popoverPresentationController {
+                popover.sourceView = downloadLogsButton
+                popover.sourceRect = downloadLogsButton.bounds
+            }
+            guard let presenter = nearestViewController else {
+                NyxelActivityLog.record("No se pudo abrir la hoja de descarga de logs")
+                downloadLogsButton.setTitle("NO SE PUDO ABRIR · INTENTA COPIAR LOGS", for: .normal)
+                return
+            }
+            NyxelActivityLog.record("Archivo de diagnóstico generado para guardar/compartir")
+            presenter.present(controller, animated: true)
+        } catch {
+            NyxelActivityLog.record("Falló la generación del archivo de diagnóstico: \(error.localizedDescription)")
+            downloadLogsButton.setTitle("ERROR AL GENERAR LOGS · INTENTA COPIAR", for: .normal)
+        }
+    }
+
+    private var nearestViewController: UIViewController? {
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let viewController = current as? UIViewController { return viewController }
+            responder = current.next
+        }
+        return nil
+    }
 
     @objc private func appearanceChanged() {
         let theme = NyxelAppearanceStore.Theme(rawValue: appearanceControl.selectedSegmentIndex) ?? .cyan

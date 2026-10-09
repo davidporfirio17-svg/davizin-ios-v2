@@ -138,6 +138,9 @@ final class DavizinBridge {
 
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
         vc?.setOperationState(.injecting)
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        NyxelActivityLog.record("========== INJECTION TRACE BEGIN ==========")
+        NyxelActivityLog.record("DIAG appVersion=\(appVersion) system=\(NyxelSupportPolicy.currentSystemDescription) game=\(game.rawValue) mode=\(mode.displayName) pairingRecordAvailable=\(Self.airLiftRouteAvailable)")
 
         // Los modos marcados como "hybrid" en la configuración remota usan el
         // Packet Tunnel local antes de descargar/aplicar el recurso. Los modos
