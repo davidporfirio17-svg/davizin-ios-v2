@@ -482,7 +482,7 @@ final class ViewController: UIViewController {
         screen.delegate = self
         screen.selectedGame = selectedGame
         screen.selectedMode = selectedMode
-        let gameReady = NyxelInstalledGames.statusText().contains(selectedGame == .freeFireMax ? "✓ MAX instalado" : "✓ Free Fire instalado")
+        let gameReady = NyxelInstalledGames.isInstalled(for: selectedGame)
         screen.setPreflight([
             activeKey != nil && activeRemainingSeconds > 0 ? "✓ Key autorizada" : "✕ Sesión no autorizada",
             activeRemainingSeconds > 0 ? "✓ Sesión activa" : "✕ Sesión expirada",

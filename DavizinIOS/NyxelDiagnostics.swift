@@ -41,7 +41,7 @@ enum NyxelRemoteConfigStore {
     static func recordFailure(_ message: String) { UserDefaults.standard.set(message, forKey: statusKey) }
 }
 
-/// Historial técnico local acotado; redacta posibles credenciales antes de guardar/exportar.
+/// Historial técnico local acotado; redacta posibles credenciales antes de guardarlas.
 enum NyxelActivityLog {
     private static let key = "nyxel.activity.log"
     private static let limit = 1_600
@@ -54,23 +54,6 @@ enum NyxelActivityLog {
     }
 
     static var recentEntries: [String] { Array(entries.prefix(100)) }
-
-    static var exportText: String {
-        let values = entries
-        guard !values.isEmpty else { return "Sin eventos técnicos registrados." }
-        let chronological = values.reversed().map { sanitized($0) }.joined(separator: "\n")
-        return "NYXEL DIAGNÓSTICO · \(values.count) eventos\n\(chronological)\n"
-    }
-
-    static func exportFileURL() throws -> URL {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        let name = "nyxel-diagnostics-\(formatter.string(from: Date())).txt"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-        try exportText.write(to: url, atomically: true, encoding: .utf8)
-        return url
-    }
 
     static func record(_ message: String) {
         lock.lock()
@@ -105,14 +88,14 @@ enum NyxelActivityLog {
     }
 }
 
-/// Estado de disponibilidad de apps mediante los esquemas declarados en Info.plist.
 enum NyxelInstalledGames {
-    static func statusText() -> String {
-        let maxInstalled = canOpen("freefiremax")
-        let normalInstalled = canOpen("freefire") || canOpen("freefireth")
-        let max = maxInstalled ? "✓ MAX instalado" : "— MAX no detectado"
-        let normal = normalInstalled ? "✓ Free Fire instalado" : "— Free Fire no detectado"
-        return "JUEGOS\n\(max)\n\(normal)"
+    static func isInstalled(for game: DavizinGame) -> Bool {
+        switch game {
+        case .freeFireMax:
+            return canOpen("freefiremax")
+        case .freeFire:
+            return canOpen("freefire") || canOpen("freefireth")
+        }
     }
 
     private static func canOpen(_ scheme: String) -> Bool {

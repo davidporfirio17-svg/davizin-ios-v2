@@ -3,7 +3,7 @@ import NetworkExtension
 import UserNotifications
 
 /// Pantalla de conectividad y pairing de iOS 27.
-/// Mantiene la lógica existente; los detalles técnicos permanecen en Perfil > Diagnóstico.
+/// Mantiene la lógica existente y reorganiza la información según el tamaño de pantalla.
 final class NyxelVPNView: UIView {
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
@@ -32,6 +32,7 @@ final class NyxelVPNView: UIView {
     private var accessExpiresAt: Date?
     private var accessTimer: Timer?
     private var batteryRefreshTimer: Timer?
+    private var iPadColumns: UIStackView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -73,7 +74,7 @@ final class NyxelVPNView: UIView {
 
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
         let horizontalInset: CGFloat = isPad ? 32 : 18
-        let width: CGFloat = isPad ? 860 : min(AppTheme.contentMaximumWidth, 520)
+        let width: CGFloat = isPad ? 1040 : min(AppTheme.contentMaximumWidth, 520)
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -98,11 +99,35 @@ final class NyxelVPNView: UIView {
         category.accessibilityTraits = .header
         stack.addArrangedSubview(category)
 
-        stack.addArrangedSubview(makeConnectionCard())
-        stack.addArrangedSubview(makePairingCard())
-        stack.addArrangedSubview(makeAccessCard())
-        stack.addArrangedSubview(makeDeviceCard())
-        stack.addArrangedSubview(makeSupportCard())
+        let connectionCard = makeConnectionCard()
+        let pairingCard = makePairingCard()
+        let accessCard = makeAccessCard()
+        let deviceCard = makeDeviceCard()
+        let supportCard = makeSupportCard()
+
+        if isPad {
+            let primaryColumn = UIStackView(arrangedSubviews: [connectionCard, pairingCard])
+            primaryColumn.axis = .vertical
+            primaryColumn.alignment = .fill
+            primaryColumn.spacing = 16
+
+            let detailsColumn = UIStackView(arrangedSubviews: [accessCard, deviceCard, supportCard])
+            detailsColumn.axis = .vertical
+            detailsColumn.alignment = .fill
+            detailsColumn.spacing = 16
+
+            let columns = UIStackView(arrangedSubviews: [primaryColumn, detailsColumn])
+            columns.axis = .horizontal
+            columns.alignment = .top
+            columns.distribution = .fillEqually
+            columns.spacing = 16
+            iPadColumns = columns
+            stack.addArrangedSubview(columns)
+        } else {
+            [connectionCard, pairingCard, accessCard, deviceCard, supportCard].forEach {
+                stack.addArrangedSubview($0)
+            }
+        }
 
         toggleButton.addTarget(self, action: #selector(toggleConnection), for: .touchUpInside)
         pairButton.addTarget(self, action: #selector(beginPairing), for: .touchUpInside)
@@ -127,6 +152,17 @@ final class NyxelVPNView: UIView {
         batteryRefreshTimer?.invalidate()
         // No detener la sesión al cambiar de pestaña: el pairing debe seguir vivo
         // mientras el usuario cambia de pantalla para completar la operación.
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let iPadColumns else { return }
+        let useTwoColumns = bounds.width >= 760
+        let axis: NSLayoutConstraint.Axis = useTwoColumns ? .horizontal : .vertical
+        guard iPadColumns.axis != axis else { return }
+        iPadColumns.axis = axis
+        iPadColumns.alignment = useTwoColumns ? .top : .fill
+        iPadColumns.distribution = useTwoColumns ? .fillEqually : .fill
     }
 
     private func makeAccessCard() -> UIView {
@@ -239,7 +275,7 @@ final class NyxelVPNView: UIView {
         supportStatusLabel.text = isSupported ? "Compatible con Nyxel" : "Versión no verificada"
         supportStatusLabel.textColor = isSupported ? AppTheme.readableSuccess : AppTheme.readableFailure
         supportedVersionsLabel.text = NyxelSupportPolicy.supportedRangesDescription
-        supportNoteLabel.text = "Este panel aplica a las versiones compatibles indicadas. En iOS 27 se requiere un build verificado y el flujo de emparejamiento con túnel. Revisa Perfil > Diagnóstico si necesitas más detalles."
+        supportNoteLabel.text = "Este panel aplica a las versiones compatibles indicadas. En iOS 27 se requiere un build verificado y completar el flujo de emparejamiento con túnel."
     }
 
     @objc private func refreshStatus() {
@@ -285,7 +321,7 @@ final class NyxelVPNView: UIView {
                     self.refreshStatus()
                 case .failure(let error):
                     NyxelActivityLog.record("iOS 27 connection setup failed: \(error.localizedDescription)")
-                    self.statusLabel.text = "No se pudo conectar. Revisa Perfil > Diagnóstico."
+                    self.statusLabel.text = "No se pudo conectar. Inténtalo de nuevo o revisa el estado del dispositivo."
                     self.statusLabel.textColor = AppTheme.readableFailure
                     self.statusDot.backgroundColor = AppTheme.readableFailure
                 }
@@ -703,7 +739,7 @@ final class NyxelVPNView: UIView {
         case .ready:
             return "Vinculación lista"
         case .failed:
-            return "No se completó. Revisa Perfil > Diagnóstico."
+            return "No se completó. Vuelve a intentarlo o revisa el estado del dispositivo."
         }
     }
 }
