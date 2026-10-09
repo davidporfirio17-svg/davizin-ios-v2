@@ -92,7 +92,7 @@ enum NyxelActivityLog {
 
     private static func sanitized(_ value: String) -> String {
         let patterns = [
-            #"(?i)(["']?(?:authorization|api[_ -]?key|session[_ -]?key|access[_ -]?token|refresh[_ -]?token|password|secret|hwid|token|grappa|pairing[_ -]?(?:key|secret|token))["']?)\s*[:=]\s*("[^"]*"|'[^']*'|[^,;\s}\]]+)"#
+            #"(?i)(["']?(?:authorization|api[_ -]?key|session[_ -]?key|access[_ -]?token|refresh[_ -]?token|password|secret|hwid|token|grappa[_ -]?(?:key|secret|token)|pairing[_ -]?(?:key|secret|token))["']?)\s*[:=]\s*("[^"]*"|'[^']*'|[^,;\s}\]]+)"#
         ]
         return patterns.reduce(value) { result, pattern in
             result.replacingOccurrences(of: pattern, with: "$1=[REDACTED]", options: .regularExpression)
