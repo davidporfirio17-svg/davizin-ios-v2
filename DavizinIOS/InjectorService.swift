@@ -1,27 +1,14 @@
 import Foundation
 import CryptoKit
-import UserNotifications
 
 struct InjectorResult {
     let success: Bool
     let message: String
 }
 
-// MARK: - Error Notifications
+// MARK: - Injection diagnostics (log only)
 fileprivate func sendErrorNotification(_ title: String, _ body: String) {
     NyxelActivityLog.record("\(title): \(body)")
-    NotificationCenter.default.post(name: .nyxelInjectionProgress, object: "\(title): \(body)")
-    DispatchQueue.main.async {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-            guard granted else { return }
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = body
-            content.sound = .default
-            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
-            UNUserNotificationCenter.current().add(request)
-        }
-    }
 }
 
 private final class MCMContainerLookupResult {

@@ -4,6 +4,7 @@ import NetworkExtension
 import Security
 import UIKit
 import Darwin
+import UserNotifications
 
 enum NixelCheckState: String {
     case notChecked = "No verificado"
@@ -477,6 +478,34 @@ private final class NixelPairingLocalNetworkAuthorization {
 /// Orquesta el flujo de External: publica primero un PairableHost local para
 /// que el iPad lo descubra. El backend FFI acepta la conexión iniciada por iOS,
 /// entrega el PIN y devuelve el registro RPairing solo tras un handshake real.
+private enum NixelPairingPINNotification {
+    private static let identifier = "nyxel.pairing.pin.2424"
+    private static let lifetime: TimeInterval = 10
+
+    static func show(pin: String) {
+        guard (4...8).contains(pin.count), pin.allSatisfy({ $0.isNumber }) else { return }
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        center.removeDeliveredNotifications(withIdentifiers: [identifier])
+
+        let content = UNMutableNotificationContent()
+        content.title = "Código de emparejamiento 2424"
+        content.body = "PIN: \(pin). Introdúcelo en la solicitud de iOS."
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        center.add(request) { error in
+            if let error {
+                NyxelActivityLog.record("Pairing 2424: no se pudo mostrar la notificación (\(error.localizedDescription))")
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + lifetime) {
+            center.removeDeliveredNotifications(withIdentifiers: [identifier])
+            center.removePendingNotificationRequests(withIdentifiers: [identifier])
+        }
+    }
+}
+
 final class NixelPairingSession {
     static let shared = NixelPairingSession()
     private(set) var state: NixelPairingSessionState = .idle
@@ -507,6 +536,7 @@ final class NixelPairingSession {
             },
             center.addObserver(forName: NSNotification.Name("NyxelPairingPIN"), object: nil, queue: .main) { [weak self] note in
                 let pin = note.userInfo?["pin"] as? String ?? ""
+                NixelPairingPINNotification.show(pin: pin)
                 self?.update(.pairingRequired("PIN recibido por AirLift: \(pin). Introdúcelo en el iPad."), onState: onState)
             },
             center.addObserver(forName: NSNotification.Name("NyxelPairingCompleted"), object: nil, queue: .main) { [weak self] note in

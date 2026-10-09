@@ -1,5 +1,6 @@
 import UIKit
 import NetworkExtension
+import UserNotifications
 
 /// Pantalla aislada del apartado VPN. No comparte lógica con Modos, Operación ni la inyección.
 final class NyxelVPNView: UIView {
@@ -208,7 +209,9 @@ final class NyxelVPNView: UIView {
 
     @objc private func beginPairing() {
         pairingLogLabel.text = ""
-        startPairingSession()
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.startPairingSession() }
+        }
     }
 
     private func startPairingSession() {

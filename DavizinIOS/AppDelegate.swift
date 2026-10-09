@@ -22,8 +22,30 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         // Initialize Nyxel logging and system detection
         _ = retainGrappaTokenSymbol(0, 0, 0, nil, 0, nil, nil, 0)
         UNUserNotificationCenter.current().delegate = self
+        clearLegacyInjectionNotifications()
         application.logNyxelLaunchInfo()
         return true
+    }
+
+    private func clearLegacyInjectionNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { requests in
+            let identifiers = requests
+                .filter { Self.isLegacyInjectionNotification($0.content) }
+                .map(\.identifier)
+            center.removePendingNotificationRequests(withIdentifiers: identifiers)
+        }
+        center.getDeliveredNotifications { notifications in
+            let identifiers = notifications
+                .filter { Self.isLegacyInjectionNotification($0.request.content) }
+                .map { $0.request.identifier }
+            center.removeDeliveredNotifications(withIdentifiers: identifiers)
+        }
+    }
+
+    private static func isLegacyInjectionNotification(_ content: UNNotificationContent) -> Bool {
+        let title = content.title.uppercased()
+        return ["PASO", "SUCCESS", "FATAL", "NSERROR", "EXCEPTION"].contains { title.contains($0) }
     }
 
     /// Mostrar el recordatorio aunque Nyxel todavía esté en primer plano.
