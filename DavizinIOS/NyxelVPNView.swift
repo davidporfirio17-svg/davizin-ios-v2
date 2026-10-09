@@ -16,7 +16,7 @@ final class NyxelVPNView: UIView {
     private let toggleButton = DavizinButton(title: "Conectar", style: .primary)
     private let pairingLabel = UILabel()
     private let pairingDot = UIView()
-    private let pairButton = DavizinButton(title: "Iniciar vinculación", style: .secondary)
+    private let pairButton = DavizinButton(title: "Conectar 2424", style: .secondary)
     private let deviceModelLabel = UILabel()
     private let deviceConnectionLabel = UILabel()
     private let batteryValueLabel = UILabel()
@@ -24,9 +24,11 @@ final class NyxelVPNView: UIView {
     private let supportedVersionsLabel = UILabel()
     private let supportNoteLabel = UILabel()
     private let batteryNoteLabel = UILabel()
+    private let batteryProgressView = UIProgressView(progressViewStyle: .default)
     private var activeKey: String?
     private var accessExpiresAt: Date?
     private var accessTimer: Timer?
+    private var batteryRefreshTimer: Timer?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -54,6 +56,7 @@ final class NyxelVPNView: UIView {
 
     private func configure() {
         backgroundColor = .clear
+        UIDevice.current.isBatteryMonitoringEnabled = true
         translatesAutoresizingMaskIntoConstraints = false
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -90,22 +93,24 @@ final class NyxelVPNView: UIView {
         category.accessibilityTraits = .header
         stack.addArrangedSubview(category)
 
+        stack.addArrangedSubview(makeConnectionCard())
+        stack.addArrangedSubview(makePairingCard())
         stack.addArrangedSubview(makeAccessCard())
         stack.addArrangedSubview(makeDeviceCard())
-        stack.addArrangedSubview(makeConnectionCard())
         stack.addArrangedSubview(makeSupportCard())
-        stack.addArrangedSubview(makePairingCard())
 
         toggleButton.addTarget(self, action: #selector(toggleConnection), for: .touchUpInside)
         pairButton.addTarget(self, action: #selector(beginPairing), for: .touchUpInside)
 
-        UIDevice.current.isBatteryMonitoringEnabled = true
         NotificationCenter.default.addObserver(self, selector: #selector(refreshBattery), name: UIDevice.batteryLevelDidChangeNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(refreshBattery), name: UIDevice.batteryStateDidChangeNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(refreshStatus), name: .NEVPNStatusDidChange, object: nil)
         NixelVPNManager.shared.load { [weak self] _ in self?.refreshStatus() }
         refreshSystemStatus()
         refreshBattery()
+        batteryRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            self?.refreshBattery()
+        }
         refreshDeviceConnection(NixelPairingSession.shared.state)
         refreshStatus()
     }
@@ -113,6 +118,7 @@ final class NyxelVPNView: UIView {
     deinit {
         NotificationCenter.default.removeObserver(self)
         accessTimer?.invalidate()
+        batteryRefreshTimer?.invalidate()
         // No detener la sesión al cambiar de pestaña: el pairing debe seguir vivo
         // mientras el usuario cambia de pantalla para completar la operación.
     }
@@ -297,16 +303,26 @@ final class NyxelVPNView: UIView {
         }
         deviceModelLabel.text = NyxelSupportPolicy.currentDeviceModel
 
-        batteryNoteLabel.text = "La batería indicada corresponde a este dispositivo. iOS no expone aquí el porcentaje del dispositivo emparejado."
+        batteryNoteLabel.text = "Carga local del iPhone o iPad que ejecuta Nyxel. La batería del dispositivo remoto todavía no está disponible en el estado de pairing actual."
         batteryNoteLabel.font = .systemFont(ofSize: 12, weight: .regular)
         batteryNoteLabel.textColor = AppTheme.secondaryText
         batteryNoteLabel.numberOfLines = 0
+        batteryProgressView.translatesAutoresizingMaskIntoConstraints = false
+        batteryProgressView.progress = 0
+        batteryProgressView.progressTintColor = AppTheme.readableSuccess
+        batteryProgressView.trackTintColor = AppTheme.hairlineStrong
+        batteryProgressView.heightAnchor.constraint(equalToConstant: 6).isActive = true
+        batteryProgressView.layer.cornerRadius = 3
+        batteryProgressView.clipsToBounds = true
+        batteryProgressView.isHidden = true
+        batteryProgressView.accessibilityLabel = "Nivel de batería de este dispositivo"
 
         let inner = UIStackView(arrangedSubviews: [
             title,
             makeDetailStatusRow(icon: "iphone.gen3", title: "Modelo", value: deviceModelLabel),
             makeDetailStatusRow(icon: "antenna.radiowaves.left.and.right", title: "Enlace remoto", value: deviceConnectionLabel),
-            makeDetailStatusRow(icon: "battery.100", title: "Batería del dispositivo", value: batteryValueLabel),
+            makeDetailStatusRow(icon: "battery.100", title: "Batería de este dispositivo", value: batteryValueLabel),
+            batteryProgressView,
             batteryNoteLabel
         ])
         inner.axis = .vertical
@@ -346,11 +362,17 @@ final class NyxelVPNView: UIView {
     }
 
     @objc private func refreshBattery() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.refreshBattery() }
+            return
+        }
         let device = UIDevice.current
         let level = device.batteryLevel
         guard level >= 0 else {
-            batteryValueLabel.text = "No disponible"
+            batteryValueLabel.text = "Sin lectura de iOS"
             batteryValueLabel.textColor = AppTheme.secondaryText
+            batteryProgressView.isHidden = true
+            batteryNoteLabel.text = "iOS no está entregando el nivel de batería local; comprueba en un iPhone o iPad físico. La carga del dispositivo remoto aún no llega a esta sesión."
             return
         }
 
@@ -364,7 +386,13 @@ final class NyxelVPNView: UIView {
         @unknown default: chargeState = "estado desconocido"
         }
         batteryValueLabel.text = "\(percent)% · \(chargeState)"
-        batteryValueLabel.textColor = percent <= 20 ? AppTheme.readableFailure : AppTheme.readableSuccess
+        let levelColor = percent <= 20 ? AppTheme.readableFailure : (percent <= 50 ? AppTheme.readableWarm : AppTheme.readableSuccess)
+        batteryValueLabel.textColor = levelColor
+        batteryProgressView.progressTintColor = levelColor
+        batteryProgressView.setProgress(Float(percent) / 100, animated: true)
+        batteryProgressView.isHidden = false
+        batteryProgressView.accessibilityValue = "\(percent) por ciento, \(chargeState)"
+        batteryNoteLabel.text = "Carga local del iPhone o iPad que ejecuta Nyxel. La batería del dispositivo remoto todavía no está disponible en el estado de pairing actual."
     }
 
     private func refreshDeviceConnection(_ state: NixelPairingSessionState) {
@@ -416,12 +444,12 @@ final class NyxelVPNView: UIView {
         ])
 
         let title = UILabel()
-        title.text = "Emparejamiento y túnel"
+        title.text = "VPN y túnel"
         title.font = AppTheme.titleFont(18)
         title.textColor = AppTheme.primaryText
 
         let subtitle = UILabel()
-        subtitle.text = "Estado de conexión y compatibilidad del dispositivo."
+        subtitle.text = "Estado de VPN y sistema. La vinculación 2424 está justo debajo."
         subtitle.font = AppTheme.bodyFont()
         subtitle.textColor = AppTheme.secondaryText
         subtitle.numberOfLines = 2
@@ -507,7 +535,7 @@ final class NyxelVPNView: UIView {
         card.contentInsets = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
 
         let title = UILabel()
-        title.text = "Vinculación"
+        title.text = "Conexión 2424"
         title.font = AppTheme.titleFont(18)
         title.textColor = AppTheme.primaryText
 
