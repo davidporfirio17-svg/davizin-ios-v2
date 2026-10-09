@@ -31,6 +31,7 @@ final class ViewController: UIViewController {
     private var missionMapView: MissionMapView?
     private var profileView: ProfileView?
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
+    private var stageBeforeHelp: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -308,6 +309,9 @@ final class ViewController: UIViewController {
         bottomNavView.onVPN = { [weak self] in
             self?.showVPN(animated: true)
         }
+        bottomNavView.onHelp = { [weak self] in
+            self?.showHelp(animated: true)
+        }
         view.addSubview(bottomNavView)
         let bottomNavHeight = bottomNavView.heightAnchor.constraint(equalToConstant: 0)
         bottomNavHeightConstraint = bottomNavHeight
@@ -547,6 +551,18 @@ final class ViewController: UIViewController {
         display(screen, animated: animated)
     }
 
+    private func showHelp(animated: Bool) {
+        if currentStage != .help { stageBeforeHelp = currentStage }
+        currentStage = .help
+        setBottomNavigation(visible: true, selected: .help)
+        headerView.title = "Centro de ayuda"
+        headerView.showsBackButton = true
+        headerView.showsAvatarButton = false
+
+        let screen = HelpCenterView()
+        display(screen, animated: animated)
+    }
+
 	/// Abre Free Fire (MAX o normal) usando su esquema de URL.
 	private func openGame(_ game: DavizinGame) {
 		let beginOpening = { [weak self] in
@@ -712,7 +728,15 @@ final class ViewController: UIViewController {
             case .modeSelection: showModeSelection(animated: true)
             case .gameSelection: showGameSelection(animated: true)
             case .home: showGameSelection(animated: true)
+            case .help: showHelp(animated: true)
             default: showModeSelection(animated: true)
+            }
+        case .help:
+            switch stageBeforeHelp {
+            case .operation: showOperation(animated: true)
+            case .profile: showProfile(animated: true)
+            case .modeSelection: showModeSelection(animated: true)
+            case .gameSelection, .home, .login, .help: showGameSelection(animated: true)
             }
         }
     }
