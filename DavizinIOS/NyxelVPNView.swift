@@ -17,6 +17,13 @@ final class NyxelVPNView: UIView {
     private let pairingLabel = UILabel()
     private let pairingDot = UIView()
     private let pairButton = DavizinButton(title: "Iniciar vinculación", style: .secondary)
+    private let deviceModelLabel = UILabel()
+    private let deviceConnectionLabel = UILabel()
+    private let batteryValueLabel = UILabel()
+    private let supportStatusLabel = UILabel()
+    private let supportedVersionsLabel = UILabel()
+    private let supportNoteLabel = UILabel()
+    private let batteryNoteLabel = UILabel()
     private var activeKey: String?
     private var accessExpiresAt: Date?
     private var accessTimer: Timer?
@@ -78,21 +85,28 @@ final class NyxelVPNView: UIView {
         let category = UILabel()
         category.text = "NYXEL · ESTADO DEL DISPOSITIVO"
         category.font = AppTheme.captionFont()
-        category.textColor = AppTheme.accent
+        category.textColor = AppTheme.readableAccent
         category.textAlignment = .center
         category.accessibilityTraits = .header
         stack.addArrangedSubview(category)
 
         stack.addArrangedSubview(makeAccessCard())
+        stack.addArrangedSubview(makeDeviceCard())
         stack.addArrangedSubview(makeConnectionCard())
+        stack.addArrangedSubview(makeSupportCard())
         stack.addArrangedSubview(makePairingCard())
 
         toggleButton.addTarget(self, action: #selector(toggleConnection), for: .touchUpInside)
         pairButton.addTarget(self, action: #selector(beginPairing), for: .touchUpInside)
 
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshBattery), name: UIDevice.batteryLevelDidChangeNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshBattery), name: UIDevice.batteryStateDidChangeNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(refreshStatus), name: .NEVPNStatusDidChange, object: nil)
         NixelVPNManager.shared.load { [weak self] _ in self?.refreshStatus() }
         refreshSystemStatus()
+        refreshBattery()
+        refreshDeviceConnection(NixelPairingSession.shared.state)
         refreshStatus()
     }
 
@@ -110,7 +124,7 @@ final class NyxelVPNView: UIView {
         let icon = UIImageView(image: UIImage(systemName: "key.horizontal.fill"))
         icon.translatesAutoresizingMaskIntoConstraints = false
         icon.contentMode = .scaleAspectFit
-        icon.tintColor = AppTheme.accent
+        icon.tintColor = AppTheme.readableAccent
         icon.backgroundColor = AppTheme.accent.withAlphaComponent(0.12)
         icon.layer.cornerRadius = 13
         icon.layer.cornerCurve = .continuous
@@ -135,7 +149,7 @@ final class NyxelVPNView: UIView {
         keyValueLabel.textColor = AppTheme.primaryText
         keyValueLabel.textAlignment = .right
         remainingValueLabel.font = AppTheme.monoFont(12)
-        remainingValueLabel.textColor = AppTheme.accent
+        remainingValueLabel.textColor = AppTheme.readableAccent
         remainingValueLabel.textAlignment = .right
 
         let inner = UIStackView(arrangedSubviews: [
@@ -177,7 +191,7 @@ final class NyxelVPNView: UIView {
         let remaining = accessExpiresAt.map { max(0, Int($0.timeIntervalSinceNow)) } ?? 0
         let active = activeKey != nil && remaining > 0
         accessStatusLabel.text = activeKey == nil ? "Sin validar" : (active ? "Activa" : "Expirada")
-        accessStatusLabel.textColor = active ? AppTheme.success : AppTheme.warm
+        accessStatusLabel.textColor = active ? AppTheme.readableSuccess : AppTheme.readableWarm
         keyValueLabel.text = maskedKey(activeKey)
 
         if active {
@@ -185,10 +199,10 @@ final class NyxelVPNView: UIView {
             let hours = (remaining % 86_400) / 3_600
             let minutes = (remaining % 3_600) / 60
             remainingValueLabel.text = "\(days)d · \(hours)h · \(minutes)m"
-            remainingValueLabel.textColor = AppTheme.accent
+            remainingValueLabel.textColor = AppTheme.readableAccent
         } else {
             remainingValueLabel.text = activeKey == nil ? "—" : "Vencida"
-            remainingValueLabel.textColor = AppTheme.failure
+            remainingValueLabel.textColor = AppTheme.readableFailure
             accessTimer?.invalidate()
             accessTimer = nil
         }
@@ -201,14 +215,19 @@ final class NyxelVPNView: UIView {
 
     private func refreshSystemStatus() {
         let version = ProcessInfo.processInfo.operatingSystemVersion
-        let label = "iOS \(UIDevice.current.systemVersion)"
+        let label = NyxelSupportPolicy.currentSystemDescription
+        let isSupported = NyxelSupportPolicy.isCurrentSystemSupported
         if version.majorVersion >= 27 {
-            systemLabel.text = "\(label) · pairing directo"
-            systemLabel.textColor = AppTheme.success
+            systemLabel.text = isSupported ? "\(label) · pairing + túnel" : "\(label) · build no verificado"
+            systemLabel.textColor = isSupported ? AppTheme.readableSuccess : AppTheme.readableFailure
         } else {
             systemLabel.text = "\(label) · requiere VPN de apoyo"
-            systemLabel.textColor = AppTheme.accent
+            systemLabel.textColor = isSupported ? AppTheme.readableAccent : AppTheme.readableFailure
         }
+        supportStatusLabel.text = isSupported ? "Compatible con Nyxel" : "Versión no verificada"
+        supportStatusLabel.textColor = isSupported ? AppTheme.readableSuccess : AppTheme.readableFailure
+        supportedVersionsLabel.text = NyxelSupportPolicy.supportedRangesDescription
+        supportNoteLabel.text = "Este panel aplica a las versiones compatibles indicadas. En iOS 27 se requiere un build verificado y el flujo de emparejamiento con túnel. Revisa Perfil > Diagnóstico si necesitas más detalles."
     }
 
     @objc private func refreshStatus() {
@@ -219,11 +238,11 @@ final class NyxelVPNView: UIView {
 
             switch manager.status {
             case .connected:
-                self.statusLabel.textColor = AppTheme.success
-                self.statusDot.backgroundColor = AppTheme.success
+                self.statusLabel.textColor = AppTheme.readableSuccess
+                self.statusDot.backgroundColor = AppTheme.readableSuccess
             case .connecting, .reasserting:
-                self.statusLabel.textColor = AppTheme.warm
-                self.statusDot.backgroundColor = AppTheme.warm
+                self.statusLabel.textColor = AppTheme.readableWarm
+                self.statusDot.backgroundColor = AppTheme.readableWarm
             case .invalid, .disconnected, .disconnecting:
                 self.statusLabel.textColor = AppTheme.secondaryText
                 self.statusDot.backgroundColor = AppTheme.tertiaryText
@@ -242,8 +261,8 @@ final class NyxelVPNView: UIView {
         }
 
         statusLabel.text = "Conectando…"
-        statusLabel.textColor = AppTheme.warm
-        statusDot.backgroundColor = AppTheme.warm
+        statusLabel.textColor = AppTheme.readableWarm
+        statusDot.backgroundColor = AppTheme.readableWarm
         toggleButton.setLoading(true, title: "Conectando")
         manager.start { [weak self] result in
             DispatchQueue.main.async {
@@ -255,10 +274,128 @@ final class NyxelVPNView: UIView {
                 case .failure(let error):
                     NyxelActivityLog.record("iOS 27 connection setup failed: \(error.localizedDescription)")
                     self.statusLabel.text = "No se pudo conectar. Revisa Perfil > Diagnóstico."
-                    self.statusLabel.textColor = AppTheme.failure
-                    self.statusDot.backgroundColor = AppTheme.failure
+                    self.statusLabel.textColor = AppTheme.readableFailure
+                    self.statusDot.backgroundColor = AppTheme.readableFailure
                 }
             }
+        }
+    }
+
+    private func makeDeviceCard() -> UIView {
+        let card = DavizinCardView()
+        card.contentInsets = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+
+        let title = UILabel()
+        title.text = "Este dispositivo"
+        title.font = AppTheme.titleFont(18)
+        title.textColor = AppTheme.primaryText
+
+        for label in [deviceModelLabel, deviceConnectionLabel, batteryValueLabel] {
+            label.font = .systemFont(ofSize: 14, weight: .semibold)
+            label.textColor = AppTheme.primaryText
+            label.numberOfLines = 0
+        }
+        deviceModelLabel.text = NyxelSupportPolicy.currentDeviceModel
+
+        batteryNoteLabel.text = "La batería indicada corresponde a este dispositivo. iOS no expone aquí el porcentaje del dispositivo emparejado."
+        batteryNoteLabel.font = .systemFont(ofSize: 12, weight: .regular)
+        batteryNoteLabel.textColor = AppTheme.secondaryText
+        batteryNoteLabel.numberOfLines = 0
+
+        let inner = UIStackView(arrangedSubviews: [
+            title,
+            makeDetailStatusRow(icon: "iphone.gen3", title: "Modelo", value: deviceModelLabel),
+            makeDetailStatusRow(icon: "antenna.radiowaves.left.and.right", title: "Enlace remoto", value: deviceConnectionLabel),
+            makeDetailStatusRow(icon: "battery.100", title: "Batería del dispositivo", value: batteryValueLabel),
+            batteryNoteLabel
+        ])
+        inner.axis = .vertical
+        inner.spacing = 10
+        card.addContent(inner)
+        return card
+    }
+
+    private func makeSupportCard() -> UIView {
+        let card = DavizinCardView()
+        card.contentInsets = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+
+        let title = UILabel()
+        title.text = "Compatibilidad y soporte"
+        title.font = AppTheme.titleFont(18)
+        title.textColor = AppTheme.primaryText
+
+        supportStatusLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        supportStatusLabel.numberOfLines = 0
+        supportedVersionsLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        supportedVersionsLabel.textColor = AppTheme.primaryText
+        supportedVersionsLabel.numberOfLines = 0
+        supportNoteLabel.font = .systemFont(ofSize: 12, weight: .regular)
+        supportNoteLabel.textColor = AppTheme.secondaryText
+        supportNoteLabel.numberOfLines = 0
+
+        let inner = UIStackView(arrangedSubviews: [
+            title,
+            makeDetailStatusRow(icon: "checkmark.shield", title: "Sistema actual", value: supportStatusLabel),
+            makeDetailStatusRow(icon: "iphone.gen3", title: "Versiones declaradas", value: supportedVersionsLabel),
+            supportNoteLabel
+        ])
+        inner.axis = .vertical
+        inner.spacing = 10
+        card.addContent(inner)
+        return card
+    }
+
+    @objc private func refreshBattery() {
+        let device = UIDevice.current
+        let level = device.batteryLevel
+        guard level >= 0 else {
+            batteryValueLabel.text = "No disponible"
+            batteryValueLabel.textColor = AppTheme.secondaryText
+            return
+        }
+
+        let percent = Int((level * 100).rounded())
+        let chargeState: String
+        switch device.batteryState {
+        case .charging: chargeState = "cargando"
+        case .full: chargeState = "carga completa"
+        case .unplugged: chargeState = "en batería"
+        case .unknown: chargeState = "estado desconocido"
+        @unknown default: chargeState = "estado desconocido"
+        }
+        batteryValueLabel.text = "\(percent)% · \(chargeState)"
+        batteryValueLabel.textColor = percent <= 20 ? AppTheme.readableFailure : AppTheme.readableSuccess
+    }
+
+    private func refreshDeviceConnection(_ state: NixelPairingSessionState) {
+        switch state {
+        case .idle:
+            deviceConnectionLabel.text = "Sin conexión"
+            deviceConnectionLabel.textColor = AppTheme.secondaryText
+        case .searching:
+            deviceConnectionLabel.text = "Buscando dispositivo…"
+            deviceConnectionLabel.textColor = AppTheme.readableWarm
+        case .serviceDetected:
+            deviceConnectionLabel.text = "Dispositivo detectado"
+            deviceConnectionLabel.textColor = AppTheme.readableWarm
+        case .transportReachable:
+            deviceConnectionLabel.text = "Enlace disponible"
+            deviceConnectionLabel.textColor = AppTheme.readableWarm
+        case .pairingRecordFound:
+            deviceConnectionLabel.text = "Registro encontrado"
+            deviceConnectionLabel.textColor = AppTheme.readableWarm
+        case .pairingRequired:
+            deviceConnectionLabel.text = "Confirma el código"
+            deviceConnectionLabel.textColor = AppTheme.readableAccent
+        case .paired, .ready:
+            deviceConnectionLabel.text = "Conectado"
+            deviceConnectionLabel.textColor = AppTheme.readableSuccess
+        case .developerModeRequired:
+            deviceConnectionLabel.text = "Confirma en Ajustes"
+            deviceConnectionLabel.textColor = AppTheme.readableWarm
+        case .failed:
+            deviceConnectionLabel.text = "Sin conexión"
+            deviceConnectionLabel.textColor = AppTheme.readableFailure
         }
     }
 
@@ -269,7 +406,7 @@ final class NyxelVPNView: UIView {
         let icon = UIImageView(image: UIImage(systemName: "network"))
         icon.translatesAutoresizingMaskIntoConstraints = false
         icon.contentMode = .scaleAspectFit
-        icon.tintColor = AppTheme.accent
+        icon.tintColor = AppTheme.readableAccent
         icon.backgroundColor = AppTheme.accent.withAlphaComponent(0.12)
         icon.layer.cornerRadius = 13
         icon.layer.cornerCurve = .continuous
@@ -336,7 +473,7 @@ final class NyxelVPNView: UIView {
         let iconView = UIImageView(image: UIImage(systemName: icon))
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.contentMode = .scaleAspectFit
-        iconView.tintColor = AppTheme.accent
+        iconView.tintColor = AppTheme.readableAccent
         NSLayoutConstraint.activate([
             iconView.widthAnchor.constraint(equalToConstant: 18),
             iconView.heightAnchor.constraint(equalToConstant: 18)
@@ -377,7 +514,7 @@ final class NyxelVPNView: UIView {
         let identifier = UILabel()
         identifier.text = "2424"
         identifier.font = .systemFont(ofSize: 11, weight: .bold)
-        identifier.textColor = AppTheme.accent
+        identifier.textColor = AppTheme.readableAccent
         identifier.textAlignment = .center
         identifier.backgroundColor = AppTheme.accent.withAlphaComponent(0.12)
         identifier.layer.cornerRadius = 9
@@ -402,7 +539,7 @@ final class NyxelVPNView: UIView {
 
         pairingDot.translatesAutoresizingMaskIntoConstraints = false
         pairingDot.layer.cornerRadius = 4
-        pairingDot.backgroundColor = AppTheme.tertiaryText
+        pairingDot.backgroundColor = AppTheme.secondaryText
         NSLayoutConstraint.activate([
             pairingDot.widthAnchor.constraint(equalToConstant: 8),
             pairingDot.heightAnchor.constraint(equalToConstant: 8)
@@ -450,24 +587,26 @@ final class NyxelVPNView: UIView {
 
     private func startPairingSession() {
         pairingLabel.text = "Preparando vinculación…"
-        pairingDot.backgroundColor = AppTheme.warm
+        pairingDot.backgroundColor = AppTheme.readableWarm
+        refreshDeviceConnection(.searching)
         NixelPairingSession.shared.begin { [weak self] state in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.pairingLabel.text = self.concisePairingMessage(for: state)
+                self.refreshDeviceConnection(state)
                 switch state {
                 case .failed:
-                    self.pairingLabel.textColor = AppTheme.failure
-                    self.pairingDot.backgroundColor = AppTheme.failure
+                    self.pairingLabel.textColor = AppTheme.readableFailure
+                    self.pairingDot.backgroundColor = AppTheme.readableFailure
                 case .ready, .paired:
-                    self.pairingLabel.textColor = AppTheme.success
-                    self.pairingDot.backgroundColor = AppTheme.success
+                    self.pairingLabel.textColor = AppTheme.readableSuccess
+                    self.pairingDot.backgroundColor = AppTheme.readableSuccess
                 case .pairingRequired:
-                    self.pairingLabel.textColor = AppTheme.accent
-                    self.pairingDot.backgroundColor = AppTheme.accent
+                    self.pairingLabel.textColor = AppTheme.readableAccent
+                    self.pairingDot.backgroundColor = AppTheme.readableAccent
                 default:
                     self.pairingLabel.textColor = AppTheme.secondaryText
-                    self.pairingDot.backgroundColor = AppTheme.warm
+                    self.pairingDot.backgroundColor = AppTheme.readableWarm
                 }
             }
         }

@@ -176,7 +176,7 @@ enum NyxelSupportPolicy {
     }
 
     static var supportedRangesDescription: String {
-        "iOS 17.0–17.7.x · iOS 18.0–18.7.1 · iOS 26.0–26.6.2 · iOS 27.0 builds verificados"
+        "iOS 17–26 · iOS 27.0/27.2 (solo builds verificados)"
     }
     
     // MARK: - Device Information
