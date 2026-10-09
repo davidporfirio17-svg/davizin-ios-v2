@@ -491,7 +491,7 @@ final class NyxelVPNView: UIView {
         title.textColor = AppTheme.primaryText
 
         let subtitle = UILabel()
-        subtitle.text = "Túnel local para RSD/Pairing; no enruta Internet. Los datos celulares siguen disponibles; para Pairing cercano, mantén Wi‑Fi activado en ambos equipos (enlace directo)."
+        subtitle.text = "El túnel está limitado a las rutas RSD; Internet debe seguir por la red activa (Wi‑Fi o datos). Pairing y VPN son acciones separadas."
         subtitle.font = AppTheme.bodyFont()
         subtitle.textColor = AppTheme.secondaryText
         subtitle.numberOfLines = 0
