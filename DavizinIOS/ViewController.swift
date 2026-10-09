@@ -37,6 +37,12 @@ final class ViewController: UIViewController {
         traitCollection.userInterfaceStyle == .light ? .darkContent : .lightContent
     }
 
+    override var shouldAutorotate: Bool { true }
+
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
+    }
+
     /// Usa este factory cuando presentes el UI desde otro controlador.
     /// El estilo se fija antes de `present(...)`, que es el momento correcto para evitar `.pageSheet`.
     static func makeFullScreen() -> ViewController {

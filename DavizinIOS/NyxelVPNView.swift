@@ -16,7 +16,10 @@ final class NyxelVPNView: UIView {
     private let toggleButton = DavizinButton(title: "Conectar", style: .primary)
     private let pairingLabel = UILabel()
     private let pairingDot = UIView()
-    private let pairButton = DavizinButton(title: "Conectar 2424", style: .secondary)
+    private let pairButton = DavizinButton(title: "Iniciar Pairing", style: .secondary)
+    private let pairingConnectedBadge = UIStackView()
+    private let pairingConnectedIcon = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+    private let pairingConnectedText = UILabel()
     private let deviceModelLabel = UILabel()
     private let deviceConnectionLabel = UILabel()
     private let batteryValueLabel = UILabel()
@@ -68,7 +71,9 @@ final class NyxelVPNView: UIView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(stack)
 
-        let width = min(AppTheme.contentMaximumWidth, 520)
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        let horizontalInset: CGFloat = isPad ? 32 : 18
+        let width: CGFloat = isPad ? 860 : min(AppTheme.contentMaximumWidth, 520)
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -78,10 +83,10 @@ final class NyxelVPNView: UIView {
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -24),
             stack.centerXAnchor.constraint(equalTo: scrollView.frameLayoutGuide.centerXAnchor),
             stack.widthAnchor.constraint(lessThanOrEqualToConstant: width),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.leadingAnchor, constant: 18),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -18)
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.leadingAnchor, constant: horizontalInset),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -horizontalInset)
         ])
-        let fill = stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -36)
+        let fill = stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * horizontalInset)
         fill.priority = .defaultHigh
         fill.isActive = true
 
@@ -112,6 +117,7 @@ final class NyxelVPNView: UIView {
             self?.refreshBattery()
         }
         refreshDeviceConnection(NixelPairingSession.shared.state)
+        refreshPairingIndicator(NixelPairingSession.shared.state)
         refreshStatus()
     }
 
@@ -449,7 +455,7 @@ final class NyxelVPNView: UIView {
         title.textColor = AppTheme.primaryText
 
         let subtitle = UILabel()
-        subtitle.text = "Estado de VPN y sistema. La vinculación 2424 está justo debajo."
+        subtitle.text = "Estado de VPN y sistema. El Pairing está justo debajo."
         subtitle.font = AppTheme.bodyFont()
         subtitle.textColor = AppTheme.secondaryText
         subtitle.numberOfLines = 2
@@ -535,26 +541,33 @@ final class NyxelVPNView: UIView {
         card.contentInsets = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
 
         let title = UILabel()
-        title.text = "Conexión 2424"
+        title.text = "Pairing"
         title.font = AppTheme.titleFont(18)
         title.textColor = AppTheme.primaryText
 
-        let identifier = UILabel()
-        identifier.text = "2424"
-        identifier.font = .systemFont(ofSize: 11, weight: .bold)
-        identifier.textColor = AppTheme.readableAccent
-        identifier.textAlignment = .center
-        identifier.backgroundColor = AppTheme.accent.withAlphaComponent(0.12)
-        identifier.layer.cornerRadius = 9
-        identifier.layer.cornerCurve = .continuous
-        identifier.clipsToBounds = true
-        identifier.translatesAutoresizingMaskIntoConstraints = false
+        pairingConnectedIcon.translatesAutoresizingMaskIntoConstraints = false
+        pairingConnectedIcon.tintColor = AppTheme.readableSuccess
         NSLayoutConstraint.activate([
-            identifier.widthAnchor.constraint(greaterThanOrEqualToConstant: 48),
-            identifier.heightAnchor.constraint(equalToConstant: 28)
+            pairingConnectedIcon.widthAnchor.constraint(equalToConstant: 16),
+            pairingConnectedIcon.heightAnchor.constraint(equalToConstant: 16)
         ])
+        pairingConnectedText.text = "Conectado"
+        pairingConnectedText.font = .systemFont(ofSize: 11, weight: .bold)
+        pairingConnectedText.textColor = AppTheme.readableSuccess
+        pairingConnectedBadge.addArrangedSubview(pairingConnectedIcon)
+        pairingConnectedBadge.addArrangedSubview(pairingConnectedText)
+        pairingConnectedBadge.axis = .horizontal
+        pairingConnectedBadge.alignment = .center
+        pairingConnectedBadge.spacing = 5
+        pairingConnectedBadge.isLayoutMarginsRelativeArrangement = true
+        pairingConnectedBadge.layoutMargins = UIEdgeInsets(top: 5, left: 8, bottom: 5, right: 8)
+        pairingConnectedBadge.backgroundColor = AppTheme.success.withAlphaComponent(0.12)
+        pairingConnectedBadge.layer.cornerRadius = 10
+        pairingConnectedBadge.layer.cornerCurve = .continuous
+        pairingConnectedBadge.clipsToBounds = true
+        pairingConnectedBadge.isHidden = true
 
-        let header = UIStackView(arrangedSubviews: [title, UIView(), identifier])
+        let header = UIStackView(arrangedSubviews: [title, UIView(), pairingConnectedBadge])
         header.axis = .horizontal
         header.alignment = .center
         header.spacing = 8
@@ -616,12 +629,14 @@ final class NyxelVPNView: UIView {
     private func startPairingSession() {
         pairingLabel.text = "Preparando vinculación…"
         pairingDot.backgroundColor = AppTheme.readableWarm
+        refreshPairingIndicator(.searching)
         refreshDeviceConnection(.searching)
         NixelPairingSession.shared.begin { [weak self] state in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.pairingLabel.text = self.concisePairingMessage(for: state)
                 self.refreshDeviceConnection(state)
+                self.refreshPairingIndicator(state)
                 switch state {
                 case .failed:
                     self.pairingLabel.textColor = AppTheme.readableFailure
@@ -637,6 +652,19 @@ final class NyxelVPNView: UIView {
                     self.pairingDot.backgroundColor = AppTheme.readableWarm
                 }
             }
+        }
+    }
+
+    private func refreshPairingIndicator(_ state: NixelPairingSessionState) {
+        switch state {
+        case .ready:
+            pairingConnectedText.text = "Conectado"
+            pairingConnectedBadge.isHidden = false
+        case .paired, .developerModeRequired:
+            pairingConnectedText.text = "Vinculado"
+            pairingConnectedBadge.isHidden = false
+        default:
+            pairingConnectedBadge.isHidden = true
         }
     }
 

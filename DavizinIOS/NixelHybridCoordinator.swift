@@ -489,7 +489,7 @@ private enum NixelPairingPINNotification {
         center.removeDeliveredNotifications(withIdentifiers: [identifier])
 
         let content = UNMutableNotificationContent()
-        content.title = "Código de emparejamiento 2424"
+        content.title = "Código de Pairing"
         content.body = "PIN: \(pin). Introdúcelo en la solicitud de iOS."
         content.sound = .default
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
