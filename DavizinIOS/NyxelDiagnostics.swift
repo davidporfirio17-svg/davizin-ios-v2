@@ -94,9 +94,14 @@ enum NyxelActivityLog {
         let patterns = [
             #"(?i)(["']?(?:authorization|api[_ -]?key|session[_ -]?key|access[_ -]?token|refresh[_ -]?token|password|secret|hwid|token|grappa[_ -]?(?:key|secret|token)|pairing[_ -]?(?:key|secret|token))["']?)\s*[:=]\s*("[^"]*"|'[^']*'|[^,;\s}\]]+)"#
         ]
-        return patterns.reduce(value) { result, pattern in
+        let redacted = patterns.reduce(value) { result, pattern in
             result.replacingOccurrences(of: pattern, with: "$1=[REDACTED]", options: .regularExpression)
         }
+        return redacted.replacingOccurrences(
+            of: #"(?i)(PIN\s+recibido\s+por\s+AirLift:\s*)\d{4,8}\b"#,
+            with: "$1[REDACTED]",
+            options: .regularExpression
+        )
     }
 }
 
