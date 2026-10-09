@@ -51,7 +51,8 @@ final class NixelVPNManager: NSObject {
                     "HybridMode": true
                 ]
                 proto.includeAllNetworks = false
-                proto.enforceRoutes = true
+                // Keep the system's primary route (including cellular data) in control.
+                proto.enforceRoutes = false
                 m.protocolConfiguration = proto
                 m.localizedDescription = "Nixel External Hybrid"
                 m.isEnabled = true
