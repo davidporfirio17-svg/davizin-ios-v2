@@ -57,7 +57,7 @@ final class DavizinBottomNavView: UIView {
 
         configureButton(modesButton, image: "square.grid.2x2.fill", label: modesLabel, text: "MODOS", action: #selector(modesTapped))
         configureButton(profileButton, image: "person.crop.circle.fill", label: profileLabel, text: "PERFIL", action: #selector(profileTapped))
-        configureButton(vpnButton, image: "lock.shield.fill", label: vpnLabel, text: "VPN", action: #selector(vpnTapped))
+        configureButton(vpnButton, image: "iphone", label: vpnLabel, text: "iOS 27", action: #selector(vpnTapped))
 
         let stack = UIStackView(arrangedSubviews: [makeItem(button: modesButton, label: modesLabel, indicator: modesIndicator), makeItem(button: profileButton, label: profileLabel, indicator: profileIndicator), makeItem(button: vpnButton, label: vpnLabel, indicator: vpnIndicator)])
         stack.axis = .horizontal

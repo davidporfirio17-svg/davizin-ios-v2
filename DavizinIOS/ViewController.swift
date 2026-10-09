@@ -498,7 +498,7 @@ final class ViewController: UIViewController {
         stageBeforeProfile = currentStage == .profile ? stageBeforeProfile : currentStage
         currentStage = .profile
         setBottomNavigation(visible: true, selected: .vpn)
-        headerView.title = "VPN"
+        headerView.title = "iOS 27"
         headerView.showsBackButton = true
         headerView.showsAvatarButton = false
         display(NyxelVPNView(), animated: animated)
