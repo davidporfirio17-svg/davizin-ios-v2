@@ -501,7 +501,9 @@ final class ViewController: UIViewController {
         headerView.title = "iOS 27"
         headerView.showsBackButton = true
         headerView.showsAvatarButton = false
-        display(NyxelVPNView(), animated: animated)
+        let screen = NyxelVPNView()
+        screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds)
+        display(screen, animated: animated)
     }
 
     /// Perfil: accesible desde el avatar del header en cualquier pantalla (excepto login).

@@ -7,12 +7,19 @@ import UserNotifications
 final class NyxelVPNView: UIView {
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
+    private let accessStatusLabel = UILabel()
+    private let keyValueLabel = UILabel()
+    private let remainingValueLabel = UILabel()
     private let statusLabel = UILabel()
     private let statusDot = UIView()
+    private let systemLabel = UILabel()
     private let toggleButton = DavizinButton(title: "Conectar", style: .primary)
     private let pairingLabel = UILabel()
     private let pairingDot = UIView()
     private let pairButton = DavizinButton(title: "Iniciar vinculación", style: .secondary)
+    private var activeKey: String?
+    private var accessExpiresAt: Date?
+    private var accessTimer: Timer?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -22,6 +29,20 @@ final class NyxelVPNView: UIView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         configure()
+    }
+
+    func setAccount(key: String?, remainingSeconds: Int) {
+        activeKey = key
+        accessExpiresAt = key != nil && remainingSeconds > 0
+            ? Date().addingTimeInterval(TimeInterval(remainingSeconds))
+            : nil
+        updateAccessSummary()
+        accessTimer?.invalidate()
+        accessTimer = nil
+        guard accessExpiresAt != nil else { return }
+        accessTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.updateAccessSummary()
+        }
     }
 
     private func configure() {
@@ -55,13 +76,14 @@ final class NyxelVPNView: UIView {
         fill.isActive = true
 
         let category = UILabel()
-        category.text = "CONEXIÓN DEL DISPOSITIVO"
+        category.text = "NYXEL · ESTADO DEL DISPOSITIVO"
         category.font = AppTheme.captionFont()
-        category.textColor = AppTheme.tertiaryText
+        category.textColor = AppTheme.accent
         category.textAlignment = .center
         category.accessibilityTraits = .header
         stack.addArrangedSubview(category)
 
+        stack.addArrangedSubview(makeAccessCard())
         stack.addArrangedSubview(makeConnectionCard())
         stack.addArrangedSubview(makePairingCard())
 
@@ -70,13 +92,123 @@ final class NyxelVPNView: UIView {
 
         NotificationCenter.default.addObserver(self, selector: #selector(refreshStatus), name: .NEVPNStatusDidChange, object: nil)
         NixelVPNManager.shared.load { [weak self] _ in self?.refreshStatus() }
+        refreshSystemStatus()
         refreshStatus()
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        accessTimer?.invalidate()
         // No detener la sesión al cambiar de pestaña: el pairing debe seguir vivo
         // mientras el usuario cambia de pantalla para completar la operación.
+    }
+
+    private func makeAccessCard() -> UIView {
+        let card = DavizinCardView()
+        card.contentInsets = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+
+        let icon = UIImageView(image: UIImage(systemName: "key.horizontal.fill"))
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        icon.contentMode = .scaleAspectFit
+        icon.tintColor = AppTheme.accent
+        icon.backgroundColor = AppTheme.accent.withAlphaComponent(0.12)
+        icon.layer.cornerRadius = 13
+        icon.layer.cornerCurve = .continuous
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 42),
+            icon.heightAnchor.constraint(equalToConstant: 42)
+        ])
+
+        let title = UILabel()
+        title.text = "Acceso Nyxel"
+        title.font = AppTheme.titleFont(18)
+        title.textColor = AppTheme.primaryText
+
+        let heading = UIStackView(arrangedSubviews: [icon, title])
+        heading.axis = .horizontal
+        heading.alignment = .center
+        heading.spacing = 12
+
+        accessStatusLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        accessStatusLabel.numberOfLines = 0
+        keyValueLabel.font = AppTheme.monoFont(13)
+        keyValueLabel.textColor = AppTheme.primaryText
+        keyValueLabel.textAlignment = .right
+        remainingValueLabel.font = AppTheme.monoFont(12)
+        remainingValueLabel.textColor = AppTheme.accent
+        remainingValueLabel.textAlignment = .right
+
+        let inner = UIStackView(arrangedSubviews: [
+            heading,
+            makeAccessRow(title: "Estado de acceso", value: accessStatusLabel),
+            makeAccessRow(title: "Clave", value: keyValueLabel),
+            makeAccessRow(title: "Vigencia", value: remainingValueLabel)
+        ])
+        inner.axis = .vertical
+        inner.spacing = 10
+        card.addContent(inner)
+        updateAccessSummary()
+        return card
+    }
+
+    private func makeAccessRow(title: String, value: UILabel) -> UIView {
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = AppTheme.bodyFont()
+        titleLabel.textColor = AppTheme.secondaryText
+        titleLabel.numberOfLines = 0
+
+        let row = UIStackView(arrangedSubviews: [titleLabel, value])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.distribution = .equalSpacing
+        row.spacing = 12
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        row.backgroundColor = AppTheme.accent.withAlphaComponent(0.055)
+        row.layer.cornerRadius = 13
+        row.layer.cornerCurve = .continuous
+        row.layer.borderWidth = 1
+        row.layer.borderColor = AppTheme.hairline.cgColor
+        return row
+    }
+
+    private func updateAccessSummary() {
+        let remaining = accessExpiresAt.map { max(0, Int($0.timeIntervalSinceNow)) } ?? 0
+        let active = activeKey != nil && remaining > 0
+        accessStatusLabel.text = activeKey == nil ? "Sin validar" : (active ? "Activa" : "Expirada")
+        accessStatusLabel.textColor = active ? AppTheme.success : AppTheme.warm
+        keyValueLabel.text = maskedKey(activeKey)
+
+        if active {
+            let days = remaining / 86_400
+            let hours = (remaining % 86_400) / 3_600
+            let minutes = (remaining % 3_600) / 60
+            remainingValueLabel.text = "\(days)d · \(hours)h · \(minutes)m"
+            remainingValueLabel.textColor = AppTheme.accent
+        } else {
+            remainingValueLabel.text = activeKey == nil ? "—" : "Vencida"
+            remainingValueLabel.textColor = AppTheme.failure
+            accessTimer?.invalidate()
+            accessTimer = nil
+        }
+    }
+
+    private func maskedKey(_ key: String?) -> String {
+        guard let key, !key.isEmpty else { return "No disponible" }
+        return key.count > 4 ? "••••-\(key.suffix(4))" : "••••"
+    }
+
+    private func refreshSystemStatus() {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        let label = "iOS \(UIDevice.current.systemVersion)"
+        if version.majorVersion >= 27 {
+            systemLabel.text = "\(label) · pairing directo"
+            systemLabel.textColor = AppTheme.success
+        } else {
+            systemLabel.text = "\(label) · requiere VPN de apoyo"
+            systemLabel.textColor = AppTheme.accent
+        }
     }
 
     @objc private func refreshStatus() {
@@ -147,12 +279,12 @@ final class NyxelVPNView: UIView {
         ])
 
         let title = UILabel()
-        title.text = "Conexión de red"
+        title.text = "Emparejamiento y túnel"
         title.font = AppTheme.titleFont(18)
         title.textColor = AppTheme.primaryText
 
         let subtitle = UILabel()
-        subtitle.text = "Canal local para completar la vinculación."
+        subtitle.text = "Estado de conexión y compatibilidad del dispositivo."
         subtitle.font = AppTheme.bodyFont()
         subtitle.textColor = AppTheme.secondaryText
         subtitle.numberOfLines = 2
@@ -169,24 +301,68 @@ final class NyxelVPNView: UIView {
             statusDot.heightAnchor.constraint(equalToConstant: 8)
         ])
         statusLabel.text = "No configurado"
-        statusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        statusLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         statusLabel.textColor = AppTheme.secondaryText
         statusLabel.numberOfLines = 2
         let statusRow = UIStackView(arrangedSubviews: [statusDot, statusLabel])
         statusRow.axis = .horizontal
         statusRow.alignment = .center
         statusRow.spacing = 9
+        statusRow.isLayoutMarginsRelativeArrangement = true
+        statusRow.layoutMargins = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        statusRow.backgroundColor = AppTheme.accent.withAlphaComponent(0.055)
+        statusRow.layer.cornerRadius = 13
+        statusRow.layer.cornerCurve = .continuous
+        statusRow.layer.borderWidth = 1
+        statusRow.layer.borderColor = AppTheme.hairline.cgColor
+
+        systemLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        systemLabel.numberOfLines = 0
+        let systemRow = makeDetailStatusRow(icon: "iphone.gen3", title: "Sistema detectado", value: systemLabel)
 
         toggleButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
         let settingsButton = DavizinButton(title: "Ajustes de la app", style: .secondary)
         settingsButton.heightAnchor.constraint(equalToConstant: 46).isActive = true
         settingsButton.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
 
-        let inner = UIStackView(arrangedSubviews: [heading, subtitle, statusRow, toggleButton, settingsButton])
+        let inner = UIStackView(arrangedSubviews: [heading, subtitle, statusRow, systemRow, toggleButton, settingsButton])
         inner.axis = .vertical
         inner.spacing = 13
         card.addContent(inner)
         return card
+    }
+
+    private func makeDetailStatusRow(icon: String, title: String, value: UILabel) -> UIView {
+        let iconView = UIImageView(image: UIImage(systemName: icon))
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.contentMode = .scaleAspectFit
+        iconView.tintColor = AppTheme.accent
+        NSLayoutConstraint.activate([
+            iconView.widthAnchor.constraint(equalToConstant: 18),
+            iconView.heightAnchor.constraint(equalToConstant: 18)
+        ])
+
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = AppTheme.bodyFont()
+        titleLabel.textColor = AppTheme.primaryText
+        titleLabel.numberOfLines = 0
+
+        let labels = UIStackView(arrangedSubviews: [titleLabel, value])
+        labels.axis = .vertical
+        labels.spacing = 3
+        let row = UIStackView(arrangedSubviews: [iconView, labels])
+        row.axis = .horizontal
+        row.alignment = .top
+        row.spacing = 10
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        row.backgroundColor = AppTheme.accent.withAlphaComponent(0.055)
+        row.layer.cornerRadius = 13
+        row.layer.cornerCurve = .continuous
+        row.layer.borderWidth = 1
+        row.layer.borderColor = AppTheme.hairline.cgColor
+        return row
     }
 
     private func makePairingCard() -> UIView {
@@ -232,13 +408,20 @@ final class NyxelVPNView: UIView {
             pairingDot.heightAnchor.constraint(equalToConstant: 8)
         ])
         pairingLabel.text = "Listo para iniciar"
-        pairingLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        pairingLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         pairingLabel.textColor = AppTheme.secondaryText
         pairingLabel.numberOfLines = 2
         let pairingStatus = UIStackView(arrangedSubviews: [pairingDot, pairingLabel])
         pairingStatus.axis = .horizontal
         pairingStatus.alignment = .center
         pairingStatus.spacing = 9
+        pairingStatus.isLayoutMarginsRelativeArrangement = true
+        pairingStatus.layoutMargins = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        pairingStatus.backgroundColor = AppTheme.accent.withAlphaComponent(0.055)
+        pairingStatus.layer.cornerRadius = 13
+        pairingStatus.layer.cornerCurve = .continuous
+        pairingStatus.layer.borderWidth = 1
+        pairingStatus.layer.borderColor = AppTheme.hairline.cgColor
 
         pairButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
 
