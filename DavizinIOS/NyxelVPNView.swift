@@ -528,11 +528,8 @@ final class NyxelVPNView: UIView {
         let systemRow = makeDetailStatusRow(icon: "iphone.gen3", title: "Sistema detectado", value: systemLabel)
 
         toggleButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
-        let developerModeButton = DavizinButton(title: "Modo desarrollador", style: .secondary)
-        developerModeButton.heightAnchor.constraint(equalToConstant: 46).isActive = true
-        developerModeButton.addTarget(self, action: #selector(showDeveloperModeGuide), for: .touchUpInside)
 
-        let inner = UIStackView(arrangedSubviews: [heading, subtitle, statusRow, systemRow, toggleButton, developerModeButton])
+        let inner = UIStackView(arrangedSubviews: [heading, subtitle, statusRow, systemRow, toggleButton])
         inner.axis = .vertical
         inner.spacing = 13
         card.addContent(inner)
@@ -644,26 +641,6 @@ final class NyxelVPNView: UIView {
         inner.spacing = 13
         card.addContent(inner)
         return card
-    }
-
-    @objc private func showDeveloperModeGuide() {
-        let alert = UIAlertController(
-            title: "Modo desarrollador",
-            message: "iOS no permite a Nyxel abrir directamente esa pantalla. Ve a Ajustes > Privacidad y seguridad, baja hasta Seguridad y toca Modo desarrollador. Actívalo y acepta reiniciar; después del reinicio, confirma Activar e ingresa el código del dispositivo.\n\nSi no aparece la opción, primero inicia el pairing requerido por iOS o conecta el dispositivo a una Mac con Xcode.",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "Entendido", style: .default))
-
-        let activeScene = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }
-        guard let rootViewController = activeScene?.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return }
-
-        var presenter = rootViewController
-        while let presented = presenter.presentedViewController {
-            presenter = presented
-        }
-        presenter.present(alert, animated: true)
     }
 
     @objc private func beginPairing() {
