@@ -777,6 +777,15 @@ extension ViewController: ProfileViewDelegate {
         setAccountSession(key: nil, remainingSeconds: 0)
         showLogin(animated: true)
     }
+
+    func profileView(_ view: ProfileView, didRequestShareDiagnostics text: String) {
+        let share = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        if let popover = share.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+        }
+        present(share, animated: true)
+    }
 }
 
 extension ViewController: LoginViewDelegate {

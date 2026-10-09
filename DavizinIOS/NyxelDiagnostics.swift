@@ -50,7 +50,7 @@ enum NyxelActivityLog {
     static var entries: [String] {
         lock.lock()
         defer { lock.unlock() }
-        return UserDefaults.standard.stringArray(forKey: key) ?? []
+        return (UserDefaults.standard.stringArray(forKey: key) ?? []).map { sanitized($0) }
     }
 
     static var recentEntries: [String] { Array(entries.prefix(100)) }
@@ -80,9 +80,19 @@ enum NyxelActivityLog {
         let redacted = patterns.reduce(value) { result, pattern in
             result.replacingOccurrences(of: pattern, with: "$1=[REDACTED]", options: .regularExpression)
         }
-        return redacted.replacingOccurrences(
+        let pinRedacted = redacted.replacingOccurrences(
             of: #"(?i)(PIN\s+recibido\s+por\s+AirLift:\s*)\d{4,8}\b"#,
             with: "$1[REDACTED]",
+            options: .regularExpression
+        )
+        let containersRedacted = pinRedacted.replacingOccurrences(
+            of: #"(?i)(/var/mobile/Containers/Data/Application/)[A-F0-9-]{20,}"#,
+            with: "$1[APP_CONTAINER]",
+            options: .regularExpression
+        )
+        return containersRedacted.replacingOccurrences(
+            of: #"(?i)(/private)?/var/mobile/Containers/Data/Application/[^\s,;]+/tmp/nyxel-airlift-[^\s,;]+"#,
+            with: "[AIRLIFT_TEMP_PATH]",
             options: .regularExpression
         )
     }
