@@ -207,6 +207,9 @@ enum NyxelSupportPolicy {
         guard major >= 17 else { return false }
         guard major == 27 else { return major <= 26 }
         guard minor == 0 || minor == 2 else { return false }
+        if minor == 0 && patch == 1 && build == "24A446" {
+            return true
+        }
         if minor == 2 {
             return ["24B5084k", "24B5089g"].contains(build)
         }
@@ -247,7 +250,7 @@ enum NyxelSupportPolicy {
     }
 
     static var supportedRangesDescription: String {
-        "iOS 17–26 · iOS 27.0/27.2 (solo builds verificados)"
+        "iOS 17–26 · iOS 27.0/27.2 (solo builds verificados) · iOS 27.0.1 (24A446)"
     }
     
     // MARK: - Device Information
