@@ -20,20 +20,19 @@ jobs:
       - name: Build Nyxel Admin for iPad
         run: |
           set -euo pipefail
-          DERIVED="$RUNNER_TEMP/NyxelAdminDerived"
           xcodebuild \
             -project NyxelAdmin.xcodeproj \
             -target NyxelAdmin \
             -configuration Release \
             -sdk iphoneos \
             -arch arm64 \
-            -derivedDataPath "$DERIVED" \
+            CONFIGURATION_BUILD_DIR="$RUNNER_TEMP/NyxelAdminProducts" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             build
 
-          APP="$DERIVED/Build/Products/Release-iphoneos/NyxelAdmin.app"
+          APP="$RUNNER_TEMP/NyxelAdminProducts/NyxelAdmin.app"
           test -d "$APP"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist" | grep -Fx 'Nyxel Admin'
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" | grep -Fx '1.0'
