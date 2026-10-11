@@ -16,13 +16,16 @@ struct AdminPanelView: View {
     @State private var selectedRoute: String? = "/dashboard"
 
     var body: some View {
-        Group {
-            if store.isCheckingSession {
-                launchScreen
-            } else if !store.isAuthenticated {
-                AdminLoginView(store: store)
-            } else {
-                appShell
+        ZStack {
+            AdminPalette.background.ignoresSafeArea()
+            Group {
+                if store.isCheckingSession {
+                    launchScreen
+                } else if !store.isAuthenticated {
+                    AdminLoginView(store: store)
+                } else {
+                    appShell
+                }
             }
         }
         .preferredColorScheme(.dark)
@@ -375,6 +378,11 @@ private struct AdminLoginView: View {
                             .textContentType(.password)
                             .submitLabel(.go)
                             .onSubmit { Task { await submitLogin() } }
+
+                        Text("Usa la credencial asignada a Nyxel Admin. La contraseña de superadministrador es distinta a la del sitio web.")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(AdminPalette.muted)
+                            .fixedSize(horizontal: false, vertical: true)
 
                         if let error = store.errorMessage {
                             InlineNotice(text: error, style: .warning)

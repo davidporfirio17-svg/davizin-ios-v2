@@ -36,17 +36,17 @@ jobs:
           test -d "$APP"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist" | grep -Fx 'Nyxel Admin'
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" | grep -Fx '1.0'
-          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist" | grep -Fx '3'
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist" | grep -Fx '4'
 
           PACKAGE="$RUNNER_TEMP/NyxelAdminPackage"
           mkdir -p "$PACKAGE/Payload"
           ditto "$APP" "$PACKAGE/Payload/NyxelAdmin.app"
-          (cd "$PACKAGE" && /usr/bin/zip -qry "$RUNNER_TEMP/Nyxel_Admin_1.0_build_3_unsigned.ipa" Payload)
-          /usr/bin/unzip -t "$RUNNER_TEMP/Nyxel_Admin_1.0_build_3_unsigned.ipa"
+          (cd "$PACKAGE" && /usr/bin/zip -qry "$RUNNER_TEMP/Nyxel_Admin_1.0_build_4_unsigned.ipa" Payload)
+          /usr/bin/unzip -t "$RUNNER_TEMP/Nyxel_Admin_1.0_build_4_unsigned.ipa"
 
       - name: Upload Nyxel Admin IPA
         uses: actions/upload-artifact@v4
         with:
           name: Nyxel_Admin_iOS_unsigned
-          path: ${{ runner.temp }}/Nyxel_Admin_1.0_build_3_unsigned.ipa
+          path: ${{ runner.temp }}/Nyxel_Admin_1.0_build_4_unsigned.ipa
           retention-days: 30
