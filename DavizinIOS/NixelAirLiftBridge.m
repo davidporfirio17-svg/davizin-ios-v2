@@ -111,29 +111,6 @@ extern void nyxel_nw_listener_start(const char *service_name, uint16_t raw_port,
                                     const unsigned char *txt, size_t txt_len);
 extern void nyxel_nw_listener_stop(void);
 
-@interface NyxelPairingNetServiceDelegate : NSObject <NSNetServiceDelegate>
-@end
-
-static NSNetService *nyxel_pairing_host_service;
-static NyxelPairingNetServiceDelegate *nyxel_pairing_service_delegate;
-
-@implementation NyxelPairingNetServiceDelegate
-- (void)netServiceDidPublish:(NSNetService *)sender {
-    nyxel_pairing_post(@"NyxelPairingHostReady", @{
-        @"name": sender.name ?: @"",
-        @"type": sender.type ?: @"",
-        @"domain": sender.domain ?: @"local.",
-        @"message": @"Servicio RPPairing de AirLift publicado directamente."
-    });
-}
-- (void)netService:(NSNetService *)sender didNotPublish:(NSDictionary<NSString *,NSNumber *> *)errorDict {
-    (void)sender;
-    nyxel_pairing_post(@"NyxelPairingHostFailed", @{
-        @"message": [NSString stringWithFormat:@"NSNetService no pudo publicar AirLift: %@", errorDict ?: @{}]
-    });
-}
-@end
-
 static void nyxel_pairing_pin_callback(const char *pin, void *context) {
     (void)context;
     NSString *value = pin ? [NSString stringWithUTF8String:pin] : @"";
@@ -162,8 +139,8 @@ static void nyxel_pairing_ready_callback(void *context, const char *service_id,
         return;
     }
     // Los punteros del callback FFI solo viven durante esta llamada; conservar
-    // copias Objective-C antes de saltar al hilo principal. NSNetService debe
-    // publicarse allí para usar un run loop activo, como hace Tekezuna.
+    // copias antes de saltar al hilo principal y publicar el servicio mediante
+    // Network.framework, cuyo listener admite enlaces Wi-Fi peer-to-peer.
     dispatch_async(dispatch_get_main_queue(), ^{
         @autoreleasepool {
             @try {
@@ -173,25 +150,15 @@ static void nyxel_pairing_ready_callback(void *context, const char *service_id,
                     return;
                 }
                 nyxel_pairing_host_local_port = port;
-                // Publicar el puerto exacto abierto por al_pairing_run_host.
-                [nyxel_pairing_host_service stop];
-                nyxel_pairing_service_delegate = [NyxelPairingNetServiceDelegate new];
-                nyxel_pairing_host_service = [[NSNetService alloc] initWithDomain:@"local."
-                                                                              type:@"_remotepairing-pairable-host._tcp."
-                                                                              name:serviceName
-                                                                              port:(int32_t)port];
-                nyxel_pairing_host_service.delegate = nyxel_pairing_service_delegate;
-                if (![nyxel_pairing_host_service setTXTRecordData:txtRecord]) {
-                    [nyxel_pairing_host_service stop];
-                    nyxel_pairing_host_service = nil;
-                    nyxel_pairing_service_delegate = nil;
-                    nyxel_pairing_post(@"NyxelPairingHostFailed", @{ @"message": @"NSNetService rechazó el registro TXT de AirLift." });
-                    return;
-                }
-                [nyxel_pairing_host_service publish];
+                // NWListener acepta conexiones cercanas por Wi-Fi P2P/AWDL aun
+                // cuando el equipo mantiene datos celulares para Internet.
+                // El proxy Swift reenvía el flujo al socket local de AirLift.
+                nyxel_nw_listener_start(serviceName.UTF8String, port,
+                                         (const unsigned char *)txtRecord.bytes,
+                                         txtRecord.length);
             } @catch (NSException *exception) {
                 nyxel_pairing_post(@"NyxelPairingHostFailed", @{
-                    @"message": [NSString stringWithFormat:@"NSNetService lanzó %@: %@",
+                    @"message": [NSString stringWithFormat:@"El publicador AirLift lanzó %@: %@",
                                  exception.name, exception.reason ?: @"sin detalle"]
                 });
             }
@@ -245,9 +212,6 @@ uint16_t nyxel_pairable_host_local_port(void) {
 }
 
 void nyxel_pairable_host_stop(void) {
-    [nyxel_pairing_host_service stop];
-    nyxel_pairing_host_service = nil;
-    nyxel_pairing_service_delegate = nil;
     nyxel_nw_listener_stop();
     nyxel_pairing_host_running = NO;
     nyxel_pairing_host_local_port = 0;

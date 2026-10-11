@@ -256,7 +256,12 @@ class InjectorService {
         }
     }
 
-    private static func readFromContainer(relPath: String, container: String, bundleID: String) -> Data? {
+    private static func readFromContainer(
+        relPath: String,
+        container: String,
+        bundleID: String,
+        onFailure: ((String) -> Void)? = nil
+    ) -> Data? {
         let fullPath = container + "/" + relPath
         let parentDir = (fullPath as NSString).deletingLastPathComponent
 
@@ -267,16 +272,21 @@ class InjectorService {
             patch: deviceVersion.patch,
             build: NyxelSupportPolicy.currentBuild
         )
+        NyxelActivityLog.record("DIAG original read requested bundleID=\(bundleID) relativePath=\(relPath) pairingRequired=\(pairingRequired)")
         if pairingRequired {
             guard NixelAirLiftFileChannel.isAvailable else {
-                NyxelActivityLog.record("AirLift read omitido: falta pairing requerido")
+                let detail = "AirLift read omitido: falta pairing requerido"
+                NyxelActivityLog.record("DIAG \(detail)")
+                onFailure?(detail)
                 return nil
             }
             switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
             case .success(let data):
+                NyxelActivityLog.record("DIAG original read succeeded bytes=\(data.count)")
                 return data
             case .failure(let error):
-                NyxelActivityLog.record("AirLift read falló (\(relPath)): \(error.message)")
+                NyxelActivityLog.record("DIAG original read failed relativePath=\(relPath) detail=\(error.message)")
+                onFailure?(error.message)
                 return nil
             }
         }
@@ -298,7 +308,15 @@ class InjectorService {
         } else if pairingRequired {
             return nil
         }
-        return try? Data(contentsOf: URL(fileURLWithPath: fullPath))
+        do {
+            let data = try Data(contentsOf: URL(fileURLWithPath: fullPath))
+            NyxelActivityLog.record("DIAG original direct read succeeded bytes=\(data.count)")
+            return data
+        } catch {
+            NyxelActivityLog.record("DIAG original direct read failed: \(error.localizedDescription)")
+            onFailure?(error.localizedDescription)
+            return nil
+        }
     }
 
     /// Comprueba si el bundle está instalado y accesible en el sistema verificado.
@@ -452,7 +470,7 @@ class InjectorService {
             return InjectorResult(success: false, message: msg)
         }
 
-        sendErrorNotification("✅ PASO 3", "Container: \(container)")
+        sendErrorNotification("✅ PASO 3", "Contenedor del juego resuelto")
 
         sendErrorNotification("⏭️ PASO 4", "Se omite query MCM heredada: esta función está deshabilitada en la build")
 
@@ -499,6 +517,7 @@ class InjectorService {
         let previousPath = UserDefaults.standard.string(forKey: activePathKey(for: game))
         let previousRestoreWasConfirmed = UserDefaults.standard.bool(forKey: restoreCompletedKey(for: game))
         var originalData: Data?
+        var originalReadFailure: String?
         if fm.fileExists(atPath: backupURL.path) {
             guard let savedOriginal = try? Data(contentsOf: backupURL), !savedOriginal.isEmpty else {
                 let msg = "El respaldo privado existe, pero no se puede leer; no se modificó el archivo del juego."
@@ -519,7 +538,12 @@ class InjectorService {
             sendErrorNotification("❌ PASO 9", msg)
             return InjectorResult(success: false, message: msg)
         } else {
-            originalData = readFromContainer(relPath: activeRel, container: container, bundleID: bundleID)
+            originalData = readFromContainer(
+                relPath: activeRel,
+                container: container,
+                bundleID: bundleID,
+                onFailure: { originalReadFailure = $0 }
+            )
         }
 
         let originalWasMissing: Bool
@@ -543,7 +567,9 @@ class InjectorService {
             originalWasMissing = false
             NyxelActivityLog.record("Original respaldado en el almacenamiento privado (\(original.count) bytes)")
         } else if requiresPairingTransportOnCurrentDevice() {
-            let msg = "AirLift no pudo leer el original. Se canceló la inyección para no reemplazarlo sin respaldo."
+            let detail = originalReadFailure.map { String($0.prefix(480)) }
+            let reason = detail.map { " Detalle: \($0)" } ?? " Revisa Perfil > Diagnóstico para ver el registro AirLift."
+            let msg = "AirLift no pudo leer el original. Se canceló la inyección para no reemplazarlo sin respaldo.\(reason)"
             sendErrorNotification("❌ PASO 9", msg)
             return InjectorResult(success: false, message: msg)
         } else if !fm.fileExists(atPath: destPath) {

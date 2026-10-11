@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 private let nyxelAirliftLogCallback: ALLogCallback = { _, message in
     guard let message else { return }
@@ -18,6 +19,26 @@ enum NixelAirLiftFileChannel {
 
     static var isAvailable: Bool {
         NixelPairingRecordStore.shared.load(deviceID: "2424") != nil
+    }
+
+    private static func recordNetworkPath(_ context: String) {
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { path in
+            let status: String
+            switch path.status {
+            case .satisfied: status = "satisfied"
+            case .requiresConnection: status = "requiresConnection"
+            case .unsatisfied: status = "unsatisfied"
+            @unknown default: status = "unknown"
+            }
+            let interfaces = path.availableInterfaces.map { String(describing: $0.type) }.joined(separator: ",")
+            NyxelActivityLog.record(
+                "DIAG network \(context) status=\(status) cellular=\(path.usesInterfaceType(.cellular)) wifi=\(path.usesInterfaceType(.wifi)) interfaces=\(interfaces)"
+            )
+            monitor.pathUpdateHandler = nil
+            monitor.cancel()
+        }
+        monitor.start(queue: DispatchQueue.global(qos: .utility))
     }
 
     private static func safeRelativePath(_ value: String) -> Bool {
@@ -47,8 +68,9 @@ enum NixelAirLiftFileChannel {
             return .failure(ChannelError(message: detail))
         }
         let path = String(cString: containerPointer)
-        NyxelActivityLog.record("DIAG AirLift container lookup succeeded elapsed_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000)) path=\(path)")
+        NyxelActivityLog.record("DIAG AirLift container lookup succeeded elapsed_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000))")
         guard path.hasPrefix("/var/mobile/Containers/Data/Application/") else {
+            NyxelActivityLog.record("DIAG AirLift container lookup rejected an unexpected path prefix")
             return .failure(ChannelError(message: "AirLift devolvió una ruta de contenedor no válida."))
         }
         return .success(path)
@@ -73,7 +95,7 @@ enum NixelAirLiftFileChannel {
             case .failure(let error): return .failure(error)
             case .success(let container):
                 let target = URL(fileURLWithPath: container, isDirectory: true).appendingPathComponent(relativePath)
-                NyxelActivityLog.record("DIAG AirLift target resolved; targetPath=\(target.path); ATC transfer not started yet")
+                NyxelActivityLog.record("DIAG AirLift target resolved relativePath=\(relativePath); ATC transfer not started yet")
                 let staging = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-airlift-write-\(UUID().uuidString)", isDirectory: true)
                 try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
                 defer { try? FileManager.default.removeItem(at: staging) }
@@ -101,11 +123,18 @@ enum NixelAirLiftFileChannel {
 
     static func read(relativePath: String, bundleID: String) -> Result<Data, ChannelError> {
         guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else {
-            return .failure(ChannelError(message: "No hay un registro de pairing guardado."))
+            let detail = "No hay un registro de pairing guardado."
+            NyxelActivityLog.record("DIAG AirLift read stopped: pairing record missing")
+            return .failure(ChannelError(message: detail))
         }
         guard safeRelativePath(relativePath) else {
-            return .failure(ChannelError(message: "La ruta remota no es segura."))
+            let detail = "La ruta remota no es segura."
+            NyxelActivityLog.record("DIAG AirLift read stopped: unsafe relative path")
+            return .failure(ChannelError(message: detail))
         }
+        let startedAt = Date()
+        recordNetworkPath("before AirLift read")
+        NyxelActivityLog.record("DIAG AirLift read started bundleID=\(bundleID) relativePath=\(relativePath) pairingRecordBytes=\(record.count)")
         let pairingURL = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-airlift-pairing-\(UUID().uuidString).plist")
         let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-airlift-read-\(UUID().uuidString)")
         do {
@@ -129,11 +158,21 @@ enum NixelAirLiftFileChannel {
                 let detail = errorPointer.map { String(cString: $0) }
                 if let errorPointer { al_string_free(errorPointer) }
                 guard code == 0 else {
-                    return .failure(ChannelError(message: detail ?? "AirLift no pudo leer el archivo (\(code))."))
+                    let message = detail ?? "AirLift no pudo leer el archivo (\(code))."
+                    NyxelActivityLog.record("DIAG AirLift read failed code=\(code) elapsed_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000)) detail=\(message)")
+                    return .failure(ChannelError(message: message))
                 }
-                return .success(try Data(contentsOf: outputURL, options: .mappedIfSafe))
+                do {
+                    let data = try Data(contentsOf: outputURL, options: .mappedIfSafe)
+                    NyxelActivityLog.record("DIAG AirLift read succeeded elapsed_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000)) bytes=\(data.count)")
+                    return .success(data)
+                } catch {
+                    NyxelActivityLog.record("DIAG AirLift output read failed elapsed_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000)) error=\(error.localizedDescription)")
+                    return .failure(ChannelError(message: "No se pudo abrir el resultado local de AirLift: \(error.localizedDescription)"))
+                }
             }
         } catch {
+            NyxelActivityLog.record("DIAG AirLift read preparation failed elapsed_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000)) error=\(error.localizedDescription)")
             return .failure(ChannelError(message: "No se pudo preparar la lectura AirLift: \(error.localizedDescription)"))
         }
     }

@@ -1,7 +1,7 @@
 import Foundation
 import UserNotifications
 
-enum DavizinScreenStage: Equatable { case login, home, gameSelection, modeSelection, operation, profile }
+enum DavizinScreenStage: Equatable { case login, home, gameSelection, modeSelection, operation, profile, help }
 
 enum DavizinGame: String, CaseIterable { case freeFire = "Free Fire", freeFireMax = "Free Fire MAX" }
 
@@ -222,7 +222,7 @@ enum NyxelCleanupFlow {
         content.body = "Regresa a Nyxel y pulsa “LIMPIAR SESIÓN SÍ O SÍ” antes de volver a inyectar."
         content.sound = .default
         content.interruptionLevel = .timeSensitive
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 6, repeats: false)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
         let request = UNNotificationRequest(identifier: notificationID, content: content, trigger: trigger)
         center.add(request)
     }

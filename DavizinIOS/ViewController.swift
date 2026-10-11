@@ -31,10 +31,17 @@ final class ViewController: UIViewController {
     private var missionMapView: MissionMapView?
     private var profileView: ProfileView?
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
+    private var stageBeforeHelp: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
         traitCollection.userInterfaceStyle == .light ? .darkContent : .lightContent
+    }
+
+    override var shouldAutorotate: Bool { true }
+
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
     }
 
     /// Usa este factory cuando presentes el UI desde otro controlador.
@@ -302,6 +309,9 @@ final class ViewController: UIViewController {
         bottomNavView.onVPN = { [weak self] in
             self?.showVPN(animated: true)
         }
+        bottomNavView.onHelp = { [weak self] in
+            self?.showHelp(animated: true)
+        }
         view.addSubview(bottomNavView)
         let bottomNavHeight = bottomNavView.heightAnchor.constraint(equalToConstant: 0)
         bottomNavHeightConstraint = bottomNavHeight
@@ -476,7 +486,7 @@ final class ViewController: UIViewController {
         screen.delegate = self
         screen.selectedGame = selectedGame
         screen.selectedMode = selectedMode
-        let gameReady = NyxelInstalledGames.statusText().contains(selectedGame == .freeFireMax ? "✓ MAX instalado" : "✓ Free Fire instalado")
+        let gameReady = NyxelInstalledGames.isInstalled(for: selectedGame)
         screen.setPreflight([
             activeKey != nil && activeRemainingSeconds > 0 ? "✓ Key autorizada" : "✕ Sesión no autorizada",
             activeRemainingSeconds > 0 ? "✓ Sesión activa" : "✕ Sesión expirada",
@@ -501,7 +511,9 @@ final class ViewController: UIViewController {
         headerView.title = "iOS 27"
         headerView.showsBackButton = true
         headerView.showsAvatarButton = false
-        display(NyxelVPNView(), animated: animated)
+        let screen = NyxelVPNView()
+        screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds)
+        display(screen, animated: animated)
     }
 
     /// Perfil: accesible desde el avatar del header en cualquier pantalla (excepto login).
@@ -536,6 +548,18 @@ final class ViewController: UIViewController {
         }
         screen.refresh()
         profileView = screen
+        display(screen, animated: animated)
+    }
+
+    private func showHelp(animated: Bool) {
+        if currentStage != .help { stageBeforeHelp = currentStage }
+        currentStage = .help
+        setBottomNavigation(visible: true, selected: .help)
+        headerView.title = "Centro de ayuda"
+        headerView.showsBackButton = true
+        headerView.showsAvatarButton = false
+
+        let screen = HelpCenterView()
         display(screen, animated: animated)
     }
 
@@ -704,7 +728,15 @@ final class ViewController: UIViewController {
             case .modeSelection: showModeSelection(animated: true)
             case .gameSelection: showGameSelection(animated: true)
             case .home: showGameSelection(animated: true)
+            case .help: showHelp(animated: true)
             default: showModeSelection(animated: true)
+            }
+        case .help:
+            switch stageBeforeHelp {
+            case .operation: showOperation(animated: true)
+            case .profile: showProfile(animated: true)
+            case .modeSelection: showModeSelection(animated: true)
+            case .gameSelection, .home, .login, .help: showGameSelection(animated: true)
             }
         }
     }
@@ -744,6 +776,15 @@ extension ViewController: ProfileViewDelegate {
     func profileViewDidTapLogout(_ view: ProfileView) {
         setAccountSession(key: nil, remainingSeconds: 0)
         showLogin(animated: true)
+    }
+
+    func profileView(_ view: ProfileView, didRequestShareDiagnostics text: String) {
+        let share = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        if let popover = share.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+        }
+        present(share, animated: true)
     }
 }
 

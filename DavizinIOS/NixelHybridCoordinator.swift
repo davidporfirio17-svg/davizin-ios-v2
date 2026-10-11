@@ -186,12 +186,14 @@ final class NixelPairingProbe {
         self.completion = completion
         serviceMap.removeAll()
 
+        let parameters = NWParameters.tcp
+        parameters.includePeerToPeer = true
         let serviceTypes = [
             "_remotepairing-pairable-host._tcp",
             "_3105airlift._tcp"
         ]
         browsers = serviceTypes.map { serviceType in
-            let browser = NWBrowser(for: .bonjour(type: serviceType, domain: nil), using: .tcp)
+            let browser = NWBrowser(for: .bonjour(type: serviceType, domain: nil), using: parameters)
             browser.browseResultsChangedHandler = { [weak self] results, _ in
                 guard let self else { return }
                 for result in results {
@@ -229,7 +231,9 @@ final class NixelPairingProbe {
         completion: @escaping (NixelPairingTransportResult) -> Void
     ) {
         connection?.cancel()
-        let connection = NWConnection(to: service.endpoint, using: .tcp)
+        let parameters = NWParameters.tcp
+        parameters.includePeerToPeer = true
+        let connection = NWConnection(to: service.endpoint, using: parameters)
         self.connection = connection
         var completed = false
         func finish(_ result: NixelPairingTransportResult) {
@@ -489,7 +493,7 @@ private enum NixelPairingPINNotification {
         center.removeDeliveredNotifications(withIdentifiers: [identifier])
 
         let content = UNMutableNotificationContent()
-        content.title = "Código de emparejamiento 2424"
+        content.title = "Código de Pairing"
         content.body = "PIN: \(pin). Introdúcelo en la solicitud de iOS."
         content.sound = .default
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
