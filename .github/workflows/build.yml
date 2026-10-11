@@ -4,9 +4,19 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      target:
+        description: App a compilar
+        type: choice
+        required: true
+        default: nyxel
+        options:
+          - nyxel
+          - admin
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target != 'admin' }}
     runs-on: macos-14
     steps:
     - name: Checkout
@@ -167,3 +177,7 @@ jobs:
         name: Nyxel_External_iOS_unsigned
         path: /tmp/Nyxel_External_unsigned.ipa
         retention-days: 30
+
+  build-admin:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'admin' }}
+    uses: ./.github/workflows/build-admin.yml
