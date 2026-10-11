@@ -1,0 +1,52 @@
+name: Build Nyxel Admin iOS
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'NyxelAdmin/**'
+      - 'NyxelAdmin.xcodeproj/**'
+      - '.github/workflows/build-admin.yml'
+  workflow_dispatch:
+
+jobs:
+  build-admin:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Nyxel Admin for iPad
+        run: |
+          set -euo pipefail
+          DERIVED="$RUNNER_TEMP/NyxelAdminDerived"
+          xcodebuild \
+            -project NyxelAdmin.xcodeproj \
+            -target NyxelAdmin \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            -derivedDataPath "$DERIVED" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+          APP="$DERIVED/Build/Products/Release-iphoneos/NyxelAdmin.app"
+          test -d "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist" | grep -Fx 'Nyxel Admin'
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" | grep -Fx '1.0'
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist" | grep -Fx '1'
+
+          PACKAGE="$RUNNER_TEMP/NyxelAdminPackage"
+          mkdir -p "$PACKAGE/Payload"
+          ditto "$APP" "$PACKAGE/Payload/NyxelAdmin.app"
+          (cd "$PACKAGE" && /usr/bin/zip -qry "$RUNNER_TEMP/Nyxel_Admin_1.0_build_1_unsigned.ipa" Payload)
+          /usr/bin/unzip -t "$RUNNER_TEMP/Nyxel_Admin_1.0_build_1_unsigned.ipa"
+
+      - name: Upload Nyxel Admin IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nyxel_Admin_iOS_unsigned
+          path: ${{ runner.temp }}/Nyxel_Admin_1.0_build_1_unsigned.ipa
+          retention-days: 30
