@@ -2088,7 +2088,7 @@ ${card('Entre 7 y 15 días','Keys a media vida','g7_15',g7,'#f5b301')}
 ${card('De 1 a 7 días','Keys por vencer pronto','g1_7',g1,'#ff8c42')}
 `,ses);
   }
-  
+
 if(path==='/usage'&&sa){
   const period=['today','week','all'].includes(url.searchParams.get('period'))?url.searchParams.get('period'):'today';
   const now=new Date(),parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now),get=t=>parts.find(x=>x.type===t)?.value||'';
@@ -2104,7 +2104,7 @@ if(path==='/usage'&&sa){
   const tab=(value,text)=>'<a href="/usage?period='+value+'" class="btn '+(period===value?'b-pr':'b-gh')+'"'+(period===value?' aria-current="page"':'')+'>'+text+'</a>';
   const warning=dataError?'<div class="al al-w" style="margin-bottom:14px">No se pudieron consultar las estadísticas ahora. Esto no interrumpe la entrega de recursos.</div>':'';
   const body='<div class="ph"><div><h1>▥ Uso de funciones</h1><p>Modos más usados e inyecciones registradas</p></div><div class="acts"><span class="tag">'+new Intl.DateTimeFormat('es-MX',{timeZone:'America/Mexico_City',hour:'2-digit',minute:'2-digit'}).format(now)+' CDMX</span><a class="btn b-gh" href="/usage?period='+period+'">Actualizar</a></div></div><div class="acts" style="margin:0 0 18px;gap:8px">'+tab('today','Hoy')+tab('week','Esta semana')+tab('all','Histórico')+'<span style="font-size:11px;color:var(--t3);align-self:center;margin-left:6px">'+periodText+'</span></div>'+warning+
-  '<div class="sg"><div class="stat"><div class="stat-n">'+(dataError?'—':total)+'</div><div class="stat-l">Entregas autorizadas</div><div class="stat-sub">'+label+' · recursos solicitados</div></div><div class="stat"><div class="stat-n" style="font-size:20px">'+(dataError?'No disponible':esc(top?top.label:'Sin registros'))+'</div><div class="stat-l">Modo con más uso</div><div class="stat-sub">'+(top?top.total+' entregas en este periodo':'Todavía no hay actividad de este periodo')+'</div></div><div class="stat"><div class="stat-n">'+(dataError?'—':noActivity)+'</div><div class="stat-l">Modos activos sin uso</div><div class="stat-sub">Sin entregas registradas en '+label.toLowerCase()+'</div></div></div>'+ 
+  '<div class="sg"><div class="stat"><div class="stat-n">'+(dataError?'—':total)+'</div><div class="stat-l">Entregas autorizadas</div><div class="stat-sub">'+label+' · recursos solicitados</div></div><div class="stat"><div class="stat-n" style="font-size:20px">'+(dataError?'No disponible':esc(top?top.label:'Sin registros'))+'</div><div class="stat-l">Modo con más uso</div><div class="stat-sub">'+(top?top.total+' entregas en este periodo':'Todavía no hay actividad de este periodo')+'</div></div><div class="stat"><div class="stat-n">'+(dataError?'—':noActivity)+'</div><div class="stat-l">Modos activos sin uso</div><div class="stat-sub">Sin entregas registradas en '+label.toLowerCase()+'</div></div></div>'+
   '<div class="card" style="margin-top:18px"><div class="card-h"><span class="card-t">Ranking por modo y juego</span><span style="font-size:11px;color:var(--t3)">Participación del total</span></div><div class="card-b"><div class="tw">'+(rows?'<table><thead><tr><th>Opción</th><th>FF MAX</th><th>FF Normal</th><th>Total</th><th>Participación</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div class="em"><span class="em-ic">▥</span><p class="em-t">'+(dataError?'Estadísticas temporalmente no disponibles':'Sin entregas registradas')+'</p><p class="em-s">'+(dataError?'Inténtalo más tarde; los recursos del cliente siguen funcionando.':'Los conteos históricos empiezan el '+startDate+'. No hay datos anteriores que se puedan recuperar.')+'</p></div>')+'</div></div></div><div class="al al-s" style="margin-top:14px">Se guarda únicamente un contador diario agregado por modo y juego; no se conservan keys, IP ni identificadores de clientes. Cuenta entregas autorizadas del recurso, no confirma que la inyección haya terminado correctamente. Histórico disponible desde '+startDate+'. Si falla el contador o se alcanza la cuota de D1, no se interrumpen las descargas pero puede omitirse ese conteo.</div>';
   return wrap('Uso',body,ses);
 }
@@ -2172,7 +2172,7 @@ ${cur?`<div style="margin-top:20px;padding:16px;background:var(--bg2);border-rad
         <a href="/keys/${encodeURIComponent(d.key)}/pause" class="btn b-sm ${d.paused?'b-ok':'b-w'}">${d.paused?'▶':'⏸'}</a>
         <a href="/keys/${encodeURIComponent(d.key)}/poison" class="btn b-sm ${d.poisoned?'b-e':'b-w'}" onclick="return confirm('${d.poisoned?'¿Quitar veneno?':'¿Envenenar? Crashea Free Fire.'}')">☠</a>
         <a href="/keys/${encodeURIComponent(d.key)}/reset" class="btn b-sm b-w" onclick="return confirm('¿Reset dispositivo?')">♻️</a>
-        
+
         <a href="/keys/${encodeURIComponent(d.key)}/trash" class="btn b-sm b-e" onclick="return confirm('¿Eliminar?')">✕</a>
       </div></td></tr>`;}
     const okMsg=url.searchParams.get('ok'),resultAction=url.searchParams.get('action');
@@ -2344,12 +2344,3 @@ async function appChk(req,env){
 }
 async function appUpd(){return Response.json({success:true,message:'Device updated.',user_data:{phone:'any',ios:'any',remaining_seconds:999999}},{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
 }
-
-
-
-
-
-
-
-
---1bec4c1a74b90641e8692c0c4e8864e4bd4fbd564acbcc4ce53c6e9c8883--
