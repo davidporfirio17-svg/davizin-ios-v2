@@ -1,9 +1,0 @@
-{
-  "name": "Ejemplo Dissolve",
-  "description": "Shader de ejemplo para ver cómo funciona el organizador. Copia esta carpeta para agregar el tuyo.",
-  "type": "Surface",
-  "pipeline": "URP",
-  "format": "HLSL",
-  "tags": ["EJEMPLO", "VFX"],
-  "created": "2026-10-12"
-}

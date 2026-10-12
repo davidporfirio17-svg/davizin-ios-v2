@@ -1,9 +1,0 @@
-{
-  "name": "Holographic Dissolve",
-  "description": "Efecto de disolución holográfica con fresnel rim y scan lines animadas. Ideal para UI sci-fi.",
-  "type": "Surface",
-  "pipeline": "HDRP",
-  "format": "HLSL",
-  "tags": ["HDRP", "VFX", "ANIMATED"],
-  "created": "2026-10-12"
-}
