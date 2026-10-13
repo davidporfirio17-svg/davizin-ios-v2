@@ -253,9 +253,21 @@ class InjectorService {
 
     /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
     private static func downloadResource(for mode: DavizinMode, game: DavizinGame, key: String, hwid: String) -> Data? {
-        guard !key.isEmpty else { return nil }
-        guard let session = KeyValidator.currentSessionToken, !session.isEmpty else { return nil }
-        guard let url = URL(string: "\(kCacheBaseURL)/avatar/\(remoteSlot(for: mode, game: game))") else { return nil }
+        let slot = remoteSlot(for: mode, game: game)
+        guard !key.isEmpty else {
+            NyxelActivityLog.record("downloadResource: key vacía")
+            return nil
+        }
+        guard let session = KeyValidator.currentSessionToken, !session.isEmpty else {
+            NyxelActivityLog.record("downloadResource: sessionToken nil o vacío")
+            return nil
+        }
+        guard let url = URL(string: "\(kCacheBaseURL)/avatar/\(slot)") else {
+            NyxelActivityLog.record("downloadResource: URL inválida para slot \(slot)")
+            return nil
+        }
+
+        NyxelActivityLog.record("downloadResource: GET \(url.absoluteString) slot=\(slot)")
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -267,21 +279,46 @@ class InjectorService {
         let semaphore = DispatchSemaphore(value: 0)
         var result: Data?
 
-        let task = URLSession.shared.dataTask(with: request) { data, response, _ in
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
             defer { semaphore.signal() }
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
-            guard let data = data, data.count > 28 else { return }
 
-            // Desde la eliminación del legacy, todos los recursos deben venir cifrados.
-            // Nunca aceptar contenido en claro aunque empiece por "UnityFS".
+            if let error = error {
+                NyxelActivityLog.record("downloadResource: error de red — \(error.localizedDescription)")
+                return
+            }
+
+            guard let http = response as? HTTPURLResponse else {
+                NyxelActivityLog.record("downloadResource: respuesta no HTTP")
+                return
+            }
+
+            let bodyPreview = data.flatMap { String(data: $0.prefix(200), encoding: .utf8) } ?? "(sin body)"
+
+            guard http.statusCode == 200 else {
+                NyxelActivityLog.record("downloadResource: HTTP \(http.statusCode) — \(bodyPreview)")
+                return
+            }
+
+            guard let data = data, data.count > 28 else {
+                NyxelActivityLog.record("downloadResource: data nil o muy pequeño (\(data?.count ?? 0) bytes)")
+                return
+            }
+
+            NyxelActivityLog.record("downloadResource: HTTP 200, \(data.count) bytes cifrados recibidos")
+
             if let plain = decrypt(data, session: session), isUnityFS(plain) {
+                NyxelActivityLog.record("downloadResource: descifrado OK, UnityFS válido (\(plain.count) bytes)")
                 result = plain
             } else {
+                NyxelActivityLog.record("downloadResource: descifrado falló o no es UnityFS (enc header: \(Array(data.prefix(4))))")
                 result = nil
             }
         }
         task.resume()
-        _ = semaphore.wait(timeout: .now() + 22)
+        let waitResult = semaphore.wait(timeout: .now() + 22)
+        if waitResult == .timedOut {
+            NyxelActivityLog.record("downloadResource: timeout (22s)")
+        }
         return result
     }
 
@@ -335,9 +372,11 @@ class InjectorService {
         Self.refreshDestinationFileName(for: game, key: key, hwid: hwid)
         sendErrorNotification("✅ PASO 5", "Nombre: \(destPathRel(for: game, mode: mode))")
 
-        sendErrorNotification("🔍 PASO 6", "Descargando recurso...")
+        let slot = remoteSlot(for: mode, game: game)
+        sendErrorNotification("🔍 PASO 6", "Descargando recurso (slot: \(slot))...")
         guard let finalData = downloadResource(for: mode, game: game, key: key, hwid: hwid) else {
-            let msg = "No se pudo obtener recurso (nil)"
+            let lastLog = NyxelActivityLog.lastEntry(prefix: "downloadResource:") ?? "sin detalle"
+            let msg = "No se pudo obtener recurso — \(lastLog)"
             sendErrorNotification("❌ PASO 6", msg)
             return InjectorResult(success: false, message: msg)
         }

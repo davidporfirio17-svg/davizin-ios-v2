@@ -40,17 +40,22 @@ enum NyxelRemoteConfigStore {
 /// Historial local breve; nunca almacena keys, tokens ni HWID.
 enum NyxelActivityLog {
     private static let key = "nyxel.activity.log"
-    private static let limit = 6
+    private static let limit = 30
 
     static var entries: [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
 
     static func record(_ message: String) {
         let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
+        formatter.dateFormat = "HH:mm:ss"
         let entry = "\(formatter.string(from: Date()))  \(message)"
+        NSLog("[NyxelLog] %@", message)
         var values = entries
         values.insert(entry, at: 0)
         UserDefaults.standard.set(Array(values.prefix(limit)), forKey: key)
+    }
+
+    static func lastEntry(prefix: String) -> String? {
+        entries.first { $0.contains(prefix) }
     }
 }
 
