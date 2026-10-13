@@ -251,20 +251,68 @@ class InjectorService {
         _ = semaphore.wait(timeout: .now() + 9)
     }
 
-    /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
-    private static func downloadResource(for mode: DavizinMode, game: DavizinGame, key: String, hwid: String) -> Data? {
-        let slot = remoteSlot(for: mode, game: game)
-        guard !key.isEmpty else {
-            NyxelActivityLog.record("downloadResource: key vacía")
-            return nil
-        }
+    /// Refresca el session token directamente contra /check (síncrono, sin main thread).
+    /// Devuelve true si se obtuvo un token nuevo.
+    private static func refreshSession(key: String, hwid: String) -> Bool {
+        NyxelActivityLog.record("refreshSession: revalidando key para sesión fresca")
+        guard let url = URL(string: "\(kCacheBaseURL)/check") else { return false }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.timeoutInterval = 15
+        KeyValidator.applySecurityHeaders(to: &request)
+
+        let body: [String: Any] = [
+            "key": key.uppercased(),
+            "username": key.uppercased(),
+            "hwid": hwid,
+            "model": KeyValidator.getDeviceModel(),
+            "ios": KeyValidator.getIOSVersion(),
+            "app_version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
+            "app_build": KeyValidator.getAppBuild(),
+            "installation_id": KeyValidator.getInstallationID()
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var success = false
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            defer { semaphore.signal() }
+            guard error == nil,
+                  let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  let data = data,
+                  let resp = try? JSONDecoder().decode(KeyResponse.self, from: data),
+                  resp.success,
+                  let session = resp.data?.client_session, !session.isEmpty else {
+                NyxelActivityLog.record("refreshSession: falló (\((response as? HTTPURLResponse)?.statusCode ?? -1))")
+                return
+            }
+            KeyValidator.updateSessionToken(session)
+            NyxelActivityLog.record("refreshSession: sesión renovada OK")
+            success = true
+        }.resume()
+
+        _ = semaphore.wait(timeout: .now() + 18)
+        return success
+    }
+
+    /// Resultado interno de un intento de descarga (permite decidir si reintentar).
+    private enum DownloadAttemptResult {
+        case success(Data)
+        case retryableError(String)
+        case permanentError(String)
+    }
+
+    /// Un intento individual de descarga del cache_res.
+    private static func attemptDownload(slot: String, key: String, hwid: String) -> DownloadAttemptResult {
         guard let session = KeyValidator.currentSessionToken, !session.isEmpty else {
-            NyxelActivityLog.record("downloadResource: sessionToken nil o vacío")
-            return nil
+            return .retryableError("sessionToken nil o vacío")
         }
         guard let url = URL(string: "\(kCacheBaseURL)/avatar/\(slot)") else {
-            NyxelActivityLog.record("downloadResource: URL inválida para slot \(slot)")
-            return nil
+            return .permanentError("URL inválida para slot \(slot)")
         }
 
         NyxelActivityLog.record("downloadResource: GET \(url.absoluteString) slot=\(slot)")
@@ -277,30 +325,36 @@ class InjectorService {
         request.timeoutInterval = 20
 
         let semaphore = DispatchSemaphore(value: 0)
-        var result: Data?
+        var attemptResult: DownloadAttemptResult = .permanentError("sin respuesta")
 
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             defer { semaphore.signal() }
 
             if let error = error {
-                NyxelActivityLog.record("downloadResource: error de red — \(error.localizedDescription)")
+                attemptResult = .retryableError("error de red — \(error.localizedDescription)")
                 return
             }
 
             guard let http = response as? HTTPURLResponse else {
-                NyxelActivityLog.record("downloadResource: respuesta no HTTP")
+                attemptResult = .permanentError("respuesta no HTTP")
                 return
             }
 
-            let bodyPreview = data.flatMap { String(data: $0.prefix(200), encoding: .utf8) } ?? "(sin body)"
+            let body = data.flatMap { String(data: $0.prefix(200), encoding: .utf8) } ?? "(sin body)"
 
             guard http.statusCode == 200 else {
-                NyxelActivityLog.record("downloadResource: HTTP \(http.statusCode) — \(bodyPreview)")
+                let detail = "HTTP \(http.statusCode) — \(body)"
+                // Errores que un refresh de sesión podría resolver
+                if http.statusCode == 401 && (body.contains("session") || body.contains("resource unavailable")) {
+                    attemptResult = .retryableError(detail)
+                } else {
+                    attemptResult = .permanentError(detail)
+                }
                 return
             }
 
             guard let data = data, data.count > 28 else {
-                NyxelActivityLog.record("downloadResource: data nil o muy pequeño (\(data?.count ?? 0) bytes)")
+                attemptResult = .permanentError("data nil o muy pequeño (\(data?.count ?? 0) bytes)")
                 return
             }
 
@@ -308,18 +362,112 @@ class InjectorService {
 
             if let plain = decrypt(data, session: session), isUnityFS(plain) {
                 NyxelActivityLog.record("downloadResource: descifrado OK, UnityFS válido (\(plain.count) bytes)")
-                result = plain
+                attemptResult = .success(plain)
             } else {
-                NyxelActivityLog.record("downloadResource: descifrado falló o no es UnityFS (enc header: \(Array(data.prefix(4))))")
-                result = nil
+                attemptResult = .permanentError("descifrado falló o no es UnityFS (enc header: \(Array(data.prefix(4))))")
             }
         }
         task.resume()
         let waitResult = semaphore.wait(timeout: .now() + 22)
         if waitResult == .timedOut {
-            NyxelActivityLog.record("downloadResource: timeout (22s)")
+            attemptResult = .retryableError("timeout (22s)")
         }
-        return result
+        return attemptResult
+    }
+
+    /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
+    /// Reintenta automáticamente con refresh de sesión ante errores recuperables.
+    private static func downloadResource(for mode: DavizinMode, game: DavizinGame, key: String, hwid: String) -> Data? {
+        let slot = remoteSlot(for: mode, game: game)
+        guard !key.isEmpty else {
+            NyxelActivityLog.record("downloadResource: key vacía")
+            return nil
+        }
+
+        // Primer intento
+        let first = attemptDownload(slot: slot, key: key, hwid: hwid)
+        switch first {
+        case .success(let data):
+            return data
+        case .permanentError(let detail):
+            NyxelActivityLog.record("downloadResource: error permanente — \(detail)")
+            return nil
+        case .retryableError(let detail):
+            NyxelActivityLog.record("downloadResource: error recuperable — \(detail), intentando refresh de sesión")
+        }
+
+        // Refresh de sesión y segundo intento
+        guard refreshSession(key: key, hwid: hwid) else {
+            NyxelActivityLog.record("downloadResource: refresh de sesión falló, abortando")
+            return nil
+        }
+
+        let second = attemptDownload(slot: slot, key: key, hwid: hwid)
+        switch second {
+        case .success(let data):
+            NyxelActivityLog.record("downloadResource: segundo intento exitoso tras refresh")
+            return data
+        case .retryableError(let detail), .permanentError(let detail):
+            NyxelActivityLog.record("downloadResource: segundo intento falló — \(detail)")
+            return nil
+        }
+    }
+
+    /// Traduce los errores del Worker a mensajes accionables para el usuario.
+    private static func translateWorkerError(_ rawLog: String) -> String {
+        let log = rawLog.lowercased()
+        if log.contains("unknown slot") || log.contains("unknown mode") {
+            return "Modo no disponible en el servidor. Verifica que el modo esté configurado en el panel."
+        }
+        if log.contains("resource unavailable") && log.contains("404") {
+            return "Build de la app no permitido. Actualiza allowed_app_builds en el Worker (build actual: \(KeyValidator.getAppBuild()))."
+        }
+        if log.contains("resource unavailable") && log.contains("401") {
+            return "Sesión no válida. Cierra y vuelve a entrar con tu key."
+        }
+        if log.contains("session required") {
+            return "Sesión expirada (TTL 5 min). Revalida tu key antes de inyectar."
+        }
+        if log.contains("empty") && log.contains("404") {
+            return "No hay archivo subido para este modo/slot en el servidor."
+        }
+        if log.contains("expired") {
+            return "Tu key ha expirado."
+        }
+        if log.contains("paused") {
+            return "Tu key está pausada."
+        }
+        if log.contains("banned") {
+            return "Dispositivo baneado."
+        }
+        if log.contains("invalid") && log.contains("401") {
+            return "Key no válida."
+        }
+        if log.contains("locked") {
+            return "Key bloqueada a otro dispositivo."
+        }
+        if log.contains("pro required") {
+            return "Este modo requiere acceso Pro."
+        }
+        if log.contains("maintenance") {
+            return "Servidor en mantenimiento. Intenta más tarde."
+        }
+        if log.contains("killswitch") {
+            return "Servicio deshabilitado temporalmente."
+        }
+        if log.contains("sessiontoken nil") {
+            return "Sin sesión activa. Revalida tu key."
+        }
+        if log.contains("timeout") {
+            return "El servidor no respondió a tiempo. Revisa tu conexión."
+        }
+        if log.contains("error de red") {
+            return "Error de conexión. Revisa tu internet."
+        }
+        if log.contains("descifrado falló") {
+            return "Error al descifrar el recurso. La sesión puede estar corrupta — revalida tu key."
+        }
+        return "No se pudo obtener recurso — \(rawLog)"
     }
 
     static func checkIsInjected(bundleID: String) -> Bool {
@@ -376,9 +524,9 @@ class InjectorService {
         sendErrorNotification("🔍 PASO 6", "Descargando recurso (slot: \(slot))...")
         guard let finalData = downloadResource(for: mode, game: game, key: key, hwid: hwid) else {
             let lastLog = NyxelActivityLog.lastEntry(prefix: "downloadResource:") ?? "sin detalle"
-            let msg = "No se pudo obtener recurso — \(lastLog)"
-            sendErrorNotification("❌ PASO 6", msg)
-            return InjectorResult(success: false, message: msg)
+            let userMsg = Self.translateWorkerError(lastLog)
+            sendErrorNotification("❌ PASO 6", userMsg)
+            return InjectorResult(success: false, message: userMsg)
         }
 
         guard finalData.count > 1000 else {

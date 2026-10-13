@@ -29,6 +29,11 @@ class KeyValidator {
     /// Token efímero emitido por el Worker para las operaciones posteriores.
     /// No se persiste en UserDefaults: debe desaparecer al cerrar la app.
     private(set) static var currentSessionToken: String?
+
+    /// Permite a InjectorService actualizar el token tras un refresh directo.
+    static func updateSessionToken(_ token: String) {
+        currentSessionToken = token
+    }
     private(set) static var lastCountryCode: String?
     private(set) static var lastValidationWasVersionUnavailable = false
 
@@ -114,12 +119,12 @@ class KeyValidator {
             return
         }
 
-			var request = URLRequest(url: url)
-			request.httpMethod = "POST"
-			request.cachePolicy = .reloadIgnoringLocalCacheData
-			request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-			request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-			request.timeoutInterval = 15
+				var request = URLRequest(url: url)
+				request.httpMethod = "POST"
+				request.cachePolicy = .reloadIgnoringLocalCacheData
+				request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+				request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+				request.timeoutInterval = 15
         applySecurityHeaders(to: &request)
 
         let hwid = getDeviceHWID()
