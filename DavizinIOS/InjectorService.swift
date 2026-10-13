@@ -384,21 +384,26 @@ class InjectorService {
             return nil
         }
 
+        let vpnActive = NixelHybridCoordinator.isExternalVPNActive()
+        if vpnActive {
+            NyxelActivityLog.record("downloadResource: VPN externo detectado — puede interferir con la descarga")
+        }
+
         // Primer intento
         let first = attemptDownload(slot: slot, key: key, hwid: hwid)
         switch first {
         case .success(let data):
             return data
         case .permanentError(let detail):
-            NyxelActivityLog.record("downloadResource: error permanente — \(detail)")
+            NyxelActivityLog.record("downloadResource: error permanente — \(detail)\(vpnActive ? " [VPN ACTIVO]" : "")")
             return nil
         case .retryableError(let detail):
-            NyxelActivityLog.record("downloadResource: error recuperable — \(detail), intentando refresh de sesión")
+            NyxelActivityLog.record("downloadResource: error recuperable — \(detail)\(vpnActive ? " [VPN ACTIVO]" : ""), intentando refresh de sesión")
         }
 
         // Refresh de sesión y segundo intento
         guard refreshSession(key: key, hwid: hwid) else {
-            NyxelActivityLog.record("downloadResource: refresh de sesión falló, abortando")
+            NyxelActivityLog.record("downloadResource: refresh de sesión falló\(vpnActive ? " [VPN ACTIVO — desactiva el VPN e intenta de nuevo]" : ""), abortando")
             return nil
         }
 
@@ -408,7 +413,7 @@ class InjectorService {
             NyxelActivityLog.record("downloadResource: segundo intento exitoso tras refresh")
             return data
         case .retryableError(let detail), .permanentError(let detail):
-            NyxelActivityLog.record("downloadResource: segundo intento falló — \(detail)")
+            NyxelActivityLog.record("downloadResource: segundo intento falló — \(detail)\(vpnActive ? " [VPN ACTIVO]" : "")")
             return nil
         }
     }
@@ -416,6 +421,10 @@ class InjectorService {
     /// Traduce los errores del Worker a mensajes accionables para el usuario.
     private static func translateWorkerError(_ rawLog: String) -> String {
         let log = rawLog.lowercased()
+        let vpnHint = NixelHybridCoordinator.isExternalVPNActive()
+            ? " Desactiva tu VPN e intenta de nuevo."
+            : ""
+
         if log.contains("unknown slot") || log.contains("unknown mode") {
             return "Modo no disponible en el servidor. Verifica que el modo esté configurado en el panel."
         }
@@ -423,10 +432,10 @@ class InjectorService {
             return "Build de la app no permitido. Actualiza allowed_app_builds en el Worker (build actual: \(KeyValidator.getAppBuild()))."
         }
         if log.contains("resource unavailable") && log.contains("401") {
-            return "Sesión no válida. Cierra y vuelve a entrar con tu key."
+            return "Sesión no válida. Cierra y vuelve a entrar con tu key.\(vpnHint)"
         }
         if log.contains("session required") {
-            return "Sesión expirada (TTL 5 min). Revalida tu key antes de inyectar."
+            return "Sesión expirada (TTL 5 min). Revalida tu key antes de inyectar.\(vpnHint)"
         }
         if log.contains("empty") && log.contains("404") {
             return "No hay archivo subido para este modo/slot en el servidor."
@@ -456,16 +465,19 @@ class InjectorService {
             return "Servicio deshabilitado temporalmente."
         }
         if log.contains("sessiontoken nil") {
-            return "Sin sesión activa. Revalida tu key."
+            return "Sin sesión activa. Revalida tu key.\(vpnHint)"
         }
         if log.contains("timeout") {
-            return "El servidor no respondió a tiempo. Revisa tu conexión."
+            return "El servidor no respondió a tiempo.\(vpnHint.isEmpty ? " Revisa tu conexión." : vpnHint)"
         }
-        if log.contains("error de red") {
-            return "Error de conexión. Revisa tu internet."
+        if log.contains("error de red") || log.contains("vpn activo") {
+            return "Error de conexión.\(vpnHint.isEmpty ? " Revisa tu internet." : vpnHint)"
         }
         if log.contains("descifrado falló") {
-            return "Error al descifrar el recurso. La sesión puede estar corrupta — revalida tu key."
+            return "Error al descifrar el recurso. La sesión puede estar corrupta — revalida tu key.\(vpnHint)"
+        }
+        if !vpnHint.isEmpty {
+            return "No se pudo obtener recurso.\(vpnHint)"
         }
         return "No se pudo obtener recurso — \(rawLog)"
     }
