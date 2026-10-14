@@ -35,6 +35,17 @@ Lecciones aprendidas (NO repetir):
 8. **Subnet mask /16 en el utun** (#512) — iOS 27 ignora la máscara en celular, kernel sigue escogiendo IP celular como source
 9. **Bind socket a `10.7.1.1` desde Rust** (#513) — rompe WiFi también ("No route to host" por bind al utun desde el app)
 10. **Fallback `bad_query` + I/O directa en iOS 27** (#514) — `bad_query` retorna handle=-3 sin kexploit (Apple patcheó la ruta sin exploit)
+11. **IP_BOUND_IF al utun desde Rust del main app** (#518) — WiFi sigue funcionando (confirmado inyección completa), celular ahora falla con `Connection refused` (os error 61) inmediato en vez de timeout 6s. Progreso diagnóstico (el paquete llega al kernel) pero sigue sin alcanzar remotepairingd con source correcto.
+
+## Observación clave del usuario (iOS 27 celular)
+
+- En **WiFi** aparece el icono de VPN en la barra de status cuando el app está en operación
+- En **celular** NO aparece ese icono, aunque `NEVPNStatus` reporte `.connected`
+- Diagnóstico: iOS 27 trata el VPN de manera distinta en celular — no lo activa realmente del lado del PacketTunnelProvider para procesamiento de paquetes
+
+## Siguiente paso aprobado por usuario
+
+Hacer un **botón separado "Datos (experimental)"** con ruta de inyección completamente aparte, que NO toque el camino de WiFi.  Plan técnico: TCP relay dentro del PacketTunnelProvider (la extension) escuchando en 127.0.0.1:49153 que a su vez conecta a 127.0.0.1:49152 (remotepairingd) usando IP_BOUND_IF al utun desde el proceso de la extension (que tiene privilegios de VPN distintos al main app).
 
 ## Causa raíz confirmada
 
