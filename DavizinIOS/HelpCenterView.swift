@@ -132,7 +132,8 @@ final class HelpCenterView: UIView {
         let version = UILabel()
         let shortVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
-        version.text = "\(NyxelSupportPolicy.currentDeviceModel)  ·  \(NyxelSupportPolicy.currentSystemDescription)  ·  v\(shortVersion) (\(build))  ·  IPA #\(AppState.ipaBuildNumber)"
+        let ipaBuild = (Bundle.main.infoDictionary?["NyxelBuildNumber"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "local"
+        version.text = "\(NyxelSupportPolicy.currentDeviceModel)  ·  \(NyxelSupportPolicy.currentSystemDescription)  ·  v\(shortVersion) (\(build))  ·  IPA #\(ipaBuild)"
         version.font = AppTheme.monoFont(10)
         version.textColor = AppTheme.tertiaryText
         version.numberOfLines = 0
