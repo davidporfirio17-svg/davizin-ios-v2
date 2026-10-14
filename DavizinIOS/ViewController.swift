@@ -113,25 +113,23 @@ final class ViewController: UIViewController {
         }
     }
 
-    /// Lee el log compartido escrito por el extension (ExternalTunnel.appex)
-    /// vía el App Group `group.com.apple.mobile.MobileHouseArrest.airlift`.
-    /// Así los mensajes del relay (que viven en otro proceso) quedan visibles
-    /// al compartir diagnósticos.
+    /// Pide al PacketTunnelProvider su log del relay via la API oficial
+    /// `sendProviderMessage` (handleAppMessage en la extension).  Esto NO
+    /// depende de App Groups — funciona aunque ldid no firme con un
+    /// provisioning profile reconocido por iOS.
     private static func flushRelayLog() {
-        let appGroup = "group.com.apple.mobile.MobileHouseArrest.airlift"
-        guard let url = FileManager.default
-                .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
-                .appendingPathComponent("airlift-relay.log"),
-              let data = try? Data(contentsOf: url),
-              let text = String(data: data, encoding: .utf8),
-              !text.isEmpty else { return }
-        for line in text.split(separator: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if !trimmed.isEmpty {
-                NyxelActivityLog.record("Relay: \(trimmed)")
+        NixelVPNManager.shared.fetchExtensionLogs { text in
+            guard let text, !text.isEmpty else {
+                NyxelActivityLog.record("Relay: (sin datos — handleAppMessage no respondió o VPN no activo)")
+                return
+            }
+            for line in text.split(separator: "\n") {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty {
+                    NyxelActivityLog.record("Relay: \(trimmed)")
+                }
             }
         }
-        try? Data().write(to: url)
     }
 
     func setOperationProgress(_ message: String) {

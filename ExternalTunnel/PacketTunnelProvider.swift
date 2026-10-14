@@ -6,45 +6,37 @@ import Darwin
 /// el estado de cada estrategia del relay y el main app lee este archivo al
 /// final de cada operación para incluirlo en el activity log — así podemos
 /// diagnosticar sin tener que conectar a Console.
+/// Log in-memory del relay, inicializado en el proceso de la extension.
+/// El main app lo pide por `NETunnelProviderSession.sendProviderMessage("fetch_logs")`
+/// via `handleAppMessage` abajo.  Esto evita depender de App Groups (que
+/// ldid no firma de forma reconocible por iOS sin provisioning profile).
 enum AirliftRelayLog {
-    static let appGroup = "group.com.apple.mobile.MobileHouseArrest.airlift"
-    static let fileName = "airlift-relay.log"
-    static let queue = DispatchQueue(label: "airlift.relay.log")
-
-    static var sharedURL: URL? {
-        FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
-            .appendingPathComponent(fileName)
-    }
+    private static let queue = DispatchQueue(label: "airlift.relay.log")
+    private static var lines: [String] = []
 
     static func push(_ msg: String) {
         NSLog("[AirliftRelay] %@", msg)
-        queue.async {
-            guard let url = sharedURL else { return }
+        queue.sync {
             let ts = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-            let line = "\(ts) \(msg)\n"
-            guard let data = line.data(using: .utf8) else { return }
-            if FileManager.default.fileExists(atPath: url.path),
-               let fh = try? FileHandle(forWritingTo: url) {
-                _ = try? fh.seekToEnd()
-                try? fh.write(contentsOf: data)
-                try? fh.close()
-            } else {
-                try? data.write(to: url)
-            }
+            lines.append("\(ts) \(msg)")
+            if lines.count > 500 { lines.removeFirst(lines.count - 500) }
         }
     }
 
     static func truncate() {
-        guard let url = sharedURL else { return }
-        try? Data().write(to: url)
+        queue.sync { lines.removeAll() }
     }
 
     static func readAndTruncate() -> String {
-        guard let url = sharedURL else { return "" }
-        let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-        try? Data().write(to: url)
-        return text
+        queue.sync {
+            let out = lines.joined(separator: "\n")
+            lines.removeAll()
+            return out
+        }
+    }
+
+    static func snapshot() -> String {
+        queue.sync { lines.joined(separator: "\n") }
     }
 }
 
@@ -89,6 +81,20 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         stopAirliftRelay()
         completionHandler()
+    }
+
+    override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
+        let text = String(data: messageData, encoding: .utf8) ?? ""
+        switch text {
+        case "fetch_logs":
+            let log = AirliftRelayLog.readAndTruncate()
+            completionHandler?(log.data(using: .utf8))
+        case "snapshot_logs":
+            let log = AirliftRelayLog.snapshot()
+            completionHandler?(log.data(using: .utf8))
+        default:
+            completionHandler?(Data())
+        }
     }
 
     private func readLoop() {
@@ -204,6 +210,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             ("bind10.7.1.1 → 10.7.0.1:49152",   0x0A070101, 0x0A070001, false),
             ("bind10.7.1.1 → 127.0.0.1:49152",  0x0A070101, 0x7F000001, false),
             ("IP_BOUND_IF utun → 127.0.0.1:49152", 0,        0x7F000001, true),
+            ("plain → 127.0.0.1:49152",         0,          0x7F000001, false),
         ]
         for (label, bindHostOrder, dstHostOrder, useIpBoundIf) in strategies {
             let fd = socket(AF_INET, SOCK_STREAM, 0)
