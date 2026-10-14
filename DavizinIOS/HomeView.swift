@@ -41,7 +41,7 @@ struct HomeView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .tracking(-0.4)
                     .foregroundStyle(primary)
-                Text("SECURE OPERATIONS · TEST BUILD · v\(appState.appVersion)")
+                Text("SECURE OPERATIONS · TEST BUILD · v\(appState.appVersion) · IPA #\(appState.ipaBuildNumber)")
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(1.1)
                     .foregroundStyle(muted)
