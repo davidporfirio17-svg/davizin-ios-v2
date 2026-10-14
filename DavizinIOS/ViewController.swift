@@ -101,14 +101,37 @@ final class ViewController: UIViewController {
         operationView?.setState(state)
         switch state {
         case .succeeded(let message):
+            Self.flushRelayLog()
             NyxelActivityLog.record("Operación completada")
             DavizinToastCenter.shared.show(title: "Operación completada", subtitle: message, kind: .success)
         case .failed(let message):
+            Self.flushRelayLog()
             NyxelActivityLog.record("Operación fallida")
             DavizinToastCenter.shared.show(title: "Operación fallida", subtitle: message, kind: .danger)
         default:
             break
         }
+    }
+
+    /// Lee el log compartido escrito por el extension (ExternalTunnel.appex)
+    /// vía el App Group `group.com.apple.mobile.MobileHouseArrest.airlift`.
+    /// Así los mensajes del relay (que viven en otro proceso) quedan visibles
+    /// al compartir diagnósticos.
+    private static func flushRelayLog() {
+        let appGroup = "group.com.apple.mobile.MobileHouseArrest.airlift"
+        guard let url = FileManager.default
+                .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
+                .appendingPathComponent("airlift-relay.log"),
+              let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .utf8),
+              !text.isEmpty else { return }
+        for line in text.split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if !trimmed.isEmpty {
+                NyxelActivityLog.record("Relay: \(trimmed)")
+            }
+        }
+        try? Data().write(to: url)
     }
 
     func setOperationProgress(_ message: String) {

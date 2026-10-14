@@ -1,6 +1,53 @@
 import NetworkExtension
 import Darwin
 
+/// Pequeño log compartido entre la extension y el main app vía el App Group
+/// `group.com.apple.mobile.MobileHouseArrest.airlift`.  La extension escribe
+/// el estado de cada estrategia del relay y el main app lee este archivo al
+/// final de cada operación para incluirlo en el activity log — así podemos
+/// diagnosticar sin tener que conectar a Console.
+enum AirliftRelayLog {
+    static let appGroup = "group.com.apple.mobile.MobileHouseArrest.airlift"
+    static let fileName = "airlift-relay.log"
+    static let queue = DispatchQueue(label: "airlift.relay.log")
+
+    static var sharedURL: URL? {
+        FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
+            .appendingPathComponent(fileName)
+    }
+
+    static func push(_ msg: String) {
+        NSLog("[AirliftRelay] %@", msg)
+        queue.async {
+            guard let url = sharedURL else { return }
+            let ts = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+            let line = "\(ts) \(msg)\n"
+            guard let data = line.data(using: .utf8) else { return }
+            if FileManager.default.fileExists(atPath: url.path),
+               let fh = try? FileHandle(forWritingTo: url) {
+                _ = try? fh.seekToEnd()
+                try? fh.write(contentsOf: data)
+                try? fh.close()
+            } else {
+                try? data.write(to: url)
+            }
+        }
+    }
+
+    static func truncate() {
+        guard let url = sharedURL else { return }
+        try? Data().write(to: url)
+    }
+
+    static func readAndTruncate() -> String {
+        guard let url = sharedURL else { return "" }
+        let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        try? Data().write(to: url)
+        return text
+    }
+}
+
 /// Túnel local para los endpoints RSD de AirLift (10.7.0.1–10.7.0.3).
 /// Cada paquete IPv4 vuelve por el mismo túnel con origen y destino intercambiados.
 ///
@@ -66,9 +113,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     // MARK: - AirLift relay (celular)
 
     private func startAirliftRelay() {
+        AirliftRelayLog.truncate()
+        AirliftRelayLog.push("startAirliftRelay()")
         let fd = socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else {
-            NSLog("[AirliftRelay] socket() failed errno=%d", errno)
+            AirliftRelayLog.push("socket() for listener failed errno=\(errno)")
             return
         }
         var reuse: Int32 = 1
@@ -86,12 +135,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             }
         }
         guard bindOk == 0 else {
-            NSLog("[AirliftRelay] bind 127.0.0.1:49153 failed errno=%d", errno)
+            AirliftRelayLog.push("bind 127.0.0.1:49153 failed errno=\(errno)")
             close(fd)
             return
         }
         guard listen(fd, 8) == 0 else {
-            NSLog("[AirliftRelay] listen failed errno=%d", errno)
+            AirliftRelayLog.push("listen failed errno=\(errno)")
             close(fd)
             return
         }
@@ -104,7 +153,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
         source.resume()
         relayAcceptSource = source
-        NSLog("[AirliftRelay] listening on 127.0.0.1:49153")
+        AirliftRelayLog.push("listening on 127.0.0.1:49153")
     }
 
     private func stopAirliftRelay() {
@@ -126,12 +175,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             }
         }
         if clientFd < 0 { return }
-        NSLog("[AirliftRelay] inbound client accepted (fd=%d)", clientFd)
+        AirliftRelayLog.push("inbound client accepted (fd=\(clientFd))")
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { close(clientFd); return }
             guard let outboundFd = self.openPrivilegedOutbound() else {
-                NSLog("[AirliftRelay] outbound creation failed; closing client")
+                AirliftRelayLog.push("outbound creation failed; closing client")
                 close(clientFd)
                 return
             }
@@ -139,63 +188,85 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
 
-    /// Abre un socket desde el proceso de la extension hacia
-    /// 127.0.0.1:49152 (remotepairingd) intentando primero `bind(10.7.1.1)` y
-    /// luego `IP_BOUND_IF` al utun para que la source IP sea no-loopback.
+    /// Abre un socket desde el proceso de la extension hacia remotepairingd
+    /// intentando varias estrategias: bind(10.7.1.1) + connect(10.7.1.1:49152),
+    /// IP_BOUND_IF al utun + connect(10.7.0.1:49152), bind + connect(127.0.0.1).
+    /// La idea es que el source IP del paquete llegue a remotepairingd como
+    /// no-loopback para que acepte la pair-verify.  Darwin tiene una optimización
+    /// de loopback que puede forzar source=127.0.0.1 cuando dst=127.0.0.1,
+    /// por eso intentamos primero destinos no-loopback.
     private func openPrivilegedOutbound() -> Int32? {
-        let fd = socket(AF_INET, SOCK_STREAM, 0)
-        guard fd >= 0 else { return nil }
-
-        // Estrategia 1: bind al 10.7.1.1 (la extension OWNS esta IP)
-        var baddr = sockaddr_in()
-        baddr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-        baddr.sin_family = sa_family_t(AF_INET)
-        baddr.sin_port = 0
-        baddr.sin_addr.s_addr = UInt32(0x0A070101).bigEndian // 10.7.1.1
-        let bindResult = withUnsafePointer(to: &baddr) { ptr -> Int32 in
-            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sap in
-                bind(fd, sap, socklen_t(MemoryLayout<sockaddr_in>.size))
+        // Intenta cada estrategia en orden; retorna el primer fd que logre connect.
+        let strategies: [(String, UInt32, UInt32, Bool)] = [
+            // (label, bindIP_be_hex, dstIP_be_hex, useIpBoundIf)
+            ("bind10.7.1.1 → 10.7.1.1:49152",   0x0A070101, 0x0A070101, false),
+            ("IP_BOUND_IF utun → 10.7.0.1:49152", 0,          0x0A070001, true),
+            ("bind10.7.1.1 → 10.7.0.1:49152",   0x0A070101, 0x0A070001, false),
+            ("bind10.7.1.1 → 127.0.0.1:49152",  0x0A070101, 0x7F000001, false),
+            ("IP_BOUND_IF utun → 127.0.0.1:49152", 0,        0x7F000001, true),
+        ]
+        for (label, bindHostOrder, dstHostOrder, useIpBoundIf) in strategies {
+            let fd = socket(AF_INET, SOCK_STREAM, 0)
+            if fd < 0 {
+                AirliftRelayLog.push("socket() failed errno=\(errno)")
+                continue
             }
-        }
-
-        if bindResult == 0 {
-            NSLog("[AirliftRelay] outbound bind(10.7.1.1) OK")
-        } else {
-            NSLog("[AirliftRelay] bind(10.7.1.1) failed errno=%d; trying IP_BOUND_IF", errno)
-            // Estrategia 2: IP_BOUND_IF al utun (encuentra el interfaz que tiene 10.7.1.1)
-            if let idx = utunIfIndex() {
-                var ifindex: UInt32 = idx
-                let rc = setsockopt(fd, IPPROTO_IP, 25 /* IP_BOUND_IF */,
-                                    &ifindex,
-                                    socklen_t(MemoryLayout<UInt32>.size))
-                if rc == 0 {
-                    NSLog("[AirliftRelay] IP_BOUND_IF to utun idx=%u OK", idx)
-                } else {
-                    NSLog("[AirliftRelay] IP_BOUND_IF failed errno=%d", errno)
+            var okSoFar = true
+            if bindHostOrder != 0 {
+                var baddr = sockaddr_in()
+                baddr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+                baddr.sin_family = sa_family_t(AF_INET)
+                baddr.sin_port = 0
+                baddr.sin_addr.s_addr = bindHostOrder.bigEndian
+                let bindResult = withUnsafePointer(to: &baddr) { ptr -> Int32 in
+                    ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sap in
+                        bind(fd, sap, socklen_t(MemoryLayout<sockaddr_in>.size))
+                    }
                 }
-            } else {
-                NSLog("[AirliftRelay] utun ifindex not found")
+                if bindResult != 0 {
+                    AirliftRelayLog.push("[\(label)] bind failed errno=\(errno)")
+                    close(fd)
+                    continue
+                }
             }
-        }
-
-        // Conectar a remotepairingd en 127.0.0.1:49152
-        var daddr = sockaddr_in()
-        daddr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-        daddr.sin_family = sa_family_t(AF_INET)
-        daddr.sin_port = UInt16(49152).bigEndian
-        daddr.sin_addr.s_addr = UInt32(0x7F000001).bigEndian // 127.0.0.1
-        let connResult = withUnsafePointer(to: &daddr) { ptr -> Int32 in
-            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sap in
-                connect(fd, sap, socklen_t(MemoryLayout<sockaddr_in>.size))
+            if useIpBoundIf {
+                if let idx = utunIfIndex() {
+                    var ifindex: UInt32 = idx
+                    let rc = setsockopt(fd, IPPROTO_IP, 25 /* IP_BOUND_IF */,
+                                        &ifindex,
+                                        socklen_t(MemoryLayout<UInt32>.size))
+                    if rc != 0 {
+                        AirliftRelayLog.push("[\(label)] IP_BOUND_IF failed errno=\(errno)")
+                        close(fd)
+                        okSoFar = false
+                    }
+                } else {
+                    AirliftRelayLog.push("[\(label)] utun ifindex not found")
+                    close(fd)
+                    okSoFar = false
+                }
             }
+            if !okSoFar { continue }
+            var daddr = sockaddr_in()
+            daddr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+            daddr.sin_family = sa_family_t(AF_INET)
+            daddr.sin_port = UInt16(49152).bigEndian
+            daddr.sin_addr.s_addr = dstHostOrder.bigEndian
+            let connResult = withUnsafePointer(to: &daddr) { ptr -> Int32 in
+                ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sap in
+                    connect(fd, sap, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
+            }
+            if connResult != 0 {
+                AirliftRelayLog.push("[\(label)] connect failed errno=\(errno)")
+                close(fd)
+                continue
+            }
+            AirliftRelayLog.push("[\(label)] SUCCESS fd=\(fd)")
+            return fd
         }
-        if connResult != 0 {
-            NSLog("[AirliftRelay] connect(127.0.0.1:49152) failed errno=%d", errno)
-            close(fd)
-            return nil
-        }
-        NSLog("[AirliftRelay] outbound established to remotepairingd (fd=%d)", fd)
-        return fd
+        AirliftRelayLog.push("all outbound strategies failed")
+        return nil
     }
 
     private func utunIfIndex() -> UInt32? {
@@ -229,7 +300,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 alreadyClosed = true
                 close(clientFd)
                 close(outboundFd)
-                NSLog("[AirliftRelay] relay pair closed (fds %d/%d)", clientFd, outboundFd)
+                AirliftRelayLog.push("relay pair closed (fds \(clientFd)/\(outboundFd))")
             }
             closed.signal()
         }
