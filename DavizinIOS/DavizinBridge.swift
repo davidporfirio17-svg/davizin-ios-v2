@@ -137,6 +137,29 @@ final class DavizinBridge {
     }
 
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
+        // Pre-flight de red: iOS no enruta el VPN loopback sobre datos celulares
+        // (NECP fuerza la ruta default por la celular). El workaround oficial del
+        // ecosistema (StikJIT, LocalDevVPN, SideStore) es activar Modo Avión con
+        // el VPN ya conectado. Si estamos en celular puro, pedimos al usuario
+        // que lo active antes de operar.
+        let netState = NyxelCellularPreflight.currentState()
+        if netState == .cellularOnly {
+            NyxelActivityLog.record("Preflight: solo datos celulares detectado — pidiendo Modo Avión al usuario")
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let vc = self.vc else { return }
+                NyxelCellularPreflight.presentAirplaneModeGuide(
+                    from: vc,
+                    onContinue: { [weak self] in
+                        self?.performInjection(game: game, mode: mode, key: key, hwid: hwid)
+                    },
+                    onCancel: { [weak self] in
+                        self?.operationInFlight = false
+                        self?.vc?.setOperationState(.failed("Operación cancelada: activa Modo Avión para operar con datos."))
+                    }
+                )
+            }
+            return
+        }
         vc?.setOperationState(.injecting)
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         NyxelActivityLog.record("========== INJECTION TRACE BEGIN ==========")

@@ -78,25 +78,6 @@ final class NixelVPNManager: NSObject {
 
     func stop() { manager?.connection.stopVPNTunnel() }
 
-    /// Pide al PacketTunnelProvider sus logs del relay AirLift via la API oficial
-    /// `sendProviderMessage`.  Esto no depende de App Groups.
-    func fetchExtensionLogs(fetch: Bool = true, completion: @escaping (String?) -> Void) {
-        guard let session = manager?.connection as? NETunnelProviderSession else {
-            completion(nil); return
-        }
-        let msg = (fetch ? "fetch_logs" : "snapshot_logs").data(using: .utf8)!
-        do {
-            try session.sendProviderMessage(msg) { data in
-                guard let data, let text = String(data: data, encoding: .utf8), !text.isEmpty else {
-                    completion(nil); return
-                }
-                completion(text)
-            }
-        } catch {
-            completion(nil)
-        }
-    }
-
     @objc private func statusChanged() {
         NyxelActivityLog.record("Hybrid VPN: \(Self.statusText(status))")
     }

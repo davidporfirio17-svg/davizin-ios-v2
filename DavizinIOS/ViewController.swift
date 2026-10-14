@@ -101,34 +101,13 @@ final class ViewController: UIViewController {
         operationView?.setState(state)
         switch state {
         case .succeeded(let message):
-            Self.flushRelayLog()
             NyxelActivityLog.record("Operación completada")
             DavizinToastCenter.shared.show(title: "Operación completada", subtitle: message, kind: .success)
         case .failed(let message):
-            Self.flushRelayLog()
             NyxelActivityLog.record("Operación fallida")
             DavizinToastCenter.shared.show(title: "Operación fallida", subtitle: message, kind: .danger)
         default:
             break
-        }
-    }
-
-    /// Pide al PacketTunnelProvider su log del relay via la API oficial
-    /// `sendProviderMessage` (handleAppMessage en la extension).  Esto NO
-    /// depende de App Groups — funciona aunque ldid no firme con un
-    /// provisioning profile reconocido por iOS.
-    private static func flushRelayLog() {
-        NixelVPNManager.shared.fetchExtensionLogs { text in
-            guard let text, !text.isEmpty else {
-                NyxelActivityLog.record("Relay: (sin datos — handleAppMessage no respondió o VPN no activo)")
-                return
-            }
-            for line in text.split(separator: "\n") {
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                if !trimmed.isEmpty {
-                    NyxelActivityLog.record("Relay: \(trimmed)")
-                }
-            }
         }
     }
 

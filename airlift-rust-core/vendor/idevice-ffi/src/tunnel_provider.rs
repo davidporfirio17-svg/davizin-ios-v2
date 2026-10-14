@@ -27,87 +27,6 @@ use tokio::net::TcpStream;
 use tracing::{info, warn};
 
 use crate::core_device_proxy::AdapterHandle;
-
-/// Darwin's IP_BOUND_IF socket option.  Forces outgoing traffic through the
-/// specified interface index, bypassing the kernel's normal interface
-/// selection.  On iOS 27 cellular, if we leave the kernel to pick, it uses
-/// the cellular interface's IP as source for 10.7.0.x destinations even
-/// though those /32 routes point to the utun — the PacketTunnelProvider swap
-/// then produces unreachable destinations.  By forcing the outbound
-/// interface to the utun, source selection falls back to the utun's own
-/// 10.7.1.1 primary, which makes the swap trick land on remotepairingd
-/// exactly as it does on WiFi.  Unlike bind(10.7.1.1) (which iOS 27 refused
-/// with ENETUNREACH), IP_BOUND_IF does not validate the source address
-/// against the routing table — it only pins the interface.
-const DARWIN_IP_BOUND_IF: libc::c_int = 25;
-
-/// Returns the ifindex of the interface that currently owns 10.7.1.1.
-/// None if the utun is not up or does not expose that address yet.
-fn utun_ifindex_for_airlift() -> Option<u32> {
-    unsafe {
-        let mut ifap: *mut libc::ifaddrs = std::ptr::null_mut();
-        if libc::getifaddrs(&mut ifap) != 0 {
-            return None;
-        }
-        let mut found: Option<u32> = None;
-        let mut ifa = ifap;
-        while !ifa.is_null() {
-            let sa = (*ifa).ifa_addr;
-            if !sa.is_null() && (*sa).sa_family as i32 == libc::AF_INET {
-                let sin = sa as *const libc::sockaddr_in;
-                let addr = u32::from_be((*sin).sin_addr.s_addr);
-                // 10.7.1.1 → 0x0A070101
-                if addr == 0x0A07_0101 {
-                    let name = (*ifa).ifa_name;
-                    if !name.is_null() {
-                        let idx = libc::if_nametoindex(name);
-                        if idx > 0 {
-                            found = Some(idx);
-                            break;
-                        }
-                    }
-                }
-            }
-            ifa = (*ifa).ifa_next;
-        }
-        libc::freeifaddrs(ifap);
-        found
-    }
-}
-
-/// Open a TCP connection to a 10.7.x destination forcing the outbound
-/// interface to the AirLift utun.  For destinations outside 10.7.0.0/16, or
-/// when the utun is not yet up, falls back to the default route.
-async fn tcp_connect_via_utun(
-    socket_addr: std::net::SocketAddr,
-) -> std::io::Result<TcpStream> {
-    if let std::net::SocketAddr::V4(sv4) = socket_addr {
-        let octets = sv4.ip().octets();
-        if octets[0] == 10 && octets[1] == 7 {
-            if let Some(ifindex) = utun_ifindex_for_airlift() {
-                if let Ok(socket) = tokio::net::TcpSocket::new_v4() {
-                    use std::os::fd::AsRawFd;
-                    let fd = socket.as_raw_fd();
-                    let idx: libc::c_uint = ifindex as libc::c_uint;
-                    let rc = unsafe {
-                        libc::setsockopt(
-                            fd,
-                            libc::IPPROTO_IP,
-                            DARWIN_IP_BOUND_IF,
-                            &idx as *const _ as *const libc::c_void,
-                            std::mem::size_of::<libc::c_uint>() as libc::socklen_t,
-                        )
-                    };
-                    if rc == 0 {
-                        return socket.connect(socket_addr).await;
-                    }
-                    // setsockopt failed — fall through to default connect.
-                }
-            }
-        }
-    }
-    TcpStream::connect(socket_addr).await
-}
 use crate::rp_pairing_file::RpPairingFileHandle;
 use crate::rsd::RsdHandshakeHandle;
 use crate::util::{SockAddr, idevice_sockaddr, idevice_socklen_t};
@@ -302,7 +221,7 @@ async fn dial_once(
     );
 
     let cap = left.min(DIAL_ATTEMPT_TIMEOUT);
-    match tokio::time::timeout(cap, tcp_connect_via_utun(addr)).await {
+    match tokio::time::timeout(cap, TcpStream::connect(addr)).await {
         Ok(Ok(stream)) => {
             info!("tunnel dial: {addr} accepted the connection in round {round}");
             DialOutcome::Connected(stream)
@@ -762,7 +681,7 @@ pub async fn tunnel_create_remotexpc_multihost_async(
     extras: &[IpAddr],
 ) -> Result<(TcpAdapterHandle, RsdHandshake), TunnelFailure> {
     // RSD handshake to discover tunnel service
-    let rsd_stream = tcp_connect_via_utun(socket_addr)
+    let rsd_stream = tokio::net::TcpStream::connect(socket_addr)
         .await
         .map_err(|e| {
             TunnelFailure::new(
@@ -791,7 +710,7 @@ pub async fn tunnel_create_remotexpc_multihost_async(
 
     // Connect to tunnel service via RemoteXPC
     let ts_addr = std::net::SocketAddr::new(socket_addr.ip(), ts.port);
-    let ts_stream = tcp_connect_via_utun(ts_addr)
+    let ts_stream = tokio::net::TcpStream::connect(ts_addr)
         .await
         .map_err(|e| {
             TunnelFailure::new(
@@ -827,7 +746,7 @@ pub async fn tunnel_create_rppairing_multihost_async(
     extras: &[IpAddr],
 ) -> Result<(TcpAdapterHandle, RsdHandshake), TunnelFailure> {
     info!("tunnel dial: opening the RPPairing connection to {socket_addr}");
-    let stream = tcp_connect_via_utun(socket_addr).await.map_err(|e| {
+    let stream = TcpStream::connect(socket_addr).await.map_err(|e| {
         warn!(
             "tunnel dial: RPPairing connect to {socket_addr} failed: {e} (kind {:?}, os error {:?})",
             e.kind(),
