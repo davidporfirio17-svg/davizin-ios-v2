@@ -131,6 +131,24 @@ jobs:
           echo "Tunnel entitlements embedded"
         fi
 
+    - name: Validate embedded VPN extension
+      run: |
+        set -euo pipefail
+        APP=$(find /tmp/davizin_build -name "*.app" -not -path "*/simulator/*" -type d | head -1)
+        test -n "$APP" || { echo "ERROR: No device .app found"; exit 1; }
+        TUNNEL_APPEX="$APP/PlugIns/ExternalTunnel.appex"
+        test -d "$TUNNEL_APPEX" || { echo "ERROR: ExternalTunnel.appex is missing from the app"; exit 1; }
+        EXPECTED_ID="com.apple.mobile.MobileHouseArrest.ExternalTunnel"
+        ACTUAL_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$TUNNEL_APPEX/Info.plist")
+        if [ "$ACTUAL_ID" != "$EXPECTED_ID" ]; then
+          echo "ERROR: VPN provider bundle ID mismatch: expected $EXPECTED_ID, got $ACTUAL_ID"
+          exit 1
+        fi
+        test -x "$TUNNEL_APPEX/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$TUNNEL_APPEX/Info.plist")" || {
+          echo "ERROR: VPN provider executable is missing"; exit 1;
+        }
+        echo "Validated embedded VPN extension: $ACTUAL_ID"
+
     - name: Create IPA
       run: |
         APP=$(find /tmp/davizin_build -name "*.app" -not -path "*/simulator/*" -type d | head -1)
