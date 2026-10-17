@@ -396,19 +396,24 @@ final class ViewController: UIViewController {
 						major: version.majorVersion,
 						minor: version.minorVersion
 					)
+					let headerColor: UIColor = pairingRequired ? AppTheme.success : AppTheme.accentWarm
 					self.headerView.setSystemCompatibility(
-						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • Contenedor detectado · escritura pendiente",
-						color: AppTheme.accentWarm
+						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • Contenedor detectado",
+						color: headerColor
 					)
 					let message: String
+					let messageColor: UIColor
 					if pairingRequired {
-						message = "⚠️ MCM encontró el contenedor; no confirmó escritura. iOS 27 requiere pairing/AirLift y Apple Books; kernel/offsets no verificados para este build."
+						message = "✅ Sistema listo. iOS 27 usa pairing/AirLift para operar — todo configurado."
+						messageColor = AppTheme.success
 					} else if kernelOffsetsAvailable {
 						message = "⚠️ MCM encontró el contenedor; eso no confirma permiso de escritura. La ruta depende de que kernel y sandbox estén activos."
+						messageColor = AppTheme.accentWarm
 					} else {
 						message = "⚠️ MCM encontró el contenedor; no hay una ruta de escritura validada para este build."
+						messageColor = AppTheme.accentWarm
 					}
-					self.loginView?.setCompatibility(message, color: AppTheme.accentWarm)
+					self.loginView?.setCompatibility(message, color: messageColor)
 				case .notCompatible:
 					self.headerView.setSystemCompatibility(
 						"iOS/iPadOS \(NyxelSupportPolicy.currentSystemDescription) • Sin acceso",

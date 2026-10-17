@@ -137,28 +137,37 @@ final class DavizinBridge {
     }
 
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
-        // Pre-flight de red: iOS no enruta el VPN loopback sobre datos celulares
-        // (NECP fuerza la ruta default por la celular). El workaround oficial del
-        // ecosistema (StikJIT, LocalDevVPN, SideStore) es activar Modo Avión con
-        // el VPN ya conectado. Si estamos en celular puro, pedimos al usuario
-        // que lo active antes de operar.
-        let netState = NyxelCellularPreflight.currentState()
-        if netState == .cellularOnly {
-            NyxelActivityLog.record("Preflight: solo datos celulares detectado — pidiendo Modo Avión al usuario")
-            DispatchQueue.main.async { [weak self] in
-                guard let self, let vc = self.vc else { return }
-                NyxelCellularPreflight.presentAirplaneModeGuide(
-                    from: vc,
-                    onContinue: { [weak self] in
-                        self?.performInjection(game: game, mode: mode, key: key, hwid: hwid)
-                    },
-                    onCancel: { [weak self] in
-                        self?.operationInFlight = false
-                        self?.vc?.setOperationState(.failed("Operación cancelada: activa Modo Avión para operar con datos."))
-                    }
-                )
+        // Decisión de camino por versión de iOS, NO por "hay pairing AirLift guardado":
+        //  - iOS ≤ 26.0.x  → kexploit directo (como la IPA #252). Sin VPN, sin pairing,
+        //                     sin preflight de Modo Avión. Funciona en WiFi y datos.
+        //  - iOS 26.1+ / 27+ → AirLift + VPN loopback. En celular puro pedimos Modo Avión
+        //                     (workaround oficial del ecosistema).
+        let iosVersion = NyxelDeviceInfo.versionTuple
+        let useKexploitPath = NyxelSupportPolicy.supportsKernelOffsets(
+            major: iosVersion.major,
+            minor: iosVersion.minor
+        )
+
+        // El preflight de Modo Avión solo aplica al camino AirLift.
+        if !useKexploitPath {
+            let netState = NyxelCellularPreflight.currentState()
+            if netState == .cellularOnly {
+                NyxelActivityLog.record("Preflight: solo datos celulares detectado — pidiendo Modo Avión al usuario")
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, let vc = self.vc else { return }
+                    NyxelCellularPreflight.presentAirplaneModeGuide(
+                        from: vc,
+                        onContinue: { [weak self] in
+                            self?.performInjection(game: game, mode: mode, key: key, hwid: hwid)
+                        },
+                        onCancel: { [weak self] in
+                            self?.operationInFlight = false
+                            self?.vc?.setOperationState(.failed("Operación cancelada: activa Modo Avión para operar con datos."))
+                        }
+                    )
+                }
+                return
             }
-            return
         }
         vc?.setOperationState(.injecting)
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
@@ -172,13 +181,8 @@ final class DavizinBridge {
             || mode.id.lowercased().contains("hybrid")
             || mode.label.lowercased().contains("hybrid")
 
-        let version = NyxelDeviceInfo.versionTuple
-        let kernelOffsetsSupported = NyxelSupportPolicy.supportsKernelOffsets(
-            major: version.major,
-            minor: version.minor
-        )
-        guard kernelOffsetsSupported || Self.airLiftRouteAvailable else {
-            let message = "Offsets de kernel validados solo hasta iOS 26.0.x; agrega pairing AirLift para iOS \(version.major).\(version.minor)."
+        guard useKexploitPath || Self.airLiftRouteAvailable else {
+            let message = "Offsets de kernel validados solo hasta iOS 26.0.x; agrega pairing AirLift para iOS \(iosVersion.major).\(iosVersion.minor)."
             NyxelActivityLog.record(message)
             DispatchQueue.main.async {
                 self.operationInFlight = false
@@ -190,8 +194,40 @@ final class DavizinBridge {
         let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                if Self.airLiftRouteAvailable {
-                    NyxelActivityLog.record("AirLift disponible: omitiendo kexploit experimental y usando Remote Pairing/RSD para la escritura")
+                // Prioridad por versión: en iOS ≤26.0.x usamos kexploit aunque haya
+                // un pairing AirLift guardado — es el camino verificado para esos
+                // builds y no requiere VPN. AirLift queda para iOS 26.1+ y 27+.
+                if useKexploitPath {
+                    NyxelActivityLog.record("iOS \(iosVersion.major).\(iosVersion.minor): usando kexploit (ruta verificada para este build)")
+                    if sandbox_access_is_active() == 0 {
+                        NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
+                        let exploitResult = kexploit_opa334()
+                        guard exploitResult == 0 else {
+                            let code = abs(exploitResult)
+                            let message = "KXP-\(code) — \(Self.kxpDetail(code))"
+                            NyxelActivityLog.record("Exploit pre-inyección falló (\(message)); se detiene antes de MCM/bad_query")
+                            DispatchQueue.main.async {
+                                self.operationInFlight = false
+                                self.vc?.setOperationState(.failed(message))
+                            }
+                            return
+                        }
+
+                        let selfProc = proc_self()
+                        let escapeResult = sandbox_escape(selfProc)
+                        let sandboxActive = sandbox_access_is_active() != 0
+                        NyxelActivityLog.record("Exploit pre-inyección: sandbox_escape=\(escapeResult), activo=\(sandboxActive)")
+                        guard escapeResult == 0 && sandboxActive else {
+                            let message = "SBX-001 — El exploit terminó, pero el sandbox escape no quedó activo (\(escapeResult))."
+                            DispatchQueue.main.async {
+                                self.operationInFlight = false
+                                self.vc?.setOperationState(.failed(message))
+                            }
+                            return
+                        }
+                    }
+                } else if Self.airLiftRouteAvailable {
+                    NyxelActivityLog.record("AirLift disponible: usando Remote Pairing/RSD para la escritura")
                 } else if sandbox_access_is_active() == 0 {
                     NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
                     let exploitResult = kexploit_opa334()
@@ -233,7 +269,9 @@ final class DavizinBridge {
             }
         }
 
-        let requiresRSDLoopback = wantsHybrid || Self.airLiftRouteAvailable
+        // iOS ≤26.0.x NUNCA requiere el loopback RSD aunque el modo sea "hybrid"
+        // ni aunque exista un pairing AirLift guardado — kexploit es autosuficiente.
+        let requiresRSDLoopback = !useKexploitPath && (wantsHybrid || Self.airLiftRouteAvailable)
         guard requiresRSDLoopback else {
             injectNow()
             return
@@ -329,8 +367,15 @@ final class DavizinBridge {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self else { return }
 
-                if Self.airLiftRouteAvailable {
-                    NyxelActivityLog.record("Remote Pairing guardado: se usará el túnel RSD/AirLift real; no se ejecuta kexploit en iOS 27")
+                // Decidir por versión (unificado): iOS ≤26.0.x → kexploit; resto → AirLift.
+                let version = NyxelDeviceInfo.versionTuple
+                let useKexploitPath = NyxelSupportPolicy.supportsKernelOffsets(
+                    major: version.major,
+                    minor: version.minor
+                )
+
+                if !useKexploitPath && Self.airLiftRouteAvailable {
+                    NyxelActivityLog.record("Remote Pairing guardado: se usará el túnel RSD/AirLift real")
                     DispatchQueue.main.async {
                         self.operationInFlight = false
                         self.vc?.setOperationState(.succeeded("Remote Pairing guardado ✓ — AirLift se validará al escribir"))
@@ -338,11 +383,7 @@ final class DavizinBridge {
                     return
                 }
 
-                let version = NyxelDeviceInfo.versionTuple
-                if !NyxelSupportPolicy.supportsKernelOffsets(
-                    major: version.major,
-                    minor: version.minor
-                ) {
+                if !useKexploitPath {
                     let message = "Offsets de kernel validados solo hasta iOS 26.0.x; no se ejecutó el exploit en iOS \(version.major).\(version.minor)."
                     NyxelActivityLog.record(message)
                     DispatchQueue.main.async {
