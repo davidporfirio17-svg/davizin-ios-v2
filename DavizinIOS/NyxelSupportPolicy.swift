@@ -211,7 +211,7 @@ enum NyxelSupportPolicy {
             return true
         }
         if minor == 2 {
-            return ["24B5084k", "24B5089g"].contains(build)
+            return ["24B5084k", "24B5089g", "24B5110a"].contains(build)
         }
         return verifiedIOS27Builds.contains { $0.build == build }
             || ["24A435", "24A437"].contains(build)

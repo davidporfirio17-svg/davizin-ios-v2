@@ -179,16 +179,16 @@ jobs:
 
         mkdir -p /tmp/Payload
         cp -r "$APP" /tmp/Payload/DavizinIOS.app
-        cd /tmp && zip -r Nyxel_External_unsigned.ipa Payload/
+        cd /tmp && zip -r "NyxelExternal_27.2.0_build${GITHUB_RUN_NUMBER}.ipa" Payload/
 
-        ls -lh /tmp/Nyxel_External_unsigned.ipa
-        unzip -l /tmp/Nyxel_External_unsigned.ipa | head -20
+        ls -lh "/tmp/NyxelExternal_27.2.0_build${GITHUB_RUN_NUMBER}.ipa"
+        unzip -l "/tmp/NyxelExternal_27.2.0_build${GITHUB_RUN_NUMBER}.ipa" | head -20
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
-        name: Nyxel_External_iOS_unsigned
-        path: /tmp/Nyxel_External_unsigned.ipa
+        name: NyxelExternal_27.2.0_build${{ github.run_number }}
+        path: /tmp/NyxelExternal_27.2.0_build${{ github.run_number }}.ipa
         retention-days: 30
 
   build-admin:
