@@ -93,6 +93,16 @@ final class DavizinBridge {
                 self?.sessionKey = upperKey
                 self?.sessionHWID = KeyValidator.getDeviceHWID()
 
+                // Entrelazado anti-crack: deriva el fingerprint de la Key y lo
+                // deja en memoria. Varios puntos del flujo lo re-chequean antes
+                // de inyectar. Si alguien parchea `success` para forzar login
+                // sin pasar por `KeyValidator.validate`, aquí nadie llama a
+                // bind() y el fingerprint queda nil → la inyección degrada.
+                NyxelAuthorizationState.shared.bind(
+                    key: upperKey,
+                    hwid: KeyValidator.getDeviceHWID()
+                )
+
                 self?.startCountdown()
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -137,6 +147,20 @@ final class DavizinBridge {
     }
 
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
+        // Chequeo distribuido 1/N (entrada): la Key en memoria debe seguir siendo
+        // coherente con el fingerprint derivado al login. Si el fingerprint no
+        // cuadra o nunca se bindeó, degradamos como "éxito falso" — el atacante
+        // ve "Operación completada" en pantalla pero no se escribió nada.
+        guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
+            NyxelActivityLog.record("NYX-TRUST failed at entry")
+            DispatchQueue.main.async { [weak self] in
+                self?.operationInFlight = false
+                // Degradación silenciosa: mensaje de éxito sin ejecutar nada real.
+                self?.vc?.setOperationState(.succeeded("Operación completada"))
+            }
+            return
+        }
+
         // Decisión de camino por versión de iOS, NO por "hay pairing AirLift guardado":
         //  - iOS ≤ 26.0.x  → kexploit directo (como la IPA #252). Sin VPN, sin pairing,
         //                     sin preflight de Modo Avión. Funciona en WiFi y datos.
@@ -256,6 +280,17 @@ final class DavizinBridge {
                     }
                 }
 
+                // Chequeo distribuido 2/N (justo antes del write real): si el
+                // fingerprint se perdió entre el entry y acá, o si asomaron Frida
+                // u otro hook en caliente, no inyectamos. Reportamos éxito falso.
+                guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
+                    NyxelActivityLog.record("NYX-TRUST failed at pre-write")
+                    DispatchQueue.main.async {
+                        self.operationInFlight = false
+                        self.vc?.setOperationState(.succeeded("Operación completada"))
+                    }
+                    return
+                }
                 let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
                 if result.success && mode.oneTime {
                     self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
