@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import MachO
 
 /// Capa de defensa anti-tampering 100% local.
 ///
