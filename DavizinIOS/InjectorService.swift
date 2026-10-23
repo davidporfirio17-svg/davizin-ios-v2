@@ -533,15 +533,10 @@ class InjectorService {
         } else if let legacyBackup = readFromContainer(relPath: backupRel, container: container, bundleID: bundleID), !legacyBackup.isEmpty {
             originalData = legacyBackup
             NyxelActivityLog.record("Respaldo remoto anterior encontrado; se migrará al almacenamiento privado")
-        } else if previousPath != nil && !previousRestoreWasConfirmed {
-            let msg = "Hay una sesión anterior sin restauración confirmada y no se encontró su respaldo. No se volverá a inyectar para evitar perder el original."
-            sendErrorNotification("❌ PASO 9", msg)
-            return InjectorResult(success: false, message: msg)
-        } else if previousPath != nil && UserDefaults.standard.bool(forKey: originalMissingKey(for: game)) {
-            let msg = "El build anterior marcó el original como ausente y no dejó un respaldo legible. Repara o vuelve a descargar los archivos del juego antes de inyectar."
-            sendErrorNotification("❌ PASO 9", msg)
-            return InjectorResult(success: false, message: msg)
         } else {
+            if previousPath != nil {
+                NyxelActivityLog.record("Sesión anterior detectada sin respaldo; se tomará respaldo fresco del original actual")
+            }
             originalData = readFromContainer(
                 relPath: activeRel,
                 container: container,

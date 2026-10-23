@@ -147,36 +147,14 @@ final class DavizinBridge {
     }
 
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
-        // Chequeo distribuido 1/N (entrada): la Key en memoria debe seguir siendo
-        // coherente con el fingerprint derivado al login. Si el fingerprint no
-        // cuadra o nunca se bindeó, degradamos como "éxito falso" — el atacante
-        // ve "Operación completada" en pantalla pero no se escribió nada.
-        guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
-            NyxelActivityLog.record("NYX-TRUST failed at entry")
-            DispatchQueue.main.async { [weak self] in
-                self?.operationInFlight = false
-                // Degradación silenciosa: mensaje de éxito sin ejecutar nada real.
-                self?.vc?.setOperationState(.succeeded("Operación completada"))
-            }
-            return
-        }
-
-        // Decisión de camino por versión de iOS, NO por "hay pairing AirLift guardado":
-        //  - iOS ≤ 26.0.x  → kexploit directo (como la IPA #252). Sin VPN, sin pairing,
-        //                     sin preflight de Modo Avión. Funciona en WiFi y datos.
-        //  - iOS 26.1+ / 27+ → AirLift + VPN loopback. En celular puro pedimos Modo Avión
-        //                     (workaround oficial del ecosistema).
-        let iosVersion = NyxelDeviceInfo.versionTuple
-        let useKexploitPath = NyxelSupportPolicy.supportsKernelOffsets(
-            major: iosVersion.major,
-            minor: iosVersion.minor
+        let device = NyxelDeviceInfo.versionTuple
+        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+            major: device.major, minor: device.minor,
+            patch: device.patch, build: NyxelSupportPolicy.currentBuild
         )
-
-        // El preflight de Modo Avión solo aplica al camino AirLift.
-        if !useKexploitPath {
+        if pairingRequired {
             let netState = NyxelCellularPreflight.currentState()
             if netState == .cellularOnly {
-                NyxelActivityLog.record("Preflight: solo datos celulares detectado — pidiendo Modo Avión al usuario")
                 DispatchQueue.main.async { [weak self] in
                     guard let self, let vc = self.vc else { return }
                     NyxelCellularPreflight.presentAirplaneModeGuide(
@@ -194,137 +172,16 @@ final class DavizinBridge {
             }
         }
         vc?.setOperationState(.injecting)
-        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
-        NyxelActivityLog.record("========== INJECTION TRACE BEGIN ==========")
-        NyxelActivityLog.record("DIAG appVersion=\(appVersion) system=\(NyxelSupportPolicy.currentSystemDescription) game=\(game.rawValue) mode=\(mode.displayName) pairingRecordAvailable=\(Self.airLiftRouteAvailable)")
-
-        // Los modos marcados como "hybrid" en la configuración remota usan el
-        // Packet Tunnel local antes de descargar/aplicar el recurso. Los modos
-        // normales conservan exactamente el flujo anterior.
-        let wantsHybrid = mode.accessTier.lowercased() == "hybrid"
-            || mode.id.lowercased().contains("hybrid")
-            || mode.label.lowercased().contains("hybrid")
-
-        guard useKexploitPath || Self.airLiftRouteAvailable else {
-            let message = "Offsets de kernel validados solo hasta iOS 26.0.x; agrega pairing AirLift para iOS \(iosVersion.major).\(iosVersion.minor)."
-            NyxelActivityLog.record(message)
-            DispatchQueue.main.async {
-                self.operationInFlight = false
-                self.vc?.setOperationState(.failed(message))
-            }
-            return
-        }
-
-        let injectNow: () -> Void = { [weak self] in
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
-            DispatchQueue.global(qos: .userInitiated).async {
-                // Prioridad por versión: en iOS ≤26.0.x usamos kexploit aunque haya
-                // un pairing AirLift guardado — es el camino verificado para esos
-                // builds y no requiere VPN. AirLift queda para iOS 26.1+ y 27+.
-                if useKexploitPath {
-                    NyxelActivityLog.record("iOS \(iosVersion.major).\(iosVersion.minor): usando kexploit (ruta verificada para este build)")
-                    if sandbox_access_is_active() == 0 {
-                        NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
-                        let exploitResult = kexploit_opa334()
-                        guard exploitResult == 0 else {
-                            let code = abs(exploitResult)
-                            let message = "KXP-\(code) — \(Self.kxpDetail(code))"
-                            NyxelActivityLog.record("Exploit pre-inyección falló (\(message)); se detiene antes de MCM/bad_query")
-                            DispatchQueue.main.async {
-                                self.operationInFlight = false
-                                self.vc?.setOperationState(.failed(message))
-                            }
-                            return
-                        }
-
-                        let selfProc = proc_self()
-                        let escapeResult = sandbox_escape(selfProc)
-                        let sandboxActive = sandbox_access_is_active() != 0
-                        NyxelActivityLog.record("Exploit pre-inyección: sandbox_escape=\(escapeResult), activo=\(sandboxActive)")
-                        guard escapeResult == 0 && sandboxActive else {
-                            let message = "SBX-001 — El exploit terminó, pero el sandbox escape no quedó activo (\(escapeResult))."
-                            DispatchQueue.main.async {
-                                self.operationInFlight = false
-                                self.vc?.setOperationState(.failed(message))
-                            }
-                            return
-                        }
-                    }
-                } else if Self.airLiftRouteAvailable {
-                    NyxelActivityLog.record("AirLift disponible: usando Remote Pairing/RSD para la escritura")
-                } else if sandbox_access_is_active() == 0 {
-                    NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
-                    let exploitResult = kexploit_opa334()
-                    guard exploitResult == 0 else {
-                        let code = abs(exploitResult)
-                        let message = "KXP-\(code) — \(Self.kxpDetail(code))"
-                        NyxelActivityLog.record("Exploit pre-inyección falló (\(message)); se detiene antes de MCM/bad_query")
-                        DispatchQueue.main.async {
-                            self.operationInFlight = false
-                            self.vc?.setOperationState(.failed(message))
-                        }
-                        return
-                    }
-
-                    let selfProc = proc_self()
-                    let escapeResult = sandbox_escape(selfProc)
-                    let sandboxActive = sandbox_access_is_active() != 0
-                    NyxelActivityLog.record("Exploit pre-inyección: sandbox_escape=\(escapeResult), activo=\(sandboxActive)")
-                    guard escapeResult == 0 && sandboxActive else {
-                        let message = "SBX-001 — El exploit terminó, pero el sandbox escape no quedó activo (\(escapeResult))."
-                        DispatchQueue.main.async {
-                            self.operationInFlight = false
-                            self.vc?.setOperationState(.failed(message))
-                        }
-                        return
-                    }
-                }
-
-                // Chequeo distribuido 2/N (justo antes del write real): si el
-                // fingerprint se perdió entre el entry y acá, o si asomaron Frida
-                // u otro hook en caliente, no inyectamos. Reportamos éxito falso.
-                guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
-                    NyxelActivityLog.record("NYX-TRUST failed at pre-write")
-                    DispatchQueue.main.async {
-                        self.operationInFlight = false
-                        self.vc?.setOperationState(.succeeded("Operación completada"))
-                    }
-                    return
-                }
-                let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
-                if result.success && mode.oneTime {
-                    self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
-                } else {
-                    DispatchQueue.main.async {
-                        self.hapticFeedback(success: result.success)
-                        self.operationInFlight = false
-                        self.vc?.setOperationState(result.success ? .succeeded(result.message) : .failed(result.message))
-                    }
-                }
-            }
-        }
-
-        // iOS ≤26.0.x NUNCA requiere el loopback RSD aunque el modo sea "hybrid"
-        // ni aunque exista un pairing AirLift guardado — kexploit es autosuficiente.
-        let requiresRSDLoopback = !useKexploitPath && (wantsHybrid || Self.airLiftRouteAvailable)
-        guard requiresRSDLoopback else {
-            injectNow()
-            return
-        }
-
-        NixelHybridCoordinator.startForAirLift { [weak self] result in
-            guard let self = self else { return }
-            switch result {
-            case .success:
-                NyxelActivityLog.record("Hybrid VPN verificado; ruta TCP RSD alcanzable")
-                injectNow()
-            case .failure(let error):
-                let message = "Inyección detenida: el loopback VPN/RSD no está listo. \(error.localizedDescription)"
-                NyxelActivityLog.record(message)
+            let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
+            if result.success && mode.oneTime {
+                self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
+            } else {
                 DispatchQueue.main.async {
-                    self.hapticFeedback(success: false)
+                    self.hapticFeedback(success: result.success)
                     self.operationInFlight = false
-                    self.vc?.setOperationState(.failed(message))
+                    self.vc?.setOperationState(result.success ? .succeeded(result.message) : .failed(result.message))
                 }
             }
         }
@@ -356,10 +213,6 @@ final class DavizinBridge {
     private func handleOperation(_ operation: DavizinOperationKind) {
         guard !operationInFlight else {
             vc?.setOperationState(.failed("NYX-006 — Ya hay una operación en curso."))
-            return
-        }
-        if operation == .inject && NyxelCleanupFlow.hasPendingWork {
-            vc?.setOperationState(.failed("Limpia sesión sí o sí antes de volver a inyectar."))
             return
         }
         if operation == .clean {
