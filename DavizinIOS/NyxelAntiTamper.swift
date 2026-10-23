@@ -21,12 +21,14 @@ enum NyxelAntiTamper {
         var isSuspect: Bool { if case .suspect = self { return true } else { return false } }
     }
 
-    /// Ejecuta todas las verificaciones y devuelve el peor veredicto.
-    /// Pensado para llamarse al arrancar la app y antes de operaciones críticas.
     static func inspect() -> Verdict {
         if isBeingDebugged() { return .suspect("DBG-001") }
         if hasFridaSignature() { return .suspect("DBG-002") }
         if hasSuspiciousDyldImages() { return .suspect("DBG-003") }
+        if hasDyldInsertLibraries() { return .suspect("DBG-004") }
+        if hasFridaNamedPipe() { return .suspect("DBG-005") }
+        if hasExceptionPortHijack() { return .suspect("DBG-006") }
+        if hasSuspiciousFiles() { return .suspect("DBG-007") }
         return .pass
     }
 
@@ -75,10 +77,14 @@ enum NyxelAntiTamper {
         return r == 0
     }
 
-    /// Enumera las imágenes cargadas por dyld y busca strings asociados a
-    /// frameworks de hooking típicos.
     private static func hasSuspiciousDyldImages() -> Bool {
-        let needles = ["FridaGadget", "frida", "cynject", "libcycript", "SubstrateLoader", "MobileSubstrate", "SubstrateInserter"]
+        let needles = [
+            "FridaGadget", "frida", "cynject", "libcycript",
+            "SubstrateLoader", "MobileSubstrate", "SubstrateInserter",
+            "SSLKillSwitch", "ssl-kill-switch", "flexdecrypt",
+            "shadow.dylib", "Liberty", "A-Bypass", "FlyJB",
+            "Choicy", "TweakInject", "ellekit", "substitute"
+        ]
         let count = _dyld_image_count()
         for i in 0..<count {
             guard let raw = _dyld_get_image_name(i) else { continue }
@@ -86,6 +92,58 @@ enum NyxelAntiTamper {
             if needles.contains(where: { name.contains($0.lowercased()) }) {
                 return true
             }
+        }
+        return false
+    }
+
+    private static func hasDyldInsertLibraries() -> Bool {
+        getenv("DYLD_INSERT_LIBRARIES") != nil
+    }
+
+    private static func hasFridaNamedPipe() -> Bool {
+        let pipes = ["/tmp/frida-", "/tmp/re.frida", "/tmp/frida.pipe"]
+        for p in pipes {
+            if access(p, F_OK) == 0 { return true }
+            var buf = stat()
+            if lstat(p, &buf) == 0 { return true }
+        }
+        return false
+    }
+
+    private static func hasExceptionPortHijack() -> Bool {
+        var masks = exception_mask_t(EXC_MASK_ALL)
+        var ports = mach_port_t(MACH_PORT_NULL)
+        var behaviors = exception_behavior_t(0)
+        var flavors = thread_state_flavor_t(0)
+        var count = mach_msg_type_number_t(1)
+        let kr = withUnsafeMutablePointer(to: &masks) { mp in
+            withUnsafeMutablePointer(to: &ports) { pp in
+                withUnsafeMutablePointer(to: &behaviors) { bp in
+                    withUnsafeMutablePointer(to: &flavors) { fp in
+                        task_get_exception_ports(
+                            mach_task_self_,
+                            exception_mask_t(EXC_MASK_ALL),
+                            mp, &count, pp, bp, fp
+                        )
+                    }
+                }
+            }
+        }
+        if kr != KERN_SUCCESS { return false }
+        return count > 0 && ports != mach_port_t(MACH_PORT_NULL)
+    }
+
+    private static func hasSuspiciousFiles() -> Bool {
+        let paths = [
+            "/Library/MobileSubstrate/MobileSubstrate.dylib",
+            "/usr/lib/substrate",
+            "/usr/lib/TweakInject",
+            "/var/lib/dpkg/info",
+            "/usr/sbin/frida-server",
+            "/usr/bin/cycript"
+        ]
+        for p in paths {
+            if FileManager.default.fileExists(atPath: p) { return true }
         }
         return false
     }
