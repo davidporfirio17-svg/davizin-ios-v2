@@ -500,6 +500,7 @@ class InjectorService {
         sendErrorNotification("🔍 PASO 7", "Preparando rutas...")
         let activeRel = destPathRel(for: game, mode: mode)
         let destPath   = container + "/" + activeRel
+        UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
         let destDir    = (destPath as NSString).deletingLastPathComponent
         sendErrorNotification("✅ PASO 7", "Dest: \(activeRel)")
 
@@ -507,7 +508,23 @@ class InjectorService {
         try? fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
         sendErrorNotification("✅ PASO 8", "Directorio OK (o ya existía)")
 
-        sendErrorNotification("🔍 PASO 9", "Escribiendo archivo...")
+        sendErrorNotification("🔍 PASO 9", "Haciendo backup...")
+        let backupRel = disguisedBackupPath(for: activeRel)
+        let backupPath = container + "/" + backupRel
+        if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
+            if let original = readFromContainer(relPath: activeRel, container: container, bundleID: bundleID) {
+                if let error = writeToContainer(original, relPath: backupRel, container: container, bundleID: bundleID) {
+                    let msg = "Error haciendo backup: \(error.localizedDescription)"
+                    sendErrorNotification("❌ PASO 9", msg)
+                    return InjectorResult(success: false, message: msg)
+                }
+            } else {
+                let msg = "No se pudo leer archivo original para backup"
+                sendErrorNotification("❌ PASO 9", msg)
+                return InjectorResult(success: false, message: msg)
+            }
+        }
+        sendErrorNotification("✅ PASO 9", "Backup OK")
 
         sendErrorNotification("🔍 PASO 10", "INYECTANDO ARCHIVO...")
         if let error = writeToContainer(finalData, relPath: activeRel, container: container, bundleID: bundleID) {
