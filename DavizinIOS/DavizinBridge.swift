@@ -20,6 +20,9 @@ final class DavizinBridge {
     private var sessionHWID: String = ""
     private var operationInFlight = false
 
+    var currentKey: String { sessionKey }
+    var currentHWID: String { sessionHWID }
+
     func connect(to viewController: ViewController) {
         self.vc = viewController
         if let injectionProgressObserver {
@@ -127,6 +130,14 @@ final class DavizinBridge {
     }
 
     private func continueAfterLogin() {
+        if NyxelAutoInjectCoordinator.shared.hasPending(), let vc = self.vc {
+            vc.showOperationScreen()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self else { return }
+                NyxelAutoInjectCoordinator.shared.executeAfterLogin(bridge: self, viewController: vc)
+            }
+            return
+        }
         if NyxelCleanupFlow.hasPendingWork, let game = NyxelCleanupFlow.game {
             selectedGame = game
             let savedModeID = UserDefaults.standard.string(forKey: "dz_last_mode")

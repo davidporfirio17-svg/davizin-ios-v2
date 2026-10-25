@@ -9,6 +9,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         willConnectTo session: UISceneSession,
         options connectionOptions: UIScene.ConnectionOptions
     ) {
+        if let url = connectionOptions.urlContexts.first?.url,
+           url.scheme == "nyxelext",
+           let action = NyxelAutoAction(rawValue: url.host ?? "") {
+            NyxelAutoInjectCoordinator.shared.setPending(action)
+            NyxelActivityLog.record("URL scheme en launch: \(url.absoluteString)")
+        }
+
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let window = UIWindow(windowScene: windowScene)
@@ -26,15 +33,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     /// 2. Flujo principal real: login -> entorno -> mapa de mision -> operacion.
-    /// El aviso real (si el Worker tiene uno publicado en /anuncio) SI se
-    /// muestra, pero justo despues de validar la key — eso ya lo hace
-    /// DavizinBridge, porque el /check del Worker exige key+hwid: no existe
-    /// forma de consultar un aviso antes de que la persona escriba su key.
     private func showMainApp(in window: UIWindow) {
-        // Log compatibility status before proceeding
         let compatStatus = NyxelSupportPolicy.status.label
         nyxelLog("Scene loading: Compatibility status = \(compatStatus)", level: "INFO")
-        
+
         let rootViewController = ViewController()
         rootViewController.modalPresentationStyle = .fullScreen
 
@@ -44,6 +46,20 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve) {
             window.rootViewController = rootViewController
+        }
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        guard let url = URLContexts.first?.url,
+              url.scheme == "nyxelext",
+              let action = NyxelAutoAction(rawValue: url.host ?? "") else { return }
+        NyxelAutoInjectCoordinator.shared.setPending(action)
+        NyxelActivityLog.record("URL scheme recibido: \(url.absoluteString)")
+
+        if let bridge, let vc = window?.rootViewController as? ViewController,
+           !bridge.currentKey.isEmpty {
+            vc.showOperationScreen()
+            NyxelAutoInjectCoordinator.shared.executeAfterLogin(bridge: bridge, viewController: vc)
         }
     }
 
