@@ -500,7 +500,6 @@ class InjectorService {
         sendErrorNotification("🔍 PASO 7", "Preparando rutas...")
         let activeRel = destPathRel(for: game, mode: mode)
         let destPath   = container + "/" + activeRel
-        UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
         let destDir    = (destPath as NSString).deletingLastPathComponent
         sendErrorNotification("✅ PASO 7", "Dest: \(activeRel)")
 
@@ -510,37 +509,105 @@ class InjectorService {
 
         sendErrorNotification("🔍 PASO 9", "Haciendo backup...")
         let backupRel = disguisedBackupPath(for: activeRel)
-        let backupPath = container + "/" + backupRel
-        if fm.fileExists(atPath: destPath) && !fm.fileExists(atPath: backupPath) {
-            if let original = readFromContainer(relPath: activeRel, container: container, bundleID: bundleID) {
-                if let error = writeToContainer(original, relPath: backupRel, container: container, bundleID: bundleID) {
-                    let msg = "Error haciendo backup: \(error.localizedDescription)"
-                    sendErrorNotification("❌ PASO 9", msg)
-                    return InjectorResult(success: false, message: msg)
-                }
-            } else {
-                let msg = "No se pudo leer archivo original para backup"
+        let backupURL: URL
+        do {
+            backupURL = try localRestoreBackupURL(for: game, relativePath: activeRel)
+        } catch {
+            let msg = "No se pudo preparar el respaldo privado: \(error.localizedDescription)"
+            sendErrorNotification("❌ PASO 9", msg)
+            return InjectorResult(success: false, message: msg)
+        }
+
+        let previousPath = UserDefaults.standard.string(forKey: activePathKey(for: game))
+        let previousRestoreWasConfirmed = UserDefaults.standard.bool(forKey: restoreCompletedKey(for: game))
+        var originalData: Data?
+        var originalReadFailure: String?
+        if fm.fileExists(atPath: backupURL.path) {
+            guard let savedOriginal = try? Data(contentsOf: backupURL), !savedOriginal.isEmpty else {
+                let msg = "El respaldo privado existe, pero no se puede leer; no se modificó el archivo del juego."
                 sendErrorNotification("❌ PASO 9", msg)
                 return InjectorResult(success: false, message: msg)
             }
+            originalData = savedOriginal
+            NyxelActivityLog.record("Respaldo privado previo encontrado (\(savedOriginal.count) bytes)")
+        } else if let legacyBackup = readFromContainer(relPath: backupRel, container: container, bundleID: bundleID), !legacyBackup.isEmpty {
+            originalData = legacyBackup
+            NyxelActivityLog.record("Respaldo remoto anterior encontrado; se migrará al almacenamiento privado")
+        } else if previousPath != nil && !previousRestoreWasConfirmed {
+            let msg = "Hay una sesión anterior sin restauración confirmada y no se encontró su respaldo. No se volverá a inyectar para evitar perder el original."
+            sendErrorNotification("❌ PASO 9", msg)
+            return InjectorResult(success: false, message: msg)
+        } else if previousPath != nil && UserDefaults.standard.bool(forKey: originalMissingKey(for: game)) {
+            let msg = "El build anterior marcó el original como ausente y no dejó un respaldo legible. Repara o vuelve a descargar los archivos del juego antes de inyectar."
+            sendErrorNotification("❌ PASO 9", msg)
+            return InjectorResult(success: false, message: msg)
+        } else {
+            originalData = readFromContainer(
+                relPath: activeRel,
+                container: container,
+                bundleID: bundleID,
+                onFailure: { originalReadFailure = $0 }
+            )
         }
-        sendErrorNotification("✅ PASO 9", "Backup OK")
 
-        sendErrorNotification("🔍 PASO 10", "INYECTANDO ARCHIVO...")
-        if let error = writeToContainer(finalData, relPath: activeRel, container: container, bundleID: bundleID) {
-            let msg = "Inyección falló: \(error.localizedDescription)"
-            sendErrorNotification("❌ PASO 10", msg)
+        let originalWasMissing: Bool
+        if let original = originalData {
+            guard !original.isEmpty else {
+                let msg = "El original está vacío; se canceló la inyección para evitar una restauración incompleta."
+                sendErrorNotification("❌ PASO 9", msg)
+                return InjectorResult(success: false, message: msg)
+            }
+            do {
+                try saveLocalRestoreBackup(original, to: backupURL)
+                guard let verifiedBackup = try? Data(contentsOf: backupURL), verifiedBackup == original else {
+                    throw NSError(domain: "NyxelRestore", code: 1, userInfo: [NSLocalizedDescriptionKey: "la verificación del respaldo no coincidió"])
+                }
+            } catch {
+                let msg = "No se pudo guardar/verificar el original: \(error.localizedDescription)"
+                sendErrorNotification("❌ PASO 9", msg)
+                return InjectorResult(success: false, message: msg)
+            }
+            UserDefaults.standard.set(restoreDigest(original), forKey: restoreDigestKey(for: game))
+            originalWasMissing = false
+            NyxelActivityLog.record("Original respaldado en el almacenamiento privado (\(original.count) bytes)")
+        } else if requiresPairingTransportOnCurrentDevice() {
+            let detail = originalReadFailure.map { String($0.prefix(480)) }
+            let reason = detail.map { " Detalle: \($0)" } ?? " Revisa Perfil > Diagnóstico para ver el registro AirLift."
+            let msg = "AirLift no pudo leer el original. Se canceló la inyección para no reemplazarlo sin respaldo.\(reason)"
+            sendErrorNotification("❌ PASO 9", msg)
+            return InjectorResult(success: false, message: msg)
+        } else if !fm.fileExists(atPath: destPath) {
+            originalWasMissing = true
+        } else {
+            let msg = "No se pudo leer el archivo original; la inyección se canceló."
+            sendErrorNotification("❌ PASO 9", msg)
             return InjectorResult(success: false, message: msg)
         }
-        sendErrorNotification("✅ PASO 10", "INYECCIÓN OK")
+        sendErrorNotification("✅ PASO 9", "Original respaldado y verificado")
 
-        sendErrorNotification("🔍 PASO 11", "Seteando permisos...")
+        sendErrorNotification("🔍 PASO 10", "Validando estado...")
+        sendErrorNotification("✅ PASO 10", "Estado OK")
+
+        UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
+        UserDefaults.standard.set(originalWasMissing, forKey: originalMissingKey(for: game))
+        UserDefaults.standard.set(false, forKey: restoreCompletedKey(for: game))
+        NyxelCleanupFlow.markInjectionWriteStarted(for: game)
+
+        sendErrorNotification("🔍 PASO 11", "INYECTANDO ARCHIVO...")
+        if let error = writeToContainer(finalData, relPath: activeRel, container: container, bundleID: bundleID) {
+            let msg = "Inyección falló: \(error.localizedDescription)"
+            sendErrorNotification("❌ PASO 11", msg)
+            return InjectorResult(success: false, message: msg)
+        }
+        sendErrorNotification("✅ PASO 11", "INYECCIÓN OK")
+
+        sendErrorNotification("🔍 PASO 12", "Seteando permisos...")
         try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        sendErrorNotification("✅ PASO 11", "Permisos OK")
+        sendErrorNotification("✅ PASO 12", "Permisos OK (AirLift ya setea permisos)")
 
-        sendErrorNotification("🔍 PASO 12", "Finalizando...")
+        sendErrorNotification("🔍 PASO 13", "Finalizando...")
         NyxelCleanupFlow.markInjectionSucceeded(for: game)
-        sendErrorNotification("✅ PASO 12", "Finalizado")
+        sendErrorNotification("✅ PASO 13", "Finalizado")
 
         sendErrorNotification("🎉 SUCCESS", "¡\(mode.displayName) inyectado!")
         return InjectorResult(success: true,
