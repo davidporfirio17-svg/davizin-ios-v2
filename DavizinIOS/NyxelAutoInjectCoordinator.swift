@@ -102,8 +102,11 @@ final class NyxelAutoInjectCoordinator {
                 self?.isRunning = false
                 if result.success {
                     NyxelCleanupFlow.markCleaningSucceeded(for: game)
-                    NyxelActivityLog.record("AutoClean: limpieza exitosa")
+                    NyxelActivityLog.record("AutoClean: limpieza exitosa, abriendo juego...")
                     viewController.setOperationState(.succeeded(result.message))
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        Self.openGame(game, from: viewController)
+                    }
                 } else {
                     NyxelActivityLog.record("AutoClean: limpieza falló — \(result.message)")
                     viewController.setOperationState(.failed(result.message))
