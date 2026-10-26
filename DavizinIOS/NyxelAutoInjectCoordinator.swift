@@ -104,8 +104,8 @@ final class NyxelAutoInjectCoordinator {
                     NyxelActivityLog.record("Auto: inyección exitosa, abriendo juego...")
                     viewController.setOperationState(.succeeded(result.message))
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        Self.openGame(game, from: viewController)
                         Self.scheduleBackgroundClean(for: game, delay: 6.0)
+                        Self.openGame(game, from: viewController)
                     }
                 } else {
                     NyxelActivityLog.record("Auto: inyección falló — \(result.message)")
@@ -123,12 +123,8 @@ final class NyxelAutoInjectCoordinator {
         }
 
         DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay) {
-            NyxelCleanupFlow.markReturnedToNyxel()
-            NyxelCleanupFlow.prepareForRelaunch()
-
             let result = InjectorService.uninject(game: game)
             if result.success {
-                NyxelCleanupFlow.markCleaningSucceeded(for: game)
                 NyxelCleanupFlow.finishCycle()
                 NyxelActivityLog.record("Auto: limpieza automática en background — exitosa")
             } else {
