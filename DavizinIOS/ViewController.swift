@@ -434,6 +434,7 @@ final class ViewController: UIViewController {
         let screen = GameSelectionView()
         screen.delegate = self
         screen.setSelectedGame(selectedGame)
+        screen.checkForGameUpdates()
         gameSelectionView = screen
         display(screen, animated: animated)
     }
