@@ -3,6 +3,7 @@ import UIKit
 enum NyxelAutoAction: String {
     case inject
     case clean
+    case auto
 }
 
 final class NyxelAutoInjectCoordinator {
@@ -37,6 +38,38 @@ final class NyxelAutoInjectCoordinator {
             runAutoInject(bridge: bridge, viewController: viewController)
         case .clean:
             runAutoClean(bridge: bridge, viewController: viewController)
+        case .auto:
+            runAutoFull(bridge: bridge, viewController: viewController)
+        }
+    }
+
+    private func runAutoFull(bridge: DavizinBridge, viewController: ViewController) {
+        let game = savedGame()
+
+        NyxelCleanupFlow.markReturnedToNyxel()
+
+        if NyxelCleanupFlow.stage == .needsCleaning {
+            NyxelActivityLog.record("Auto: limpieza pendiente, limpiando primero...")
+            viewController.setOperationProgress("Limpiando sesión anterior...")
+
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let result = InjectorService.uninject(game: game)
+
+                DispatchQueue.main.async {
+                    if result.success {
+                        NyxelCleanupFlow.markCleaningSucceeded(for: game)
+                        NyxelCleanupFlow.finishCycle()
+                        NyxelActivityLog.record("Auto: limpieza exitosa, continuando con inyección...")
+                        self?.runAutoInject(bridge: bridge, viewController: viewController)
+                    } else {
+                        self?.isRunning = false
+                        NyxelActivityLog.record("Auto: limpieza falló — \(result.message)")
+                        viewController.setOperationState(.failed("Limpieza falló: \(result.message)"))
+                    }
+                }
+            }
+        } else {
+            runAutoInject(bridge: bridge, viewController: viewController)
         }
     }
 
@@ -46,7 +79,7 @@ final class NyxelAutoInjectCoordinator {
 
         guard let mode else {
             isRunning = false
-            showAlert(on: viewController, title: "Auto-Inject", message: "No hay un modo guardado. Selecciona un modo manualmente primero.")
+            showAlert(on: viewController, title: "Auto", message: "No hay un modo guardado. Selecciona un modo manualmente primero.")
             return
         }
 
@@ -61,7 +94,7 @@ final class NyxelAutoInjectCoordinator {
             guard !key.isEmpty else {
                 DispatchQueue.main.async {
                     self?.isRunning = false
-                    self?.showAlert(on: viewController, title: "Auto-Inject", message: "No hay sesión activa.")
+                    self?.showAlert(on: viewController, title: "Auto", message: "No hay sesión activa.")
                 }
                 return
             }
@@ -144,13 +177,13 @@ final class NyxelAutoInjectCoordinator {
 
         func attemptOpen(at index: Int) {
             guard index < urls.count else {
-                NyxelActivityLog.record("AutoInject: no se pudo abrir el juego")
+                NyxelActivityLog.record("Auto: no se pudo abrir el juego")
                 return
             }
             UIApplication.shared.open(urls[index], options: [:]) { success in
                 if success {
                     NyxelCleanupFlow.markGameOpened()
-                    NyxelActivityLog.record("AutoInject: juego abierto — \(game.rawValue)")
+                    NyxelActivityLog.record("Auto: juego abierto — \(game.rawValue)")
                 } else {
                     DispatchQueue.main.async { attemptOpen(at: index + 1) }
                 }
