@@ -104,7 +104,6 @@ final class NyxelAutoInjectCoordinator {
                     NyxelActivityLog.record("Auto: inyección exitosa, abriendo juego...")
                     viewController.setOperationState(.succeeded(result.message))
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        Self.scheduleBackgroundClean(for: game, delay: 6.0)
                         Self.openGame(game, from: viewController)
                     }
                 } else {
@@ -112,27 +111,6 @@ final class NyxelAutoInjectCoordinator {
                     viewController.setOperationState(.failed(result.message))
                 }
             }
-        }
-    }
-
-    private static func scheduleBackgroundClean(for game: DavizinGame, delay: TimeInterval) {
-        var bgTask: UIBackgroundTaskIdentifier = .invalid
-        bgTask = UIApplication.shared.beginBackgroundTask {
-            UIApplication.shared.endBackgroundTask(bgTask)
-            bgTask = .invalid
-        }
-
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay) {
-            let result = InjectorService.uninject(game: game)
-            if result.success {
-                NyxelCleanupFlow.finishCycle()
-                NyxelActivityLog.record("Auto: limpieza automática en background — exitosa")
-            } else {
-                NyxelActivityLog.record("Auto: limpieza automática en background — falló: \(result.message)")
-            }
-
-            UIApplication.shared.endBackgroundTask(bgTask)
-            bgTask = .invalid
         }
     }
 
