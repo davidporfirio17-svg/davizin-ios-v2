@@ -87,6 +87,8 @@ final class NyxelAutoInjectCoordinator {
     private func runAutoClean(bridge: DavizinBridge, viewController: ViewController) {
         let game = savedGame()
 
+        NyxelCleanupFlow.markReturnedToNyxel()
+
         guard NyxelCleanupFlow.stage == .needsCleaning else {
             isRunning = false
             showAlert(on: viewController, title: "Auto-Clean", message: "No hay una sesión pendiente de limpiar.")
