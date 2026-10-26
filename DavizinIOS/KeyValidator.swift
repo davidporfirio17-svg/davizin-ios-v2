@@ -98,6 +98,36 @@ class KeyValidator {
         validateWithSeconds(key: key, completion: completion)
     }
 
+    private static func userFriendlyMessage(errorCode: String?, workerMessage: String?) -> String {
+        switch errorCode?.uppercased() {
+        case "KEY_EXPIRED", "EXPIRED":
+            return "Key vencida. Solicita una renovación."
+        case "KEY_BLOCKED", "BLOCKED", "KEY_REVOKED", "REVOKED":
+            return "Key bloqueada por un administrador."
+        case "KEY_PAUSED", "PAUSED", "KEY_SUSPENDED", "SUSPENDED":
+            return "Key pausada temporalmente."
+        case "KEY_NOT_FOUND", "NOT_FOUND":
+            return "La key ingresada no existe."
+        case "INVALID_KEY", "INVALID":
+            return "La key ingresada no es válida."
+        case "HWID_MISMATCH", "DEVICE_MISMATCH":
+            return "Esta key está vinculada a otro dispositivo."
+        case "MAX_DEVICES", "DEVICE_LIMIT":
+            return "Límite de dispositivos alcanzado para esta key."
+        case "VERSION_UNAVAILABLE":
+            return "Versión de la app no autorizada."
+        case "RATE_LIMITED", "TOO_MANY_REQUESTS":
+            return "Demasiados intentos. Espera un momento."
+        case "MAINTENANCE", "SERVER_MAINTENANCE":
+            return "Servidor en mantenimiento. Intenta más tarde."
+        default:
+            if let msg = workerMessage, !msg.isEmpty {
+                return msg
+            }
+            return "No se pudo iniciar sesión."
+        }
+    }
+
     static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int, String?) -> Void) {
         // Check system compatibility before attempting key validation
         guard NyxelOperationGuard.canProceedWithKeyValidation() else {
@@ -190,7 +220,13 @@ class KeyValidator {
                               resp.error_code ?? "(nil)", resp.message ?? "(nil)")
                     }
 
-                    completion(resp.success, resp.message ?? "ok", rem, resp.notice)
+                    let displayMessage: String
+                    if resp.success {
+                        displayMessage = resp.message ?? "ok"
+                    } else {
+                        displayMessage = userFriendlyMessage(errorCode: resp.error_code, workerMessage: resp.message)
+                    }
+                    completion(resp.success, displayMessage, rem, resp.notice)
                 } catch {
                     NSLog("[KeyValidator] JSON decode error: %@", "\(error)")
                     lastValidationWasVersionUnavailable = false

@@ -201,7 +201,7 @@ final class DavizinBridge {
     private func consumeOneTimeMode(mode: DavizinMode, key: String, hwid: String, result: InjectorResult) {
         guard let url = NyxelStringShield.workerURL(NyxelStringShield.workerHostDZ, path: NyxelStringShield.pathConsumeMode) else {
             operationInFlight = false
-            vc?.setOperationState(.failed("NYX-002 — No se pudo confirmar la operación con el Worker."))
+            vc?.setOperationState(.failed("No se pudo confirmar la operación con el servidor."))
             return
         }
         var request = URLRequest(url: url)
@@ -216,14 +216,14 @@ final class DavizinBridge {
                 self.hapticFeedback(success: ok)
                 if ok { DavizinModeCatalog.markConsumed(mode.id) }
                 self.operationInFlight = false
-                self.vc?.setOperationState(ok ? .succeeded(result.message) : .failed("La inyección se realizó, pero no se pudo confirmar el consumo del modo. No vuelvas a intentarlo hasta revisar la conexión."))
+                self.vc?.setOperationState(ok ? .succeeded(result.message) : .failed("Se aplicó la configuración, pero no se pudo confirmar con el servidor. Revisa tu conexión."))
             }
         }.resume()
     }
 
     private func handleOperation(_ operation: DavizinOperationKind) {
         guard !operationInFlight else {
-            vc?.setOperationState(.failed("NYX-006 — Ya hay una operación en curso."))
+            vc?.setOperationState(.failed("Ya hay una operación en curso."))
             return
         }
         if operation == .clean {
@@ -237,7 +237,7 @@ final class DavizinBridge {
             return
         }
         guard !sessionKey.isEmpty else {
-            vc?.setOperationState(.failed("NYX-001 — Sesión no autorizada."))
+            vc?.setOperationState(.failed("Sesión no autorizada. Ingresa tu key."))
             return
         }
 
@@ -249,7 +249,7 @@ final class DavizinBridge {
             guard success && remaining > 0 else {
                 self.operationInFlight = false
                 NyxelActivityLog.record("Operación bloqueada: key no autorizada")
-                self.vc?.setOperationState(.failed("NYX-001 — La key ya no está autorizada por el Worker."))
+                self.vc?.setOperationState(.failed("La key ya no está autorizada. Verifica tu sesión."))
                 return
             }
             self.remainingSeconds = remaining

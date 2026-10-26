@@ -197,9 +197,7 @@ final class LoginView: UIView {
             statusLabel.textColor = AppTheme.success
             setReadiness("SESIÓN ACTIVA", color: AppTheme.success)
         } else {
-            // Mantener una respuesta uniforme: no revelar si la key existe,
-            // expiró, fue revocada o si el servidor rechazó el dispositivo.
-            statusLabel.text = "No se pudo validar la sesión."
+            statusLabel.text = text
             statusLabel.textColor = AppTheme.failure
             showValidationError()
             setReadiness("SESIÓN NO VALIDADA", color: AppTheme.failure)
