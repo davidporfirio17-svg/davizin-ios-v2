@@ -45,6 +45,13 @@ final class NyxelAutoInjectCoordinator {
 
     private func runAutoFull(bridge: DavizinBridge, viewController: ViewController) {
         let game = savedGame()
+        let mode = savedMode()
+
+        guard let mode else {
+            isRunning = false
+            showAlert(on: viewController, title: "Auto", message: "No hay un modo guardado. Selecciona un modo manualmente primero.")
+            return
+        }
 
         NyxelCleanupFlow.markReturnedToNyxel()
 
@@ -60,7 +67,7 @@ final class NyxelAutoInjectCoordinator {
                         NyxelCleanupFlow.markCleaningSucceeded(for: game)
                         NyxelCleanupFlow.finishCycle()
                         NyxelActivityLog.record("Auto: limpieza exitosa, continuando con inyección...")
-                        self?.runAutoInject(bridge: bridge, viewController: viewController)
+                        self?.runAutoFullInject(bridge: bridge, viewController: viewController, game: game, mode: mode)
                     } else {
                         self?.isRunning = false
                         NyxelActivityLog.record("Auto: limpieza falló — \(result.message)")
@@ -69,7 +76,67 @@ final class NyxelAutoInjectCoordinator {
                 }
             }
         } else {
-            runAutoInject(bridge: bridge, viewController: viewController)
+            runAutoFullInject(bridge: bridge, viewController: viewController, game: game, mode: mode)
+        }
+    }
+
+    private func runAutoFullInject(bridge: DavizinBridge, viewController: ViewController, game: DavizinGame, mode: DavizinMode) {
+        NyxelActivityLog.record("Auto: inyectando — game=\(game.rawValue) mode=\(mode.id)")
+        viewController.setOperationProgress("Inyectando automáticamente...")
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let key = bridge.currentKey
+            let hwid = bridge.currentHWID
+
+            guard !key.isEmpty else {
+                DispatchQueue.main.async {
+                    self?.isRunning = false
+                    self?.showAlert(on: viewController, title: "Auto", message: "No hay sesión activa.")
+                }
+                return
+            }
+
+            let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
+
+            DispatchQueue.main.async {
+                self?.isRunning = false
+                if result.success {
+                    NyxelActivityLog.record("Auto: inyección exitosa, abriendo juego...")
+                    viewController.setOperationState(.succeeded(result.message))
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        Self.openGame(game, from: viewController)
+                        Self.scheduleBackgroundClean(for: game, delay: 6.0)
+                    }
+                } else {
+                    NyxelActivityLog.record("Auto: inyección falló — \(result.message)")
+                    viewController.setOperationState(.failed(result.message))
+                }
+            }
+        }
+    }
+
+    private static func scheduleBackgroundClean(for game: DavizinGame, delay: TimeInterval) {
+        var bgTask: UIBackgroundTaskIdentifier = .invalid
+        bgTask = UIApplication.shared.beginBackgroundTask {
+            UIApplication.shared.endBackgroundTask(bgTask)
+            bgTask = .invalid
+        }
+
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay) {
+            NyxelCleanupFlow.markReturnedToNyxel()
+            NyxelCleanupFlow.prepareForRelaunch()
+
+            let result = InjectorService.uninject(game: game)
+            if result.success {
+                NyxelCleanupFlow.markCleaningSucceeded(for: game)
+                NyxelCleanupFlow.finishCycle()
+                NyxelActivityLog.record("Auto: limpieza automática en background — exitosa")
+            } else {
+                NyxelActivityLog.record("Auto: limpieza automática en background — falló: \(result.message)")
+            }
+
+            UIApplication.shared.endBackgroundTask(bgTask)
+            bgTask = .invalid
         }
     }
 
