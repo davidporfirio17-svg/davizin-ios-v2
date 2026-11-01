@@ -140,12 +140,13 @@ pub unsafe extern "C" fn al_exploit_write_dir(
     }
 }
 
-/// Read an existing app-container file through AirTraffic and restore it before returning.
+/// Read an existing app-container file via HouseArrest (preferred) or AirTraffic fallback.
 #[no_mangle]
 pub unsafe extern "C" fn al_exploit_read_file(
     pairing_path: *const c_char,
     target_path: *const c_char,
     output_path: *const c_char,
+    bundle_id: *const c_char,
     log_cb: exploit::ALLogCallback,
     ctx: *mut c_void,
     out_error: *mut *mut c_char,
@@ -155,6 +156,7 @@ pub unsafe extern "C" fn al_exploit_read_file(
             pairing_path,
             target_path,
             output_path,
+            bundle_id,
             log_cb,
             ctx,
             out_error,
