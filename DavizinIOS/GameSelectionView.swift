@@ -19,6 +19,8 @@ final class GameSelectionView: UIView {
     private let freeFireMaxCompatibility = UILabel()
     private let stackView = UIStackView()
 
+    private let updateBanner = UIView()
+    private let updateLabel = UILabel()
     private(set) var selectedGame: DavizinGame?
 
     override init(frame: CGRect) {
@@ -119,6 +121,26 @@ final class GameSelectionView: UIView {
             $0.alignment = .fill
             $0.spacing = 3.0
         }
+        updateBanner.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.15)
+        updateBanner.layer.cornerRadius = 8
+        updateBanner.layer.borderWidth = 1
+        updateBanner.layer.borderColor = UIColor.systemOrange.withAlphaComponent(0.4).cgColor
+        updateBanner.isHidden = true
+        updateBanner.translatesAutoresizingMaskIntoConstraints = false
+        updateLabel.font = AppTheme.captionFont()
+        updateLabel.textColor = .systemOrange
+        updateLabel.numberOfLines = 0
+        updateLabel.textAlignment = .center
+        updateLabel.translatesAutoresizingMaskIntoConstraints = false
+        updateBanner.addSubview(updateLabel)
+        NSLayoutConstraint.activate([
+            updateLabel.topAnchor.constraint(equalTo: updateBanner.topAnchor, constant: 8),
+            updateLabel.bottomAnchor.constraint(equalTo: updateBanner.bottomAnchor, constant: -8),
+            updateLabel.leadingAnchor.constraint(equalTo: updateBanner.leadingAnchor, constant: 12),
+            updateLabel.trailingAnchor.constraint(equalTo: updateBanner.trailingAnchor, constant: -12)
+        ])
+
+        stackView.addArrangedSubview(updateBanner)
         stackView.addArrangedSubview(freeFireChoice)
         stackView.addArrangedSubview(freeFireMaxChoice)
 
@@ -141,6 +163,21 @@ final class GameSelectionView: UIView {
             freeFireCompatibility.heightAnchor.constraint(equalToConstant: 14.0),
             freeFireMaxCompatibility.heightAnchor.constraint(equalToConstant: 14.0)
         ])
+    }
+
+    func checkForGameUpdates() {
+        NyxelGameVersionChecker.shared.checkForUpdates { [weak self] results in
+            let updated = results.filter(\.updated)
+            guard !updated.isEmpty else {
+                self?.updateBanner.isHidden = true
+                return
+            }
+            let names = updated.map { r in
+                "\(r.game.rawValue) (v\(r.previousVersion ?? "?") → v\(r.currentVersion))"
+            }.joined(separator: "\n")
+            self?.updateLabel.text = "⚠ Actualización detectada\n\(names)\nVerifica compatibilidad antes de inyectar."
+            self?.updateBanner.isHidden = false
+        }
     }
 
     @objc private func freeFireTapped() {

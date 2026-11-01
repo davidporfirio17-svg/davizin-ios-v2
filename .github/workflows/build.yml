@@ -4,9 +4,19 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      target:
+        description: App a compilar
+        type: choice
+        required: true
+        default: nyxel
+        options:
+          - nyxel
+          - admin
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target != 'admin' }}
     runs-on: macos-14
     steps:
     - name: Checkout
@@ -14,21 +24,31 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Build idevice-ffi transport backend
+    - name: Build AirLiftFFI transport backend
       run: |
         set -euo pipefail
-        rustup target add aarch64-apple-ios
+        rustup target add aarch64-apple-ios aarch64-apple-ios-sim
         cargo build \
-          --manifest-path Vendor/idevice/ffi/Cargo.toml \
+          --manifest-path airlift-rust-core/Cargo.toml \
           --release \
-          --target aarch64-apple-ios \
-          --no-default-features \
-          --features tunnel_tcp_stack,ring,house_arrest
-        test -f Vendor/idevice/target/aarch64-apple-ios/release/libidevice_ffi.a
-        test -f Vendor/idevice/ffi/idevice.h
-        mkdir -p /tmp/idevice-ffi
-        cp Vendor/idevice/target/aarch64-apple-ios/release/libidevice_ffi.a /tmp/idevice-ffi/
-        cp Vendor/idevice/ffi/idevice.h /tmp/idevice-ffi/
+          --target aarch64-apple-ios
+        cargo build \
+          --manifest-path airlift-rust-core/Cargo.toml \
+          --release \
+          --target aarch64-apple-ios-sim
+        test -f airlift-rust-core/target/aarch64-apple-ios/release/libairlift_ffi.a
+        test -f airlift-rust-core/target/aarch64-apple-ios-sim/release/libairlift_ffi.a
+        rm -rf /tmp/airlift /tmp/AirliftFFI.xcframework
+        mkdir -p /tmp/airlift
+        cp airlift-rust-core/target/aarch64-apple-ios/release/libairlift_ffi.a /tmp/airlift/
+        cp airlift-rust-core/include/airlift.h airlift-rust-core/include/module.modulemap /tmp/airlift/
+        xcodebuild -create-xcframework \
+          -library airlift-rust-core/target/aarch64-apple-ios/release/libairlift_ffi.a \
+          -headers airlift-rust-core/include \
+          -library airlift-rust-core/target/aarch64-apple-ios-sim/release/libairlift_ffi.a \
+          -headers airlift-rust-core/include \
+          -output /tmp/AirliftFFI.xcframework
+        cp -R /tmp/AirliftFFI.xcframework /tmp/airlift/
 
     - name: Add kexploit and mcm_bridge files to Xcode project
       run: |
@@ -88,8 +108,8 @@ jobs:
           ONLY_ACTIVE_ARCH=NO \
           ALWAYS_SEARCH_USER_PATHS=NO \
           BUILD_DIR=/tmp/davizin_build \
-          LIBRARY_SEARCH_PATHS=/tmp/idevice-ffi \
-          OTHER_LDFLAGS="-force_load /tmp/idevice-ffi/libidevice_ffi.a -framework Security -framework Network" \
+          LIBRARY_SEARCH_PATHS=/tmp/airlift \
+          FRAMEWORK_SEARCH_PATHS=/tmp/airlift \
           build > /tmp/build.log 2>&1
         status=$?
         set -e
@@ -99,6 +119,8 @@ jobs:
 
         echo "=== Checking for errors in log ==="
         grep -i "error:" /tmp/build.log | head -20 || echo "No errors found"
+        echo "=== Linker diagnostics ==="
+        grep -n -A120 -B20 -E "Undefined symbols|duplicate symbol|ld:|clang: error" /tmp/build.log | tail -180 || true
 
         if [ "$status" -ne 0 ]; then
           echo "=== Build FAILED (status $status); emitting annotations ==="
@@ -108,6 +130,47 @@ jobs:
           done
           exit "$status"
         fi
+
+    - name: Build ExternalTunnel appex
+      run: |
+        set -euo pipefail
+        APP=$(find /tmp/davizin_build -name "*.app" -not -path "*/simulator/*" -type d | head -1)
+        if [ -z "$APP" ]; then echo "ERROR: No .app found"; exit 1; fi
+
+        APPEX_DIR="$APP/PlugIns/ExternalTunnel.appex"
+        mkdir -p "$APPEX_DIR"
+
+        SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+
+        swiftc \
+          -target arm64-apple-ios16.0 \
+          -sdk "$SDK_PATH" \
+          -O \
+          -module-name ExternalTunnel \
+          -emit-executable \
+          -o "$APPEX_DIR/ExternalTunnel" \
+          -application-extension \
+          -Xlinker -e -Xlinker _NSExtensionMain \
+          -framework Foundation \
+          -framework NetworkExtension \
+          ExternalTunnel/PacketTunnelProvider.swift
+
+        cp ExternalTunnel/Info.plist "$APPEX_DIR/Info.plist"
+        echo "ExternalTunnel.appex built and embedded"
+        ls -la "$APPEX_DIR/"
+
+    - name: Inject IPA build number into Info.plist
+      run: |
+        APP=$(find /tmp/davizin_build -name "*.app" -not -path "*/simulator/*" -type d | head -1)
+        if [ -z "$APP" ]; then
+          echo "ERROR: No .app found"
+          exit 1
+        fi
+        BUILD_NUM="${GITHUB_RUN_NUMBER}"
+        echo "Injecting NyxelBuildNumber=${BUILD_NUM} into $APP/Info.plist"
+        /usr/libexec/PlistBuddy -c "Delete :NyxelBuildNumber" "$APP/Info.plist" 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c "Add :NyxelBuildNumber string ${BUILD_NUM}" "$APP/Info.plist"
+        /usr/libexec/PlistBuddy -c "Print :NyxelBuildNumber" "$APP/Info.plist"
 
     - name: Embed entitlements with ldid
       run: |
@@ -144,14 +207,18 @@ jobs:
 
         mkdir -p /tmp/Payload
         cp -r "$APP" /tmp/Payload/DavizinIOS.app
-        cd /tmp && zip -r Nyxel_External_unsigned.ipa Payload/
+        cd /tmp && zip -r "NyxelExternal_27.2.0_build${GITHUB_RUN_NUMBER}.ipa" Payload/
 
-        ls -lh /tmp/Nyxel_External_unsigned.ipa
-        unzip -l /tmp/Nyxel_External_unsigned.ipa | head -20
+        ls -lh "/tmp/NyxelExternal_27.2.0_build${GITHUB_RUN_NUMBER}.ipa"
+        unzip -l "/tmp/NyxelExternal_27.2.0_build${GITHUB_RUN_NUMBER}.ipa" | head -20
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
-        name: Nyxel_External_iOS_unsigned
-        path: /tmp/Nyxel_External_unsigned.ipa
+        name: NyxelExternal_27.2.0_build${{ github.run_number }}
+        path: /tmp/NyxelExternal_27.2.0_build${{ github.run_number }}.ipa
         retention-days: 30
+
+  build-admin:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target == 'admin' }}
+    uses: ./.github/workflows/build-admin.yml

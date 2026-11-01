@@ -22,7 +22,7 @@ private enum NyxelKeychain {
     static func save(_ value: String) {
         let data = Data(value.uppercased().utf8)
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
-        let attributes: [String: Any] = [kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        let attributes: [String: Any] = [kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly]
         if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) != errSecSuccess {
             var item = query; attributes.forEach { item[$0.key] = $0.value }
             SecItemAdd(item as CFDictionary, nil)
@@ -197,9 +197,7 @@ final class LoginView: UIView {
             statusLabel.textColor = AppTheme.success
             setReadiness("SESIÓN ACTIVA", color: AppTheme.success)
         } else {
-            // Mantener una respuesta uniforme: no revelar si la key existe,
-            // expiró, fue revocada o si el servidor rechazó el dispositivo.
-            statusLabel.text = "No se pudo validar la sesión."
+            statusLabel.text = text
             statusLabel.textColor = AppTheme.failure
             showValidationError()
             setReadiness("SESIÓN NO VALIDADA", color: AppTheme.failure)

@@ -50,6 +50,9 @@ final class NixelVPNManager: NSObject {
                     "TunnelPeerIP": "10.7.0.1/32",
                     "HybridMode": true
                 ]
+                proto.includeAllNetworks = false
+                // Keep the system's primary route (including cellular data) in control.
+                proto.enforceRoutes = false
                 m.protocolConfiguration = proto
                 m.localizedDescription = "Nixel External Hybrid"
                 m.isEnabled = true
@@ -67,8 +70,12 @@ final class NixelVPNManager: NSObject {
             switch result {
             case .failure(let error): completion(.failure(error))
             case .success:
-                do { try self.manager?.connection.startVPNTunnel(); completion(.success(())) }
-                catch { self.lastError = error; completion(.failure(error)) }
+                self.manager?.loadFromPreferences { [weak self] error in
+                    guard let self else { return }
+                    if let error { self.lastError = error; completion(.failure(error)); return }
+                    do { try self.manager?.connection.startVPNTunnel(); completion(.success(())) }
+                    catch { self.lastError = error; completion(.failure(error)) }
+                }
             }
         }
     }

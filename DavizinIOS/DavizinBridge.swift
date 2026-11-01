@@ -7,6 +7,7 @@ final class DavizinBridge {
     private weak var vc: ViewController?
     private var countdownTimer: Timer?
     private var remainingSeconds: Int = 0
+    private var injectionProgressObserver: NSObjectProtocol?
 
     /// Modo elegido por el usuario. Define que cache_res se inyecta.
     private var selectedMode: DavizinMode?
@@ -19,8 +20,22 @@ final class DavizinBridge {
     private var sessionHWID: String = ""
     private var operationInFlight = false
 
+    var currentKey: String { sessionKey }
+    var currentHWID: String { sessionHWID }
+
     func connect(to viewController: ViewController) {
         self.vc = viewController
+        if let injectionProgressObserver {
+            NotificationCenter.default.removeObserver(injectionProgressObserver)
+        }
+        injectionProgressObserver = NotificationCenter.default.addObserver(
+            forName: .nyxelInjectionProgress,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let message = notification.object as? String else { return }
+            self?.vc?.setOperationProgress(message)
+        }
         // Restaurar el ultimo juego y modo elegidos
         if let g = UserDefaults.standard.string(forKey: "dz_last_game"), let game = DavizinGame(rawValue: g) {
             selectedGame = game
@@ -81,6 +96,16 @@ final class DavizinBridge {
                 self?.sessionKey = upperKey
                 self?.sessionHWID = KeyValidator.getDeviceHWID()
 
+                // Entrelazado anti-crack: deriva el fingerprint de la Key y lo
+                // deja en memoria. Varios puntos del flujo lo re-chequean antes
+                // de inyectar. Si alguien parchea `success` para forzar login
+                // sin pasar por `KeyValidator.validate`, aquí nadie llama a
+                // bind() y el fingerprint queda nil → la inyección degrada.
+                NyxelAuthorizationState.shared.bind(
+                    key: upperKey,
+                    hwid: KeyValidator.getDeviceHWID()
+                )
+
                 self?.startCountdown()
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -105,6 +130,14 @@ final class DavizinBridge {
     }
 
     private func continueAfterLogin() {
+        if NyxelAutoInjectCoordinator.shared.hasPending(), let vc = self.vc {
+            vc.showOperationScreen()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self else { return }
+                NyxelAutoInjectCoordinator.shared.executeAfterLogin(bridge: self, viewController: vc)
+            }
+            return
+        }
         if NyxelCleanupFlow.hasPendingWork, let game = NyxelCleanupFlow.game {
             selectedGame = game
             let savedModeID = UserDefaults.standard.string(forKey: "dz_last_mode")
@@ -125,87 +158,72 @@ final class DavizinBridge {
     }
 
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
-        vc?.setOperationState(.injecting)
-
-        // Los modos marcados como "hybrid" en la configuración remota usan el
-        // Packet Tunnel local antes de descargar/aplicar el recurso. Los modos
-        // normales conservan exactamente el flujo anterior.
-        let wantsHybrid = mode.accessTier.lowercased() == "hybrid"
-            || mode.id.lowercased().contains("hybrid")
-            || mode.label.lowercased().contains("hybrid")
-
-        let injectNow: () -> Void = { [weak self] in
-            guard let self = self else { return }
-            DispatchQueue.global(qos: .userInitiated).async {
-                if Self.airLiftRouteAvailable {
-                    NyxelActivityLog.record("AirLift disponible: omitiendo kexploit experimental y usando Remote Pairing/RSD para la escritura")
-                } else if sandbox_access_is_active() == 0 {
-                    NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
-                    let exploitResult = kexploit_opa334()
-                    if exploitResult == 0 {
-                        let selfProc = proc_self()
-                        _ = sandbox_escape(selfProc)
-                        NyxelActivityLog.record("Exploit pre-inyección completado, sandbox activo: \(sandbox_access_is_active() != 0)")
-                    } else {
-                        NyxelActivityLog.record("Exploit pre-inyección falló (KXP-\(abs(exploitResult)): \(Self.kxpDetail(abs(exploitResult)))), continuando con bad_query")
-                    }
+        let device = NyxelDeviceInfo.versionTuple
+        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+            major: device.major, minor: device.minor,
+            patch: device.patch, build: NyxelSupportPolicy.currentBuild
+        )
+        if pairingRequired {
+            let netState = NyxelCellularPreflight.currentState()
+            if netState == .cellularOnly {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, let vc = self.vc else { return }
+                    NyxelCellularPreflight.presentAirplaneModeGuide(
+                        from: vc,
+                        onContinue: { [weak self] in
+                            self?.performInjection(game: game, mode: mode, key: key, hwid: hwid)
+                        },
+                        onCancel: { [weak self] in
+                            self?.operationInFlight = false
+                            self?.vc?.setOperationState(.failed("Operación cancelada: activa Modo Avión para operar con datos."))
+                        }
+                    )
                 }
-
-                let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
-                if result.success && mode.oneTime {
-                    self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
-                } else {
-                    DispatchQueue.main.async {
-                        self.hapticFeedback(success: result.success)
-                        self.operationInFlight = false
-                        self.vc?.setOperationState(result.success ? .succeeded(result.message) : .failed(result.message))
-                    }
-                }
+                return
             }
         }
-
-        guard wantsHybrid else {
-            injectNow()
-            return
-        }
-
-        NixelHybridCoordinator.start { [weak self] _ in
+        vc?.setOperationState(.injecting)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
-            NyxelActivityLog.record("Hybrid VPN preparado (o timeout/externo)")
-            injectNow()
+            let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
+            if result.success && mode.oneTime {
+                self.consumeOneTimeMode(mode: mode, key: key, hwid: hwid, result: result)
+            } else {
+                DispatchQueue.main.async {
+                    self.hapticFeedback(success: result.success)
+                    self.operationInFlight = false
+                    self.vc?.setOperationState(result.success ? .succeeded(result.message) : .failed(result.message))
+                }
+            }
         }
     }
 
     private func consumeOneTimeMode(mode: DavizinMode, key: String, hwid: String, result: InjectorResult) {
-        guard let url = URL(string: "https://dz.davidporfirio17.workers.dev/consume-mode") else {
+        guard let url = NyxelStringShield.workerURL(NyxelStringShield.workerHostDZ, path: NyxelStringShield.pathConsumeMode) else {
             operationInFlight = false
-            vc?.setOperationState(.failed("NYX-002 — No se pudo confirmar la operación con el Worker."))
+            vc?.setOperationState(.failed("No se pudo confirmar la operación con el servidor."))
             return
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(NyxelStringShield.contentTypeJSON, forHTTPHeaderField: "Content-Type")
         KeyValidator.applySecurityHeaders(to: &request)
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["key": key, "hwid": hwid, "mode": mode.id])
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
+        NyxelCertPinning.shared.session.dataTask(with: request) { [weak self] data, response, _ in
             let ok = (response as? HTTPURLResponse)?.statusCode == 200 && ((try? JSONSerialization.jsonObject(with: data ?? Data()) as? [String: Any])?["success"] as? Bool == true)
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.hapticFeedback(success: ok)
                 if ok { DavizinModeCatalog.markConsumed(mode.id) }
                 self.operationInFlight = false
-                self.vc?.setOperationState(ok ? .succeeded(result.message) : .failed("La inyección se realizó, pero no se pudo confirmar el consumo del modo. No vuelvas a intentarlo hasta revisar la conexión."))
+                self.vc?.setOperationState(ok ? .succeeded(result.message) : .failed("Se aplicó la configuración, pero no se pudo confirmar con el servidor. Revisa tu conexión."))
             }
         }.resume()
     }
 
     private func handleOperation(_ operation: DavizinOperationKind) {
         guard !operationInFlight else {
-            vc?.setOperationState(.failed("NYX-006 — Ya hay una operación en curso."))
-            return
-        }
-        if operation == .inject && NyxelCleanupFlow.hasPendingWork {
-            vc?.setOperationState(.failed("Limpia sesión sí o sí antes de volver a inyectar."))
+            vc?.setOperationState(.failed("Ya hay una operación en curso."))
             return
         }
         if operation == .clean {
@@ -219,7 +237,7 @@ final class DavizinBridge {
             return
         }
         guard !sessionKey.isEmpty else {
-            vc?.setOperationState(.failed("NYX-001 — Sesión no autorizada."))
+            vc?.setOperationState(.failed("Sesión no autorizada. Ingresa tu key."))
             return
         }
 
@@ -231,7 +249,7 @@ final class DavizinBridge {
             guard success && remaining > 0 else {
                 self.operationInFlight = false
                 NyxelActivityLog.record("Operación bloqueada: key no autorizada")
-                self.vc?.setOperationState(.failed("NYX-001 — La key ya no está autorizada por el Worker."))
+                self.vc?.setOperationState(.failed("La key ya no está autorizada. Verifica tu sesión."))
                 return
             }
             self.remainingSeconds = remaining
@@ -245,53 +263,9 @@ final class DavizinBridge {
 
         case .runExploit:
             vc?.setOperationState(.running)
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self else { return }
-
-                if Self.airLiftRouteAvailable {
-                    NyxelActivityLog.record("Remote Pairing guardado: se usará el túnel RSD/AirLift real; no se ejecuta kexploit en iOS 27")
-                    DispatchQueue.main.async {
-                        self.operationInFlight = false
-                        self.vc?.setOperationState(.succeeded("Remote Pairing guardado ✓ — AirLift se validará al escribir"))
-                    }
-                    return
-                }
-
-                if sandbox_access_is_active() != 0 {
-                    NyxelActivityLog.record("Sandbox ya activo, exploit innecesario")
-                    DispatchQueue.main.async {
-                        self.operationInFlight = false
-                        self.vc?.setOperationState(.succeeded("Sandbox ya activo ✓"))
-                    }
-                    return
-                }
-
-                NyxelActivityLog.record("Iniciando kexploit_opa334...")
-                let exploitResult = kexploit_opa334()
-                guard exploitResult == 0 else {
-                    let code = abs(exploitResult)
-                    let detail = Self.kxpDetail(code)
-                    NyxelActivityLog.record("kexploit_opa334 falló: code \(code) — \(detail)")
-                    DispatchQueue.main.async {
-                        self.operationInFlight = false
-                        self.vc?.setOperationState(.failed("KXP-\(code) — \(detail)"))
-                    }
-                    return
-                }
-
-                NyxelActivityLog.record("kexploit exitoso, ejecutando sandbox_escape...")
-                let selfProc = proc_self()
-                _ = sandbox_escape(selfProc)
-                let active = sandbox_access_is_active() != 0
-                NyxelActivityLog.record("sandbox_escape completado, activo: \(active)")
-
-                DispatchQueue.main.async {
-                    self.operationInFlight = false
-                    self.hapticFeedback(success: active)
-                    self.vc?.setOperationState(active
-                        ? .succeeded("Sistema preparado ✓")
-                        : .failed("SBX-001 — Sandbox escape no verificado."))
-                }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                self?.operationInFlight = false
+                self?.vc?.setOperationState(.succeeded("Sistema listo ✓"))
             }
 
         case .inject:

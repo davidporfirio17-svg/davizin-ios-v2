@@ -69,10 +69,10 @@ class KeyValidator {
 
     /// Añade identidad de instalación, build y sesión a cada solicitud sensible.
     static func applySecurityHeaders(to request: inout URLRequest) {
-        request.setValue(getInstallationID(), forHTTPHeaderField: "X-DZ-Installation")
-        request.setValue(getAppBuild(), forHTTPHeaderField: "X-DZ-Build")
+        request.setValue(getInstallationID(), forHTTPHeaderField: NyxelStringShield.headerInstallation)
+        request.setValue(getAppBuild(), forHTTPHeaderField: NyxelStringShield.headerBuild)
         if let session = currentSessionToken, !session.isEmpty {
-            request.setValue(session, forHTTPHeaderField: "X-DZ-Session")
+            request.setValue(session, forHTTPHeaderField: NyxelStringShield.headerSession)
         }
     }
 
@@ -98,6 +98,36 @@ class KeyValidator {
         validateWithSeconds(key: key, completion: completion)
     }
 
+    private static func userFriendlyMessage(errorCode: String?, workerMessage: String?) -> String {
+        switch errorCode?.uppercased() {
+        case "KEY_EXPIRED", "EXPIRED":
+            return "Key vencida. Solicita una renovación."
+        case "KEY_BLOCKED", "BLOCKED", "KEY_REVOKED", "REVOKED":
+            return "Key bloqueada por un administrador."
+        case "KEY_PAUSED", "PAUSED", "KEY_SUSPENDED", "SUSPENDED":
+            return "Key pausada temporalmente."
+        case "KEY_NOT_FOUND", "NOT_FOUND":
+            return "La key ingresada no existe."
+        case "INVALID_KEY", "INVALID":
+            return "La key ingresada no es válida."
+        case "HWID_MISMATCH", "DEVICE_MISMATCH":
+            return "Esta key está vinculada a otro dispositivo."
+        case "MAX_DEVICES", "DEVICE_LIMIT":
+            return "Límite de dispositivos alcanzado para esta key."
+        case "VERSION_UNAVAILABLE":
+            return "Versión de la app no autorizada."
+        case "RATE_LIMITED", "TOO_MANY_REQUESTS":
+            return "Demasiados intentos. Espera un momento."
+        case "MAINTENANCE", "SERVER_MAINTENANCE":
+            return "Servidor en mantenimiento. Intenta más tarde."
+        default:
+            if let msg = workerMessage, !msg.isEmpty {
+                return msg
+            }
+            return "No se pudo iniciar sesión."
+        }
+    }
+
     static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int, String?) -> Void) {
         // Check system compatibility before attempting key validation
         guard NyxelOperationGuard.canProceedWithKeyValidation() else {
@@ -108,8 +138,7 @@ class KeyValidator {
             return
         }
         
-        let serverURL = "https://dz.davidporfirio17.workers.dev"
-        guard let url = URL(string: "\(serverURL)/check") else {
+        guard let url = NyxelStringShield.workerURL(NyxelStringShield.workerHostDZ, path: NyxelStringShield.pathCheck) else {
             completion(false, "URL inválida", 0, nil)
             return
         }
@@ -117,7 +146,7 @@ class KeyValidator {
 			var request = URLRequest(url: url)
 			request.httpMethod = "POST"
 			request.cachePolicy = .reloadIgnoringLocalCacheData
-			request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+			request.setValue(NyxelStringShield.contentTypeJSON, forHTTPHeaderField: "Content-Type")
 			request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 			request.timeoutInterval = 15
         applySecurityHeaders(to: &request)
@@ -144,7 +173,7 @@ class KeyValidator {
 
         NSLog("[KeyValidator] Enviando validación — build=%@, version=%@", appBuild, appVersion)
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        NyxelCertPinning.shared.session.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 let httpStatus = (response as? HTTPURLResponse)?.statusCode ?? -1
                 NSLog("[KeyValidator] Respuesta HTTP %d", httpStatus)
@@ -162,9 +191,6 @@ class KeyValidator {
                     completion(false, "Sin respuesta del servidor", 0, nil)
                     return
                 }
-
-                let rawBody = String(data: data.prefix(512), encoding: .utf8) ?? "(no legible)"
-                NSLog("[KeyValidator] Body: %@", rawBody)
 
                 do {
                     let resp = try JSONDecoder().decode(KeyResponse.self, from: data)
@@ -194,7 +220,13 @@ class KeyValidator {
                               resp.error_code ?? "(nil)", resp.message ?? "(nil)")
                     }
 
-                    completion(resp.success, resp.message ?? "ok", rem, resp.notice)
+                    let displayMessage: String
+                    if resp.success {
+                        displayMessage = resp.message ?? "ok"
+                    } else {
+                        displayMessage = userFriendlyMessage(errorCode: resp.error_code, workerMessage: resp.message)
+                    }
+                    completion(resp.success, displayMessage, rem, resp.notice)
                 } catch {
                     NSLog("[KeyValidator] JSON decode error: %@", "\(error)")
                     lastValidationWasVersionUnavailable = false
