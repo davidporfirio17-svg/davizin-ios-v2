@@ -555,8 +555,8 @@ class InjectorService {
             originalWasMissing = false
             NyxelActivityLog.record("Respaldo de seguridad guardado (\(original.count) bytes)")
         } else if requiresPairingTransportOnCurrentDevice() {
-            NyxelActivityLog.record("Respaldo no disponible: lectura AirLift falló; se continuará sin backup")
-            originalWasMissing = true
+            sendErrorNotification("Error", "Lectura de original fallida")
+            return InjectorResult(success: false, message: "No se pudo leer el archivo original. Revisa la conexión y vuelve a intentar.")
         } else if !fm.fileExists(atPath: destPath) {
             originalWasMissing = true
         } else {
