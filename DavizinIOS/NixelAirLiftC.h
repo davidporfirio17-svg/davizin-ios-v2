@@ -34,8 +34,8 @@ int32_t al_exploit_write_dir(const char *pairing_path, const char *source_dir,
                              const char *target_dir, ALLogCallback log_cb,
                              void *ctx, char **out_error);
 int32_t al_exploit_read_file(const char *pairing_path, const char *target_path,
-                             const char *output_path, ALLogCallback log_cb,
-                             void *ctx, char **out_error);
+                             const char *output_path, const char *bundle_id,
+                             ALLogCallback log_cb, void *ctx, char **out_error);
 int32_t al_find_app_container(const char *pairing_path, const char *bundle_id,
                               ALLogCallback log_cb, void *ctx,
                               char **out_container, char **out_error);
