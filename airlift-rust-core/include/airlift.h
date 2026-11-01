@@ -98,11 +98,13 @@ int32_t al_exploit_write_dir(const char *pairing_path,
                              void *ctx,
                              char **out_error);
 
-// Read an existing app-container file through AirTraffic and restore it before returning.
+// Read an existing app-container file via HouseArrest (preferred) or AirTraffic fallback.
 // The bytes are written to output_path inside the caller's sandbox.
+// bundle_id is the target app's CFBundleIdentifier (e.g. "com.apple.PosterBoard").
 int32_t al_exploit_read_file(const char *pairing_path,
                              const char *target_path,
                              const char *output_path,
+                             const char *bundle_id,
                              ALLogCallback log_cb,
                              void *ctx,
                              char **out_error);

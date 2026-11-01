@@ -151,7 +151,9 @@ enum NixelAirLiftFileChannel {
                 let code = pairingURL.path.withCString { pairing in
                     target.path.withCString { remote in
                         outputURL.path.withCString { output in
-                            al_exploit_read_file(pairing, remote, output, nyxelAirliftLogCallback, nil, &errorPointer)
+                            bundleID.withCString { bid in
+                                al_exploit_read_file(pairing, remote, output, bid, nyxelAirliftLogCallback, nil, &errorPointer)
+                            }
                         }
                     }
                 }
