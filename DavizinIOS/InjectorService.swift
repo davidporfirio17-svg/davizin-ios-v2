@@ -153,6 +153,32 @@ class InjectorService {
         }
     }
 
+    private static func resolveContainerViaAirLift(bundleID: String) -> String? {
+        guard let record = NixelPairingRecordStore.shared.load(deviceID: "2424") else { return nil }
+        let pairingURL = FileManager.default.temporaryDirectory.appendingPathComponent("nyxel-container-resolve-\(UUID().uuidString).plist")
+        do {
+            try record.write(to: pairingURL, options: .atomic)
+            defer { try? FileManager.default.removeItem(at: pairingURL) }
+            var containerPointer: UnsafeMutablePointer<CChar>?
+            var errorPointer: UnsafeMutablePointer<CChar>?
+            let code = pairingURL.path.withCString { pairing in
+                bundleID.withCString { bundle in
+                    al_find_app_container(pairing, bundle, { _, _ in }, nil, &containerPointer, &errorPointer)
+                }
+            }
+            defer {
+                if let containerPointer { al_string_free(containerPointer) }
+                if let errorPointer { al_string_free(errorPointer) }
+            }
+            guard code == 0, let containerPointer else { return nil }
+            let path = String(cString: containerPointer)
+            guard path.hasPrefix("/var/mobile/Containers/Data/Application/") || path.hasPrefix("/private/var/mobile/Containers/Data/Application/") else { return nil }
+            return path
+        } catch {
+            return nil
+        }
+    }
+
     private static func getContainerPathWithTimeout(bundleID: String, timeout: TimeInterval, error: inout String?) -> String? {
         let completed = DispatchSemaphore(value: 0)
         let result = MCMContainerLookupResult()
@@ -190,23 +216,54 @@ class InjectorService {
 
         NyxelActivityLog.record("DIAG writeToContainer relPath=\(relPath) pairingRequired=\(pairingRequired) airLiftAvailable=\(NixelAirLiftFileChannel.isAvailable)")
 
-        // --- iOS 27+: AirLift es obligatorio ---
+        // --- iOS 27+: AirLift primero, fallback a bad_query + escritura directa ---
         if pairingRequired {
-            guard NixelAirLiftFileChannel.isAvailable else {
+            var airliftNote = "AirLift: no disponible"
+            if NixelAirLiftFileChannel.isAvailable {
+                switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
+                case .success:
+                    NyxelActivityLog.record("DIAG writeToContainer OK via AirLift bytes=\(data.count)")
+                    return nil
+                case .failure(let error):
+                    airliftNote = "AirLift fallo: \(error.message)"
+                    NyxelActivityLog.record("AirLift write fallo (\(relPath)): \(error.message); intentando bad_query fallback")
+                }
+            }
+
+            guard !container.isEmpty else {
+                NyxelActivityLog.record("DIAG bad_query fallback omitido: container vacio")
                 return ContainerWriteError(
-                    airliftNote: "iOS 27 requiere un registro de pairing y tunel AirLift activos",
+                    airliftNote: airliftNote,
                     directError: NSError(domain: "Davizin", code: -27, userInfo: [
-                        NSLocalizedDescriptionKey: "No hay un canal AirLift disponible para iOS 27."
+                        NSLocalizedDescriptionKey: "AirLift fallo y no hay container resuelto para bad_query fallback."
                     ])
                 )
             }
-            switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
-            case .success:
-                NyxelActivityLog.record("DIAG writeToContainer OK via AirLift bytes=\(data.count)")
+            NyxelActivityLog.record("DIAG iOS 27+ bad_query fallback para \(relPath) container=\(container)")
+            let handleRoot = DavizinGrantContainerAccess(container)
+            let handleDir = DavizinGrantContainerAccess(parentDir)
+            let handleFile = DavizinGrantContainerAccess(fullPath)
+            defer {
+                DavizinReleaseContainerGrant(handleFile)
+                DavizinReleaseContainerGrant(handleDir)
+                DavizinReleaseContainerGrant(handleRoot)
+            }
+
+            try? FileManager.default.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
+            let url = URL(fileURLWithPath: fullPath)
+            do {
+                try data.write(to: url, options: [])
+                NyxelActivityLog.record("DIAG iOS 27+ bad_query direct write OK bytes=\(data.count)")
                 return nil
-            case .failure(let error):
-                NyxelActivityLog.record("AirLift write fallo (\(relPath)): \(error.message)")
-                return ContainerWriteError(airliftNote: "AirLift fallo: \(error.message)", directError: error)
+            } catch {
+                do {
+                    try data.write(to: url, options: .atomic)
+                    NyxelActivityLog.record("DIAG iOS 27+ bad_query atomic write OK bytes=\(data.count)")
+                    return nil
+                } catch let atomicError {
+                    NyxelActivityLog.record("DIAG iOS 27+ bad_query fallback FAILED: \(atomicError.localizedDescription)")
+                    return ContainerWriteError(airliftNote: airliftNote, directError: atomicError)
+                }
             }
         }
 
@@ -257,21 +314,41 @@ class InjectorService {
 
         NyxelActivityLog.record("DIAG readFromContainer relPath=\(relPath) pairingRequired=\(pairingRequired)")
 
-        // --- iOS 27+: AirLift obligatorio ---
+        // --- iOS 27+: AirLift primero, fallback a bad_query + lectura directa ---
         if pairingRequired {
-            guard NixelAirLiftFileChannel.isAvailable else {
-                let detail = "AirLift read omitido: falta pairing requerido"
-                NyxelActivityLog.record("DIAG \(detail)")
-                onFailure?(detail)
+            if NixelAirLiftFileChannel.isAvailable {
+                switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
+                case .success(let data):
+                    NyxelActivityLog.record("DIAG read succeeded via AirLift bytes=\(data.count)")
+                    return data
+                case .failure(let error):
+                    NyxelActivityLog.record("DIAG AirLift read failed, trying bad_query fallback: \(error.message)")
+                }
+            }
+
+            guard !container.isEmpty else {
+                NyxelActivityLog.record("DIAG bad_query read fallback omitido: container vacio")
+                onFailure?("AirLift read fallo y no hay container para bad_query fallback")
                 return nil
             }
-            switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
-            case .success(let data):
-                NyxelActivityLog.record("DIAG read succeeded via AirLift bytes=\(data.count)")
+            NyxelActivityLog.record("DIAG iOS 27+ bad_query read fallback para \(relPath)")
+            let handleRoot = DavizinGrantContainerAccess(container)
+            let handleDir = DavizinGrantContainerAccess(parentDir)
+            let handleFile = DavizinGrantContainerAccess(fullPath)
+            defer {
+                DavizinReleaseContainerGrant(handleFile)
+                DavizinReleaseContainerGrant(handleDir)
+                DavizinReleaseContainerGrant(handleRoot)
+            }
+
+            let url = URL(fileURLWithPath: fullPath)
+            do {
+                let data = try Data(contentsOf: url)
+                NyxelActivityLog.record("DIAG iOS 27+ bad_query read OK bytes=\(data.count)")
                 return data
-            case .failure(let error):
-                NyxelActivityLog.record("DIAG AirLift read failed relPath=\(relPath) detail=\(error.message)")
-                onFailure?(error.message)
+            } catch {
+                NyxelActivityLog.record("DIAG iOS 27+ bad_query read FAILED: \(error.localizedDescription)")
+                onFailure?(error.localizedDescription)
                 return nil
             }
         }
@@ -447,10 +524,19 @@ class InjectorService {
 
         // --- Resolver contenedor MCM ---
         var mcmErr: String?
-        let container = getContainerPathWithTimeout(bundleID: bid, timeout: 25, error: &mcmErr)
+        var container = getContainerPathWithTimeout(bundleID: bid, timeout: 25, error: &mcmErr)
 
-        if container == nil && pairingRequired && NixelAirLiftFileChannel.isAvailable {
-            NyxelActivityLog.record("DIAG MCM lookup fallo en iOS 27 pero AirLift disponible; continuando sin container local")
+        if container == nil && pairingRequired {
+            if let airLiftContainer = resolveContainerViaAirLift(bundleID: bid) {
+                container = airLiftContainer
+                NyxelActivityLog.record("DIAG container resuelto via AirLift InstProxy: \(airLiftContainer)")
+            } else if NixelAirLiftFileChannel.isAvailable {
+                NyxelActivityLog.record("DIAG MCM+AirLift container lookup fallaron en iOS 27; continuando sin container local")
+            } else {
+                let msg = mcmErr ?? "MCM fallo - container nil"
+                NyxelActivityLog.record("DIAG MCM fallo fatal: \(msg)")
+                return InjectorResult(success: false, message: msg)
+            }
         } else if container == nil {
             let msg = mcmErr ?? "MCM fallo - container nil"
             NyxelActivityLog.record("DIAG MCM fallo fatal: \(msg)")
