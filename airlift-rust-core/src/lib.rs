@@ -122,12 +122,13 @@ pub unsafe extern "C" fn al_exploit_write_dir(
     pairing_path: *const c_char,
     source_dir: *const c_char,
     target_dir: *const c_char,
+    bundle_id: *const c_char,
     log_cb: exploit::ALLogCallback,
     ctx: *mut c_void,
     out_error: *mut *mut c_char,
 ) -> i32 {
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        exploit::write_dir(pairing_path, source_dir, target_dir, log_cb, ctx, out_error)
+        exploit::write_dir(pairing_path, source_dir, target_dir, bundle_id, log_cb, ctx, out_error)
     }));
     match res {
         Ok(rc) => rc,

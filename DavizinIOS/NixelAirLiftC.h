@@ -31,7 +31,8 @@ int32_t al_pairing_run_host(const char *bind_addr, uint16_t port,
 void al_pairing_result_free(ALPairResult *r);
 void al_string_free(char *p);
 int32_t al_exploit_write_dir(const char *pairing_path, const char *source_dir,
-                             const char *target_dir, ALLogCallback log_cb,
+                             const char *target_dir, const char *bundle_id,
+                             ALLogCallback log_cb,
                              void *ctx, char **out_error);
 int32_t al_exploit_read_file(const char *pairing_path, const char *target_path,
                              const char *output_path, ALLogCallback log_cb,

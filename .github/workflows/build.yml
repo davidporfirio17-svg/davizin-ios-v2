@@ -84,8 +84,13 @@ jobs:
     - name: Stamp IPA number into build
       run: |
         sed -i '' "s/CURRENT_PROJECT_VERSION[= ]*[0-9][0-9]*/CURRENT_PROJECT_VERSION=${{ github.run_number }}/g" DavizinIOS.xcodeproj/project.pbxproj
-        echo "Stamped CURRENT_PROJECT_VERSION=${{ github.run_number }}"
+        echo "Stamped CURRENT_PROJECT_VERSION=${{ github.run_number }} in pbxproj"
         grep CURRENT_PROJECT_VERSION DavizinIOS.xcodeproj/project.pbxproj
+        # Also stamp CFBundleVersion directly in Info.plist (GENERATE_INFOPLIST_FILE=NO means
+        # Xcode copies Info.plist as-is without substituting build settings).
+        sed -i '' '/<key>CFBundleVersion<\/key>/{n;s/<string>[^<]*<\/string>/<string>${{ github.run_number }}<\/string>/;}' DavizinIOS/Info.plist
+        echo "Stamped CFBundleVersion=${{ github.run_number }} in Info.plist"
+        grep -A1 CFBundleVersion DavizinIOS/Info.plist
 
     - name: Build
       run: |

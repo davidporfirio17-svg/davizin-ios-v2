@@ -104,7 +104,9 @@ enum NixelAirLiftFileChannel {
                 let code = pairingURL.path.withCString { pairing in
                     staging.path.withCString { source in
                         target.deletingLastPathComponent().path.withCString { destination in
-                            al_exploit_write_dir(pairing, source, destination, nyxelAirliftLogCallback, nil, &errorPointer)
+                            bundleID.withCString { bid in
+                                al_exploit_write_dir(pairing, source, destination, bid, nyxelAirliftLogCallback, nil, &errorPointer)
+                            }
                         }
                     }
                 }

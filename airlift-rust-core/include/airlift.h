@@ -94,6 +94,7 @@ int32_t al_exploit_run(const char *pairing_path,
 int32_t al_exploit_write_dir(const char *pairing_path,
                              const char *source_dir,
                              const char *target_dir,
+                             const char *bundle_id,
                              ALLogCallback log_cb,
                              void *ctx,
                              char **out_error);

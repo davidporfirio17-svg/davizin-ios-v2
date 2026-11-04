@@ -20,6 +20,7 @@ idevice = { git = "https://github.com/jkcoxson/idevice.git", rev = "7bd551c16c6d
   "xpc",
   "core_device_proxy",
   "afc",
+  "house_arrest",
   "pair",
   "usbmuxd",
   "syslog_relay",
