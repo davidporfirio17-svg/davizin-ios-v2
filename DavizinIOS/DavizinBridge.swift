@@ -147,8 +147,9 @@ final class DavizinBridge {
         )
 
         let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let ipaBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
         NyxelActivityLog.record("========== BRIDGE INJECTION TRACE ==========")
-        NyxelActivityLog.record("DIAG appVersion=\(appVersion) system=\(NyxelSupportPolicy.currentSystemDescription) game=\(game.rawValue) mode=\(mode.displayName)")
+        NyxelActivityLog.record("DIAG appVersion=\(appVersion) IPA#\(ipaBuild) system=\(NyxelSupportPolicy.currentSystemDescription) game=\(game.rawValue) mode=\(mode.displayName)")
         NyxelActivityLog.record("DIAG pairingRequired=\(pairingRequired) airLiftAvailable=\(Self.airLiftRouteAvailable) kernelOffsets=\(kernelOffsetsSupported)")
 
         vc?.setOperationState(.injecting)

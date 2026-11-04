@@ -81,6 +81,11 @@ jobs:
         RUBY
         ls -la DavizinIOS/kexploit/ DavizinIOS/mcm_bridge.*
 
+    - name: Stamp IPA number into build
+      run: |
+        sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = ${{ github.run_number }}/g" DavizinIOS.xcodeproj/project.pbxproj
+        echo "Stamped CURRENT_PROJECT_VERSION = ${{ github.run_number }}"
+
     - name: Build
       run: |
         set +e
