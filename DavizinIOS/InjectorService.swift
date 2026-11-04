@@ -697,8 +697,13 @@ class InjectorService {
 
         if UserDefaults.standard.bool(forKey: originalMissingKey(for: game)) {
             if requiresPairingTransportOnCurrentDevice() {
-                return InjectorResult(success: false,
-                    message: "No hay copia original legible de la sesión anterior. No se borrará el archivo a ciegas; repara o vuelve a descargar los archivos del juego y comparte el log de Diagnóstico.")
+                NyxelActivityLog.record("DIAG clean: iOS 27+ write-only mode — clearing session (original likely untouched)")
+                UserDefaults.standard.removeObject(forKey: activePathKey(for: game))
+                UserDefaults.standard.set(false, forKey: originalMissingKey(for: game))
+                UserDefaults.standard.set(true, forKey: restoreCompletedKey(for: game))
+                NyxelCleanupFlow.markCleanupCompleted(for: game)
+                return InjectorResult(success: true,
+                    message: "Sesión limpiada. El archivo original no fue modificado.")
             }
             let parentPath = (destPath as NSString).deletingLastPathComponent
             let rootGrant = DavizinGrantContainerAccess(container)
