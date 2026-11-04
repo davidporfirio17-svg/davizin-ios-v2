@@ -83,8 +83,9 @@ jobs:
 
     - name: Stamp IPA number into build
       run: |
-        sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = ${{ github.run_number }}/g" DavizinIOS.xcodeproj/project.pbxproj
-        echo "Stamped CURRENT_PROJECT_VERSION = ${{ github.run_number }}"
+        sed -i '' "s/CURRENT_PROJECT_VERSION[= ]*[0-9][0-9]*/CURRENT_PROJECT_VERSION=${{ github.run_number }}/g" DavizinIOS.xcodeproj/project.pbxproj
+        echo "Stamped CURRENT_PROJECT_VERSION=${{ github.run_number }}"
+        grep CURRENT_PROJECT_VERSION DavizinIOS.xcodeproj/project.pbxproj
 
     - name: Build
       run: |
