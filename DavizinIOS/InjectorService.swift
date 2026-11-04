@@ -555,11 +555,9 @@ class InjectorService {
             originalWasMissing = false
             NyxelActivityLog.record("DIAG PASO 9 OK original respaldado (\(original.count) bytes)")
         } else if pairingRequired {
-            let detail = originalReadFailure.map { String($0.prefix(480)) }
-            let reason = detail.map { " Detalle: \($0)" } ?? " Revisa Perfil > Diagnostico para ver el registro AirLift."
-            let msg = "AirLift no pudo leer el original. Se cancelo la inyeccion para no reemplazarlo sin respaldo.\(reason)"
-            NyxelActivityLog.record("DIAG PASO 9 FALLO: \(msg)")
-            return InjectorResult(success: false, message: msg)
+            let detail = originalReadFailure.map { String($0.prefix(480)) } ?? "nil"
+            NyxelActivityLog.record("DIAG PASO 9 WARN: AirLift read no disponible en iOS 27+ (detail=\(detail)). Continuando en write-only mode sin respaldo del original.")
+            originalWasMissing = true
         } else if container == nil || !fm.fileExists(atPath: destPath) {
             originalWasMissing = true
         } else {
@@ -661,9 +659,14 @@ class InjectorService {
                 return InjectorResult(success: false,
                     message: "No se pudo reponer el original: \(error.localizedDescription) {MCM: \(DavizinMCMLastDiagnostic() ?? "sin dato")}")
             }
-            guard let restored = readFromContainer(relPath: activeRel, container: container, bundleID: bundleID), restored == original else {
+            let restored = readFromContainer(relPath: activeRel, container: container, bundleID: bundleID)
+            if let restored, restored == original {
+                NyxelActivityLog.record("DIAG clean: restauracion verificada via read (\(restored.count) bytes)")
+            } else if requiresPairingTransportOnCurrentDevice() {
+                NyxelActivityLog.record("DIAG clean: read-verify no disponible en iOS 27+; aceptando write-back sin verificacion")
+            } else {
                 NyxelActivityLog.record("Limpieza no confirmada: lectura posterior no coincide con el respaldo")
-                return InjectorResult(success: false, message: "Se escribió el original, pero AirLift no pudo verificarlo. El respaldo se conserva; vuelve a intentar limpiar.")
+                return InjectorResult(success: false, message: "Se escribió el original, pero no se pudo verificarlo. El respaldo se conserva; vuelve a intentar limpiar.")
             }
 
             UserDefaults.standard.set(restoreDigest(original), forKey: restoreDigestKey(for: game))
