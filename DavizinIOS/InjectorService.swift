@@ -701,7 +701,7 @@ class InjectorService {
                 UserDefaults.standard.removeObject(forKey: activePathKey(for: game))
                 UserDefaults.standard.set(false, forKey: originalMissingKey(for: game))
                 UserDefaults.standard.set(true, forKey: restoreCompletedKey(for: game))
-                NyxelCleanupFlow.markCleanupCompleted(for: game)
+                NyxelCleanupFlow.markCleaningSucceeded(for: game)
                 return InjectorResult(success: true,
                     message: "Sesión limpiada. El archivo original no fue modificado.")
             }
