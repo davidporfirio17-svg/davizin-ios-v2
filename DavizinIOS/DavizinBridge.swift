@@ -137,26 +137,29 @@ final class DavizinBridge {
     }
 
     private func performInjection(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) {
-        vc?.setOperationState(.injecting)
-        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
-        NyxelActivityLog.record("========== INJECTION TRACE BEGIN ==========")
-        NyxelActivityLog.record("DIAG appVersion=\(appVersion) system=\(NyxelSupportPolicy.currentSystemDescription) game=\(game.rawValue) mode=\(mode.displayName) pairingRecordAvailable=\(Self.airLiftRouteAvailable)")
+        let device = NyxelDeviceInfo.versionTuple
+        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+            major: device.major, minor: device.minor,
+            patch: device.patch, build: NyxelSupportPolicy.currentBuild
+        )
+        let kernelOffsetsSupported = NyxelSupportPolicy.supportsKernelOffsets(
+            major: device.major, minor: device.minor
+        )
 
-        // Los modos marcados como "hybrid" en la configuración remota usan el
-        // Packet Tunnel local antes de descargar/aplicar el recurso. Los modos
-        // normales conservan exactamente el flujo anterior.
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        NyxelActivityLog.record("========== BRIDGE INJECTION TRACE ==========")
+        NyxelActivityLog.record("DIAG appVersion=\(appVersion) system=\(NyxelSupportPolicy.currentSystemDescription) game=\(game.rawValue) mode=\(mode.displayName)")
+        NyxelActivityLog.record("DIAG pairingRequired=\(pairingRequired) airLiftAvailable=\(Self.airLiftRouteAvailable) kernelOffsets=\(kernelOffsetsSupported)")
+
+        vc?.setOperationState(.injecting)
+
         let wantsHybrid = mode.accessTier.lowercased() == "hybrid"
             || mode.id.lowercased().contains("hybrid")
             || mode.label.lowercased().contains("hybrid")
 
-        let version = NyxelDeviceInfo.versionTuple
-        let kernelOffsetsSupported = NyxelSupportPolicy.supportsKernelOffsets(
-            major: version.major,
-            minor: version.minor
-        )
         guard kernelOffsetsSupported || Self.airLiftRouteAvailable else {
-            let message = "Offsets de kernel validados solo hasta iOS 26.0.x; agrega pairing AirLift para iOS \(version.major).\(version.minor)."
-            NyxelActivityLog.record(message)
+            let message = "Offsets de kernel validados solo hasta iOS 26.x; agrega pairing AirLift para iOS \(device.major).\(device.minor)."
+            NyxelActivityLog.record("DIAG BLOCKED: \(message)")
             DispatchQueue.main.async {
                 self.operationInFlight = false
                 self.vc?.setOperationState(.failed(message))

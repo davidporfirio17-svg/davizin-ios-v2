@@ -173,10 +173,9 @@ class InjectorService {
         return value.path
     }
 
-    /// Escribe en el contenedor del juego. Si hay un registro de pairing
-    /// AirLift guardado, usa ese canal (permisos elevados vía house_arrest/AFC);
-    /// si no, cae al acceso directo de siempre. `relPath` es relativo al
-    /// contenedor (p. ej. "Documents/.../avatar/assetindexer.xxx").
+    /// Escribe datos en el contenedor del juego.
+    /// iOS 27+: usa AirLift (pairing + RSD tunnel).
+    /// iOS <= 26: intenta AirLift si hay pairing disponible, si no cae a MCM + file I/O directo.
     private struct ContainerWriteError: LocalizedError {
         let airliftNote: String
         let directError: Swift.Error
@@ -187,17 +186,15 @@ class InjectorService {
         let fullPath = container + "/" + relPath
         let parentDir = (fullPath as NSString).deletingLastPathComponent
 
-        let deviceVersion = NyxelDeviceInfo.versionTuple
-        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
-            major: deviceVersion.major,
-            minor: deviceVersion.minor,
-            patch: deviceVersion.patch,
-            build: NyxelSupportPolicy.currentBuild
-        )
+        let pairingRequired = requiresPairingTransportOnCurrentDevice()
+
+        NyxelActivityLog.record("DIAG writeToContainer relPath=\(relPath) pairingRequired=\(pairingRequired) airLiftAvailable=\(NixelAirLiftFileChannel.isAvailable)")
+
+        // --- iOS 27+: AirLift es obligatorio ---
         if pairingRequired {
             guard NixelAirLiftFileChannel.isAvailable else {
                 return ContainerWriteError(
-                    airliftNote: "iOS 27 requiere un registro de pairing y túnel AirLift activos",
+                    airliftNote: "iOS 27 requiere un registro de pairing y tunel AirLift activos",
                     directError: NSError(domain: "Davizin", code: -27, userInfo: [
                         NSLocalizedDescriptionKey: "No hay un canal AirLift disponible para iOS 27."
                     ])
@@ -205,14 +202,15 @@ class InjectorService {
             }
             switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
             case .success:
+                NyxelActivityLog.record("DIAG writeToContainer OK via AirLift bytes=\(data.count)")
                 return nil
             case .failure(let error):
-                let note = "AirLift falló: \(error.message)"
-                NyxelActivityLog.record("AirLift write falló (\(relPath)): \(error.message)")
-                return ContainerWriteError(airliftNote: note, directError: error)
+                NyxelActivityLog.record("AirLift write fallo (\(relPath)): \(error.message)")
+                return ContainerWriteError(airliftNote: "AirLift fallo: \(error.message)", directError: error)
             }
         }
 
+        // --- iOS <= 26: intentar AirLift como optimizacion, fallback a MCM directo ---
         let handleRoot = DavizinGrantContainerAccess(container)
         let handleDir = DavizinGrantContainerAccess(parentDir)
         let handleFile = DavizinGrantContainerAccess(fullPath)
@@ -227,19 +225,9 @@ class InjectorService {
             switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
             case .success: return nil
             case .failure(let error):
-                airliftNote = "AirLift falló: \(error.message)"
-                NyxelActivityLog.record("AirLift write falló (\(relPath)): \(error.message); usando método directo")
-                if pairingRequired {
-                    return ContainerWriteError(airliftNote: airliftNote, directError: error)
-                }
+                airliftNote = "AirLift fallo: \(error.message)"
+                NyxelActivityLog.record("AirLift write fallo (\(relPath)): \(error.message); usando metodo directo")
             }
-        } else if pairingRequired {
-            return ContainerWriteError(
-                airliftNote: "iOS 27 requiere un registro de pairing y túnel AirLift activos",
-                directError: NSError(domain: "Davizin", code: -27, userInfo: [
-                    NSLocalizedDescriptionKey: "No hay un canal AirLift disponible para iOS 27."
-                ])
-            )
         }
 
         let url = URL(fileURLWithPath: fullPath)
@@ -265,14 +253,11 @@ class InjectorService {
         let fullPath = container + "/" + relPath
         let parentDir = (fullPath as NSString).deletingLastPathComponent
 
-        let deviceVersion = NyxelDeviceInfo.versionTuple
-        let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
-            major: deviceVersion.major,
-            minor: deviceVersion.minor,
-            patch: deviceVersion.patch,
-            build: NyxelSupportPolicy.currentBuild
-        )
-        NyxelActivityLog.record("DIAG original read requested bundleID=\(bundleID) relativePath=\(relPath) pairingRequired=\(pairingRequired)")
+        let pairingRequired = requiresPairingTransportOnCurrentDevice()
+
+        NyxelActivityLog.record("DIAG readFromContainer relPath=\(relPath) pairingRequired=\(pairingRequired)")
+
+        // --- iOS 27+: AirLift obligatorio ---
         if pairingRequired {
             guard NixelAirLiftFileChannel.isAvailable else {
                 let detail = "AirLift read omitido: falta pairing requerido"
@@ -282,12 +267,23 @@ class InjectorService {
             }
             switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
             case .success(let data):
-                NyxelActivityLog.record("DIAG original read succeeded bytes=\(data.count)")
+                NyxelActivityLog.record("DIAG read succeeded via AirLift bytes=\(data.count)")
                 return data
             case .failure(let error):
-                NyxelActivityLog.record("DIAG original read failed relativePath=\(relPath) detail=\(error.message)")
+                NyxelActivityLog.record("DIAG AirLift read failed relPath=\(relPath) detail=\(error.message)")
                 onFailure?(error.message)
                 return nil
+            }
+        }
+
+        // --- iOS <= 26: intentar AirLift, fallback a lectura directa ---
+        if NixelAirLiftFileChannel.isAvailable {
+            switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
+            case .success(let data):
+                NyxelActivityLog.record("DIAG read succeeded via AirLift bytes=\(data.count)")
+                return data
+            case .failure(let error):
+                NyxelActivityLog.record("DIAG AirLift read failed, falling back to direct: \(error.message)")
             }
         }
 
@@ -300,29 +296,25 @@ class InjectorService {
             DavizinReleaseContainerGrant(handleRoot)
         }
 
-        if NixelAirLiftFileChannel.isAvailable {
-            if case .success(let data) = NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
-                return data
-            }
-            if pairingRequired { return nil }
-        } else if pairingRequired {
-            return nil
-        }
+        let url = URL(fileURLWithPath: fullPath)
         do {
-            let data = try Data(contentsOf: URL(fileURLWithPath: fullPath))
-            NyxelActivityLog.record("DIAG original direct read succeeded bytes=\(data.count)")
+            let data = try Data(contentsOf: url)
+            NyxelActivityLog.record("DIAG read succeeded via direct I/O bytes=\(data.count)")
             return data
         } catch {
-            NyxelActivityLog.record("DIAG original direct read failed: \(error.localizedDescription)")
+            NyxelActivityLog.record("DIAG direct read failed relPath=\(relPath) error=\(error.localizedDescription)")
             onFailure?(error.localizedDescription)
             return nil
         }
     }
 
-    /// Comprueba si el bundle está instalado y accesible en el sistema verificado.
-    /// Esta función solo informa el estado; no modifica archivos ni intenta inyectar.
+    // MARK: - Bundle availability check
+
     static func isBundleAvailable(for game: DavizinGame) -> Bool {
         guard NyxelSupportPolicy.isCurrentSystemSupported else { return false }
+        if requiresPairingTransportOnCurrentDevice() {
+            return NixelAirLiftFileChannel.isAvailable
+        }
         var error: NSString?
         guard let container = DavizinGetContainerPath(bundleID(for: game), &error) else { return false }
         return FileManager.default.fileExists(atPath: container)
@@ -436,81 +428,77 @@ class InjectorService {
         return FileManager.default.fileExists(atPath: container + "/" + kBaseFolder)
     }
 
-	static func inject(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) -> InjectorResult {
-		defer { print("❌ inject() COMPLETÓ (defer)") }
+    static func inject(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) -> InjectorResult {
+        let fm = FileManager.default
+        let bid = bundleID(for: game)
+        let pairingRequired = requiresPairingTransportOnCurrentDevice()
 
-		print("🔵 inject() INICIANDO")
+        NyxelActivityLog.record("========== INJECTION TRACE BEGIN ==========")
+        NyxelActivityLog.record("DIAG system=\(NyxelSupportPolicy.currentSystemDescription) game=\(game.rawValue) mode=\(mode.displayName) pairingRequired=\(pairingRequired) airLiftAvailable=\(NixelAirLiftFileChannel.isAvailable)")
 
-		do {
-			print("🔵 PASO 1: Verificando iOS...")
-			sendErrorNotification("🔍 PASO 1", "Verificando iOS...")
+        guard NyxelSupportPolicy.isCurrentSystemSupported else {
+            return InjectorResult(
+                success: false,
+                message: "Version no verificada: \(NyxelSupportPolicy.currentSystemDescription)"
+            )
+        }
 
-			guard NyxelSupportPolicy.isCurrentSystemSupported else {
-				let msg = "iOS no soportado: \(NyxelSupportPolicy.currentSystemDescription)"
-				sendErrorNotification("❌ PASO 1", msg)
-				throw NSError(domain: "Davizin", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])
-			}
+        NyxelActivityLog.record("DIAG PASO 1 OK: iOS verificado")
 
-			sendErrorNotification("✅ PASO 1", "iOS OK")
-
-			sendErrorNotification("✅ PASO 1.5", "AirLift será el canal principal de escritura")
-
-			sendErrorNotification("🔍 PASO 2", "Obteniendo bundle ID...")
-
-			let fm = FileManager.default
-        let bundleID = bundleID(for: game)
-        sendErrorNotification("✅ PASO 2", "Bundle: \(bundleID)")
-
-        sendErrorNotification("🔍 PASO 3", "Activando container MCM...")
-
+        // --- Resolver contenedor MCM ---
         var mcmErr: String?
-        guard let container = Self.getContainerPathWithTimeout(bundleID: bundleID, timeout: 25, error: &mcmErr) else {
-            let msg = mcmErr ?? "MCM falló - container nil"
-            sendErrorNotification("❌ PASO 3", msg)
+        let container = getContainerPathWithTimeout(bundleID: bid, timeout: 25, error: &mcmErr)
+
+        if container == nil && pairingRequired && NixelAirLiftFileChannel.isAvailable {
+            NyxelActivityLog.record("DIAG MCM lookup fallo en iOS 27 pero AirLift disponible; continuando sin container local")
+        } else if container == nil {
+            let msg = mcmErr ?? "MCM fallo - container nil"
+            NyxelActivityLog.record("DIAG MCM fallo fatal: \(msg)")
             return InjectorResult(success: false, message: msg)
         }
 
-        sendErrorNotification("✅ PASO 3", "Contenedor del juego resuelto")
+        NyxelActivityLog.record("DIAG PASO 3 container=\(container ?? "(nil-AirLift-mode)")")
 
-        sendErrorNotification("⏭️ PASO 4", "Se omite query MCM heredada: esta función está deshabilitada en la build")
+        let containerPath = container ?? ""
 
-        sendErrorNotification("🔍 PASO 5", "Refrescando nombre de archivo...")
+        NyxelActivityLog.record("DIAG PASO 5 refrescando destino...")
         Self.refreshDestinationFileName(for: game, key: key, hwid: hwid)
-        sendErrorNotification("✅ PASO 5", "Nombre: \(destPathRel(for: game, mode: mode))")
 
-        sendErrorNotification("🔍 PASO 6", "Descargando recurso...")
+        NyxelActivityLog.record("DIAG PASO 6 descargando recurso...")
         guard let finalData = downloadResource(for: mode, game: game, key: key, hwid: hwid) else {
             let msg = "No se pudo obtener recurso (nil)"
-            sendErrorNotification("❌ PASO 6", msg)
+            NyxelActivityLog.record("DIAG PASO 6 FALLO: \(msg)")
             return InjectorResult(success: false, message: msg)
         }
 
         guard finalData.count > 1000 else {
-            let msg = "Recurso muy pequeño: \(finalData.count) bytes"
-            sendErrorNotification("❌ PASO 6", msg)
+            let msg = "Recurso muy pequeno: \(finalData.count) bytes"
+            NyxelActivityLog.record("DIAG PASO 6 FALLO: \(msg)")
             return InjectorResult(success: false, message: msg)
         }
 
-        sendErrorNotification("✅ PASO 6", "Recurso: \(finalData.count) bytes")
+        NyxelActivityLog.record("DIAG PASO 6 OK recurso=\(finalData.count) bytes")
 
-        sendErrorNotification("🔍 PASO 7", "Preparando rutas...")
         let activeRel = destPathRel(for: game, mode: mode)
-        let destPath   = container + "/" + activeRel
+        let destPath   = containerPath + "/" + activeRel
         let destDir    = (destPath as NSString).deletingLastPathComponent
-        sendErrorNotification("✅ PASO 7", "Dest: \(activeRel)")
+        NyxelActivityLog.record("DIAG PASO 7 activeRel=\(activeRel) pairingRequired=\(pairingRequired)")
 
-        sendErrorNotification("🔍 PASO 8", "Creando directorio...")
-        try? fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
-        sendErrorNotification("✅ PASO 8", "Directorio OK (o ya existía)")
+        if container != nil {
+            try? fm.createDirectory(atPath: destDir, withIntermediateDirectories: true)
+            NyxelActivityLog.record("DIAG PASO 8 directorio local creado (o ya existia)")
+        } else {
+            NyxelActivityLog.record("DIAG PASO 8 sin container local; AirLift manejara directorios")
+        }
 
-        sendErrorNotification("🔍 PASO 9", "Haciendo backup...")
+        NyxelActivityLog.record("DIAG PASO 9 backup...")
         let backupRel = disguisedBackupPath(for: activeRel)
         let backupURL: URL
         do {
             backupURL = try localRestoreBackupURL(for: game, relativePath: activeRel)
         } catch {
             let msg = "No se pudo preparar el respaldo privado: \(error.localizedDescription)"
-            sendErrorNotification("❌ PASO 9", msg)
+            NyxelActivityLog.record("DIAG PASO 9 FALLO: \(msg)")
             return InjectorResult(success: false, message: msg)
         }
 
@@ -520,28 +508,28 @@ class InjectorService {
         var originalReadFailure: String?
         if fm.fileExists(atPath: backupURL.path) {
             guard let savedOriginal = try? Data(contentsOf: backupURL), !savedOriginal.isEmpty else {
-                let msg = "El respaldo privado existe, pero no se puede leer; no se modificó el archivo del juego."
-                sendErrorNotification("❌ PASO 9", msg)
+                let msg = "El respaldo privado existe, pero no se puede leer; no se modifico el archivo del juego."
+                NyxelActivityLog.record("DIAG PASO 9 FALLO: \(msg)")
                 return InjectorResult(success: false, message: msg)
             }
             originalData = savedOriginal
-            NyxelActivityLog.record("Respaldo privado previo encontrado (\(savedOriginal.count) bytes)")
-        } else if let legacyBackup = readFromContainer(relPath: backupRel, container: container, bundleID: bundleID), !legacyBackup.isEmpty {
+            NyxelActivityLog.record("DIAG PASO 9 respaldo privado previo encontrado (\(savedOriginal.count) bytes)")
+        } else if let legacyBackup = readFromContainer(relPath: backupRel, container: containerPath, bundleID: bid), !legacyBackup.isEmpty {
             originalData = legacyBackup
-            NyxelActivityLog.record("Respaldo remoto anterior encontrado; se migrará al almacenamiento privado")
+            NyxelActivityLog.record("DIAG PASO 9 respaldo remoto anterior encontrado; se migrara al almacenamiento privado")
         } else if previousPath != nil && !previousRestoreWasConfirmed {
-            let msg = "Hay una sesión anterior sin restauración confirmada y no se encontró su respaldo. No se volverá a inyectar para evitar perder el original."
-            sendErrorNotification("❌ PASO 9", msg)
+            let msg = "Hay una sesion anterior sin restauracion confirmada y no se encontro su respaldo. No se volvera a inyectar para evitar perder el original."
+            NyxelActivityLog.record("DIAG PASO 9 FALLO: \(msg)")
             return InjectorResult(success: false, message: msg)
         } else if previousPath != nil && UserDefaults.standard.bool(forKey: originalMissingKey(for: game)) {
-            let msg = "El build anterior marcó el original como ausente y no dejó un respaldo legible. Repara o vuelve a descargar los archivos del juego antes de inyectar."
-            sendErrorNotification("❌ PASO 9", msg)
+            let msg = "El build anterior marco el original como ausente y no dejo un respaldo legible. Repara o vuelve a descargar los archivos del juego antes de inyectar."
+            NyxelActivityLog.record("DIAG PASO 9 FALLO: \(msg)")
             return InjectorResult(success: false, message: msg)
         } else {
             originalData = readFromContainer(
                 relPath: activeRel,
-                container: container,
-                bundleID: bundleID,
+                container: containerPath,
+                bundleID: bid,
                 onFailure: { originalReadFailure = $0 }
             )
         }
@@ -549,81 +537,60 @@ class InjectorService {
         let originalWasMissing: Bool
         if let original = originalData {
             guard !original.isEmpty else {
-                let msg = "El original está vacío; se canceló la inyección para evitar una restauración incompleta."
-                sendErrorNotification("❌ PASO 9", msg)
+                let msg = "El original esta vacio; se cancelo la inyeccion para evitar una restauracion incompleta."
+                NyxelActivityLog.record("DIAG PASO 9 FALLO: \(msg)")
                 return InjectorResult(success: false, message: msg)
             }
             do {
                 try saveLocalRestoreBackup(original, to: backupURL)
                 guard let verifiedBackup = try? Data(contentsOf: backupURL), verifiedBackup == original else {
-                    throw NSError(domain: "NyxelRestore", code: 1, userInfo: [NSLocalizedDescriptionKey: "la verificación del respaldo no coincidió"])
+                    throw NSError(domain: "NyxelRestore", code: 1, userInfo: [NSLocalizedDescriptionKey: "la verificacion del respaldo no coincidio"])
                 }
             } catch {
                 let msg = "No se pudo guardar/verificar el original: \(error.localizedDescription)"
-                sendErrorNotification("❌ PASO 9", msg)
+                NyxelActivityLog.record("DIAG PASO 9 FALLO: \(msg)")
                 return InjectorResult(success: false, message: msg)
             }
             UserDefaults.standard.set(restoreDigest(original), forKey: restoreDigestKey(for: game))
             originalWasMissing = false
-            NyxelActivityLog.record("Original respaldado en el almacenamiento privado (\(original.count) bytes)")
-        } else if requiresPairingTransportOnCurrentDevice() {
+            NyxelActivityLog.record("DIAG PASO 9 OK original respaldado (\(original.count) bytes)")
+        } else if pairingRequired {
             let detail = originalReadFailure.map { String($0.prefix(480)) }
-            let reason = detail.map { " Detalle: \($0)" } ?? " Revisa Perfil > Diagnóstico para ver el registro AirLift."
-            let msg = "AirLift no pudo leer el original. Se canceló la inyección para no reemplazarlo sin respaldo.\(reason)"
-            sendErrorNotification("❌ PASO 9", msg)
+            let reason = detail.map { " Detalle: \($0)" } ?? " Revisa Perfil > Diagnostico para ver el registro AirLift."
+            let msg = "AirLift no pudo leer el original. Se cancelo la inyeccion para no reemplazarlo sin respaldo.\(reason)"
+            NyxelActivityLog.record("DIAG PASO 9 FALLO: \(msg)")
             return InjectorResult(success: false, message: msg)
-        } else if !fm.fileExists(atPath: destPath) {
+        } else if container == nil || !fm.fileExists(atPath: destPath) {
             originalWasMissing = true
         } else {
-            let msg = "No se pudo leer el archivo original; la inyección se canceló."
-            sendErrorNotification("❌ PASO 9", msg)
+            let msg = "No se pudo leer el archivo original; la inyeccion se cancelo."
+            NyxelActivityLog.record("DIAG PASO 9 FALLO: \(msg)")
             return InjectorResult(success: false, message: msg)
         }
-        sendErrorNotification("✅ PASO 9", "Original respaldado y verificado")
-
-        sendErrorNotification("🔍 PASO 10", "Validando estado...")
-        sendErrorNotification("✅ PASO 10", "Estado OK")
+        NyxelActivityLog.record("DIAG PASO 9 OK originalWasMissing=\(originalWasMissing)")
 
         UserDefaults.standard.set(activeRel, forKey: activePathKey(for: game))
         UserDefaults.standard.set(originalWasMissing, forKey: originalMissingKey(for: game))
         UserDefaults.standard.set(false, forKey: restoreCompletedKey(for: game))
         NyxelCleanupFlow.markInjectionWriteStarted(for: game)
 
-        sendErrorNotification("🔍 PASO 11", "INYECTANDO ARCHIVO...")
-        if let error = writeToContainer(finalData, relPath: activeRel, container: container, bundleID: bundleID) {
-            let msg = "Inyección falló: \(error.localizedDescription)"
-            sendErrorNotification("❌ PASO 11", msg)
+        NyxelActivityLog.record("DIAG PASO 11 INYECTANDO via \(pairingRequired ? "AirLift" : "directo") relPath=\(activeRel) bytes=\(finalData.count)")
+        if let error = writeToContainer(finalData, relPath: activeRel, container: containerPath, bundleID: bid) {
+            let msg = "Inyeccion fallo: \(error.localizedDescription)"
+            NyxelActivityLog.record("DIAG PASO 11 FALLO: \(msg)")
             return InjectorResult(success: false, message: msg)
         }
-        sendErrorNotification("✅ PASO 11", "INYECCIÓN OK")
+        NyxelActivityLog.record("DIAG PASO 11 OK escritura completada")
 
-        sendErrorNotification("🔍 PASO 12", "Seteando permisos...")
-        try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
-        sendErrorNotification("✅ PASO 12", "Permisos OK (AirLift ya setea permisos)")
+        if container != nil {
+            try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destPath)
+        }
 
-        sendErrorNotification("🔍 PASO 13", "Finalizando...")
         NyxelCleanupFlow.markInjectionSucceeded(for: game)
-        sendErrorNotification("✅ PASO 13", "Finalizado")
+        NyxelActivityLog.record("========== INJECTION TRACE END: SUCCESS ==========")
 
-        sendErrorNotification("🎉 SUCCESS", "¡\(mode.displayName) inyectado!")
         return InjectorResult(success: true,
-            message: "¡\(mode.displayName) inyectado! Abre Free Fire, espera 8–10 segundos, vuelve a Nyxel y limpia la sesión.")
-		} catch let error as NSError {
-			let msg = "NSError: \(error.localizedDescription)"
-			print("💥 CRASH NSError: \(msg)")
-			sendErrorNotification("💥 NSError", msg)
-			return InjectorResult(success: false, message: msg)
-		} catch {
-			let msg = "Excepción: \(error)"
-			print("💥 CRASH Exception: \(msg)")
-			sendErrorNotification("💥 Exception", msg)
-			return InjectorResult(success: false, message: msg)
-		}
-
-		// Si llegamos aquí sin retornar, algo muy malo pasó
-		print("⚠️ FATAL: inject() reached end without return")
-		sendErrorNotification("⚠️ FATAL", "Código llegó al final sin retorno")
-		return InjectorResult(success: false, message: "Fatal: código llegó al final")
+            message: "\(mode.displayName) inyectado! Abre Free Fire, espera 8-10 segundos, vuelve a Nyxel y limpia la sesion.")
     }
 
     private static func removeLegacyRemoteBackupIfAccessible(container: String, relativePath: String) -> Bool {

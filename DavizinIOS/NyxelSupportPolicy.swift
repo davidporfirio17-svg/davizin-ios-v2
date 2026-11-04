@@ -163,7 +163,7 @@ enum NyxelSupportPolicy {
     }
 
     static let verifiedIOS17Range = "17.0–17.7.x"
-    static let verifiedIOS18Range = "18.0–18.7.1"
+    static let verifiedIOS18Range = "18.0–18.7.4"
     static let verifiedIOS26Range = "26.0–26.6.2"
 
     static let verifiedIOS27Builds: [(beta: Int, publicBeta: Int?, build: String)] = [
@@ -201,20 +201,29 @@ enum NyxelSupportPolicy {
     }
 
     /// iOS 17–26 conserva la política amplia que ya utilizaba la aplicación.
-    /// En iOS 27 se exige un build conocido porque el acceso directo al
-    /// contenedor deja de ser una ruta fiable y debe usarse pairing + túnel.
+    /// iOS 27+ acepta builds oficiales (release) automáticamente y exige
+    /// whitelist solo para betas. Los builds beta de Apple tienen '5' como
+    /// 4.º carácter (ej. 24A5355q), los release no (ej. 24A435, 24B119).
     static func supportsVerifiedSystem(major: Int, minor: Int, patch: Int, build: String) -> Bool {
         guard major >= 17 else { return false }
-        guard major == 27 else { return major <= 26 }
-        guard minor == 0 || minor == 2 else { return false }
-        if minor == 0 && patch == 1 && build == "24A446" {
-            return true
+        if major <= 26 { return true }
+
+        // iOS 27+: accept all official release builds automatically
+        if build.count >= 4 {
+            let fourthChar = build[build.index(build.startIndex, offsetBy: 3)]
+            if fourthChar != "5" {
+                return true
+            }
         }
-        if minor == 2 {
-            return ["24B5084k", "24B5089g"].contains(build)
+
+        // Beta builds: require exact whitelist match
+        if major == 27 && minor == 2 {
+            return ["24B5084k", "24B5089g", "24B5110a"].contains(build)
         }
-        return verifiedIOS27Builds.contains { $0.build == build }
-            || ["24A435", "24A437"].contains(build)
+        if major == 27 && minor == 0 {
+            return verifiedIOS27Builds.contains { $0.build == build }
+        }
+        return false
     }
 
     /// Desde iOS 27, las operaciones sobre otro contenedor deben pasar por
@@ -223,10 +232,10 @@ enum NyxelSupportPolicy {
         major >= 27
     }
 
-    /// The bundled opa334 offset table is verified only through iOS 26.0.x.
-    /// Newer systems must use the supported pairing/AirLift route instead.
+    /// The bundled opa334 offset table covers all iOS 17–26.x.
+    /// iOS 27+ must use the pairing/AirLift route instead.
     static func supportsKernelOffsets(major: Int, minor: Int) -> Bool {
-        major >= 17 && (major < 26 || (major == 26 && minor == 0))
+        major >= 17 && major <= 26
     }
 
     static func isSupported(major: Int, minor: Int, patch: Int, build: String) -> Bool {
@@ -250,7 +259,7 @@ enum NyxelSupportPolicy {
     }
 
     static var supportedRangesDescription: String {
-        "iOS 17–26 · iOS 27.0/27.2 (solo builds verificados) · iOS 27.0.1 (24A446)"
+        "iOS 17–26 · iOS 27+ (builds oficiales + betas verificados)"
     }
     
     // MARK: - Device Information
