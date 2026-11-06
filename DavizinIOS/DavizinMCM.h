@@ -29,6 +29,9 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
 /// Libera el handle del probe.
 void DavizinProbeRelease(DavizinProbeResult *result);
 
+/// Log completo de la última ejecución del probe (todas las estrategias intentadas).
+const char * _Nonnull DavizinLastProbeDiagnostic(void);
+
 /// Stub for backward compatibility
 NSString * _Nullable DavizinPrepareInjectionQuery(NSString *bundleID,
                                                   NSString * _Nullable * _Nullable error);

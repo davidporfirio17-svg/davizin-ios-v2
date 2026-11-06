@@ -225,7 +225,9 @@ class InjectorService {
                 let probeDetail = withUnsafePointer(to: &probeResult.detail) { ptr in
                     String(cString: UnsafeRawPointer(ptr).assumingMemoryBound(to: CChar.self))
                 }
+                let probeDiag = String(cString: DavizinLastProbeDiagnostic())
                 NyxelActivityLog.record("DIAG probe resultado: method=\(probeResult.method) writeOK=\(probeResult.writeOK) detail=\(probeDetail)")
+                NyxelActivityLog.record("DIAG probe diagnostics: \(probeDiag)")
 
                 if probeResult.writeOK {
                     NyxelActivityLog.record("DIAG probe EXITOSO method=\(probeResult.method) — escribiendo directo sin VPN")
@@ -233,18 +235,31 @@ class InjectorService {
                     let url = URL(fileURLWithPath: fullPath)
                     do {
                         try data.write(to: url, options: [])
-                        NyxelActivityLog.record("DIAG iOS 27+ probe direct write OK bytes=\(data.count) method=\(probeResult.method)")
-                        return nil
-                    } catch {
-                        do {
-                            try data.write(to: url, options: .atomic)
-                            NyxelActivityLog.record("DIAG iOS 27+ probe atomic write OK bytes=\(data.count) method=\(probeResult.method)")
+                        // VERIFICACIÓN: confirmar que el archivo aterrizó
+                        if FileManager.default.fileExists(atPath: fullPath),
+                           let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                           let size = attrs[.size] as? Int, size == data.count {
+                            NyxelActivityLog.record("DIAG iOS 27+ probe write VERIFIED OK bytes=\(data.count) method=\(probeResult.method)")
                             return nil
-                        } catch let atomicError {
-                            NyxelActivityLog.record("DIAG iOS 27+ probe write FAILED pese a canary OK: \(atomicError.localizedDescription)")
-                            DavizinProbeRelease(&probeResult)
                         }
+                        NyxelActivityLog.record("DIAG iOS 27+ probe write returned OK but VERIFICATION FAILED — file missing or size mismatch")
+                    } catch {
+                        NyxelActivityLog.record("DIAG iOS 27+ probe write threw: \(error.localizedDescription)")
                     }
+                    // Intento atómico como fallback
+                    do {
+                        try data.write(to: url, options: .atomic)
+                        if FileManager.default.fileExists(atPath: fullPath),
+                           let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath),
+                           let size = attrs[.size] as? Int, size == data.count {
+                            NyxelActivityLog.record("DIAG iOS 27+ probe atomic write VERIFIED OK bytes=\(data.count)")
+                            return nil
+                        }
+                        NyxelActivityLog.record("DIAG iOS 27+ probe atomic write returned OK but VERIFICATION FAILED")
+                    } catch let atomicError {
+                        NyxelActivityLog.record("DIAG iOS 27+ probe write FAILED: \(atomicError.localizedDescription)")
+                    }
+                    DavizinProbeRelease(&probeResult)
                 } else {
                     NyxelActivityLog.record("DIAG probe sin VPN FALLÓ: \(probeDetail)")
                 }
@@ -255,8 +270,25 @@ class InjectorService {
             if NixelAirLiftFileChannel.isAvailable {
                 switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
                 case .success:
-                    NyxelActivityLog.record("DIAG writeToContainer OK via AirLift bytes=\(data.count)")
-                    return nil
+                    // VERIFICACIÓN: leer el archivo de vuelta para confirmar que aterrizó
+                    if data.count < 102400 {
+                        switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
+                        case .success(let readBack):
+                            if readBack.count == data.count {
+                                NyxelActivityLog.record("DIAG AirLift write VERIFIED OK bytes=\(data.count)")
+                                return nil
+                            } else {
+                                NyxelActivityLog.record("DIAG AirLift write FALSE SUCCESS: wrote \(data.count) but read back \(readBack.count) bytes")
+                                airliftNote = "AirLift write no verificado (size \(data.count) vs \(readBack.count))"
+                            }
+                        case .failure(let readErr):
+                            NyxelActivityLog.record("DIAG AirLift write FALSE SUCCESS: read-back failed: \(readErr.message)")
+                            airliftNote = "AirLift write no verificado (\(readErr.message))"
+                        }
+                    } else {
+                        NyxelActivityLog.record("DIAG AirLift write OK (sin verificación, archivo grande \(data.count) bytes)")
+                        return nil
+                    }
                 case .failure(let error):
                     airliftNote = "AirLift fallo: \(error.message)"
                     NyxelActivityLog.record("AirLift write fallo (\(relPath)): \(error.message); intentando bad_query fallback")
@@ -277,6 +309,7 @@ class InjectorService {
             let handleRoot = DavizinGrantContainerAccess(container)
             let handleDir = DavizinGrantContainerAccess(parentDir)
             let handleFile = DavizinGrantContainerAccess(fullPath)
+            NyxelActivityLog.record("DIAG bad_query handles: root=\(handleRoot) dir=\(handleDir) file=\(handleFile)")
             defer {
                 DavizinReleaseContainerGrant(handleFile)
                 DavizinReleaseContainerGrant(handleDir)
@@ -287,18 +320,31 @@ class InjectorService {
             let url = URL(fileURLWithPath: fullPath)
             do {
                 try data.write(to: url, options: [])
-                NyxelActivityLog.record("DIAG iOS 27+ bad_query direct write OK bytes=\(data.count)")
-                return nil
-            } catch {
-                do {
-                    try data.write(to: url, options: .atomic)
-                    NyxelActivityLog.record("DIAG iOS 27+ bad_query atomic write OK bytes=\(data.count)")
+                if FileManager.default.fileExists(atPath: fullPath) {
+                    NyxelActivityLog.record("DIAG iOS 27+ bad_query direct write VERIFIED OK bytes=\(data.count)")
                     return nil
-                } catch let atomicError {
-                    NyxelActivityLog.record("DIAG iOS 27+ ALL methods FAILED: \(atomicError.localizedDescription)")
-                    return ContainerWriteError(airliftNote: airliftNote, directError: atomicError)
                 }
+                NyxelActivityLog.record("DIAG iOS 27+ bad_query write returned OK pero archivo NO existe")
+            } catch {
+                NyxelActivityLog.record("DIAG iOS 27+ bad_query write threw: \(error.localizedDescription)")
             }
+            do {
+                try data.write(to: url, options: .atomic)
+                if FileManager.default.fileExists(atPath: fullPath) {
+                    NyxelActivityLog.record("DIAG iOS 27+ bad_query atomic write VERIFIED OK bytes=\(data.count)")
+                    return nil
+                }
+                NyxelActivityLog.record("DIAG iOS 27+ bad_query atomic write returned OK pero archivo NO existe")
+            } catch let atomicError {
+                NyxelActivityLog.record("DIAG iOS 27+ ALL methods FAILED: \(atomicError.localizedDescription)")
+                return ContainerWriteError(airliftNote: airliftNote, directError: atomicError)
+            }
+            return ContainerWriteError(
+                airliftNote: airliftNote,
+                directError: NSError(domain: "Davizin", code: -271, userInfo: [
+                    NSLocalizedDescriptionKey: "Todos los métodos fallaron verificación (probe + AirLift + bad_query)"
+                ])
+            )
         }
 
         // --- iOS <= 26: intentar AirLift como optimizacion, fallback a MCM directo ---
