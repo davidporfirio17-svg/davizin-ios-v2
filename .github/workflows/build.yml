@@ -156,6 +156,8 @@ jobs:
           ExternalTunnel/PacketTunnelProvider.swift
 
         cp ExternalTunnel/Info.plist "$APPEX_DIR/Info.plist"
+        # Resolve Xcode build variables that aren't expanded by swiftc
+        /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ExternalTunnel" "$APPEX_DIR/Info.plist"
         echo "ExternalTunnel.appex built and embedded"
         ls -la "$APPEX_DIR/"
 
