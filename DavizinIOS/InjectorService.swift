@@ -216,8 +216,41 @@ class InjectorService {
 
         NyxelActivityLog.record("DIAG writeToContainer relPath=\(relPath) pairingRequired=\(pairingRequired) airLiftAvailable=\(NixelAirLiftFileChannel.isAvailable)")
 
-        // --- iOS 27+: AirLift primero, fallback a bad_query + escritura directa ---
+        // --- iOS 27+: Probe sin VPN PRIMERO, luego AirLift como fallback ---
         if pairingRequired {
+            // ── PASO A: Probe de sandbox escape sin VPN ──
+            if !container.isEmpty {
+                NyxelActivityLog.record("DIAG iOS 27+ probe sin VPN para \(relPath) container=\(container)")
+                var probeResult = DavizinProbeContainerWriteAccess(container, bundleID)
+                let probeDetail = withUnsafePointer(to: &probeResult.detail) { ptr in
+                    String(cString: UnsafeRawPointer(ptr).assumingMemoryBound(to: CChar.self))
+                }
+                NyxelActivityLog.record("DIAG probe resultado: method=\(probeResult.method) writeOK=\(probeResult.writeOK) detail=\(probeDetail)")
+
+                if probeResult.writeOK {
+                    NyxelActivityLog.record("DIAG probe EXITOSO method=\(probeResult.method) — escribiendo directo sin VPN")
+                    try? FileManager.default.createDirectory(atPath: parentDir, withIntermediateDirectories: true)
+                    let url = URL(fileURLWithPath: fullPath)
+                    do {
+                        try data.write(to: url, options: [])
+                        NyxelActivityLog.record("DIAG iOS 27+ probe direct write OK bytes=\(data.count) method=\(probeResult.method)")
+                        return nil
+                    } catch {
+                        do {
+                            try data.write(to: url, options: .atomic)
+                            NyxelActivityLog.record("DIAG iOS 27+ probe atomic write OK bytes=\(data.count) method=\(probeResult.method)")
+                            return nil
+                        } catch let atomicError {
+                            NyxelActivityLog.record("DIAG iOS 27+ probe write FAILED pese a canary OK: \(atomicError.localizedDescription)")
+                            DavizinProbeRelease(&probeResult)
+                        }
+                    }
+                } else {
+                    NyxelActivityLog.record("DIAG probe sin VPN FALLÓ: \(probeDetail)")
+                }
+            }
+
+            // ── PASO B: AirLift via VPN (fallback) ──
             var airliftNote = "AirLift: no disponible"
             if NixelAirLiftFileChannel.isAvailable {
                 switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
@@ -230,16 +263,17 @@ class InjectorService {
                 }
             }
 
+            // ── PASO C: bad_query clásico + escritura directa (legacy fallback) ──
             guard !container.isEmpty else {
-                NyxelActivityLog.record("DIAG bad_query fallback omitido: container vacio")
+                NyxelActivityLog.record("DIAG fallback omitido: container vacio")
                 return ContainerWriteError(
                     airliftNote: airliftNote,
                     directError: NSError(domain: "Davizin", code: -27, userInfo: [
-                        NSLocalizedDescriptionKey: "AirLift fallo y no hay container resuelto para bad_query fallback."
+                        NSLocalizedDescriptionKey: "Probe y AirLift fallaron, no hay container para fallback."
                     ])
                 )
             }
-            NyxelActivityLog.record("DIAG iOS 27+ bad_query fallback para \(relPath) container=\(container)")
+            NyxelActivityLog.record("DIAG iOS 27+ bad_query legacy fallback para \(relPath)")
             let handleRoot = DavizinGrantContainerAccess(container)
             let handleDir = DavizinGrantContainerAccess(parentDir)
             let handleFile = DavizinGrantContainerAccess(fullPath)
@@ -261,7 +295,7 @@ class InjectorService {
                     NyxelActivityLog.record("DIAG iOS 27+ bad_query atomic write OK bytes=\(data.count)")
                     return nil
                 } catch let atomicError {
-                    NyxelActivityLog.record("DIAG iOS 27+ bad_query fallback FAILED: \(atomicError.localizedDescription)")
+                    NyxelActivityLog.record("DIAG iOS 27+ ALL methods FAILED: \(atomicError.localizedDescription)")
                     return ContainerWriteError(airliftNote: airliftNote, directError: atomicError)
                 }
             }
