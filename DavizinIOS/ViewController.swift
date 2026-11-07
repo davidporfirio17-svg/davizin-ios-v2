@@ -30,6 +30,7 @@ final class ViewController: UIViewController {
     private var gameSelectionView: GameSelectionView?
     private var missionMapView: MissionMapView?
     private var profileView: ProfileView?
+    private var freeFireProfileController: FreeFireTestViewController?
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
     private var stageBeforeHelp: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
@@ -306,6 +307,9 @@ final class ViewController: UIViewController {
         bottomNavView.onProfile = { [weak self] in
             self?.showProfile(animated: true)
         }
+        bottomNavView.onFreeFire = { [weak self] in
+            self?.showFreeFireProfile(animated: true)
+        }
         bottomNavView.onVPN = { [weak self] in
             self?.showVPN(animated: true)
         }
@@ -532,11 +536,29 @@ final class ViewController: UIViewController {
             }
         }
         screen.refresh()
-        profileView = screen
-        display(screen, animated: animated)
-    }
+	        profileView = screen
+	        display(screen, animated: animated)
+	    }
 
-    private func showHelp(animated: Bool) {
+	    private func showFreeFireProfile(animated: Bool) {
+	        currentStage = .freeFireProfile
+	        setBottomNavigation(visible: true, selected: .freeFire)
+	        headerView.title = "Perfil Free Fire"
+	        headerView.showsBackButton = true
+	        headerView.showsAvatarButton = false
+
+	        let screen = FreeFireTestViewController()
+	        freeFireProfileController?.willMove(toParent: nil)
+	        freeFireProfileController?.view.removeFromSuperview()
+	        freeFireProfileController?.removeFromParent()
+	        addChild(screen)
+	        screen.view.backgroundColor = .clear
+	        display(screen.view, animated: animated)
+	        screen.didMove(toParent: self)
+	        freeFireProfileController = screen
+	    }
+
+	    private func showHelp(animated: Bool) {
         if currentStage != .help { stageBeforeHelp = currentStage }
         currentStage = .help
         setBottomNavigation(visible: true, selected: .help)
@@ -716,14 +738,17 @@ final class ViewController: UIViewController {
             case .help: showHelp(animated: true)
             default: showModeSelection(animated: true)
             }
-        case .help:
-            switch stageBeforeHelp {
-            case .operation: showOperation(animated: true)
-            case .profile: showProfile(animated: true)
-            case .modeSelection: showModeSelection(animated: true)
-            case .gameSelection, .home, .login, .help: showGameSelection(animated: true)
-            }
-        }
+	        case .help:
+	            switch stageBeforeHelp {
+	            case .operation: showOperation(animated: true)
+	            case .profile: showProfile(animated: true)
+	            case .freeFireProfile: showFreeFireProfile(animated: true)
+	            case .modeSelection: showModeSelection(animated: true)
+	            case .gameSelection, .home, .login, .help: showGameSelection(animated: true)
+	            }
+	        case .freeFireProfile:
+	            showModeSelection(animated: true)
+	        }
     }
 }
 
