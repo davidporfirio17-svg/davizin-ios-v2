@@ -82,6 +82,13 @@ final class ViewController: UIViewController {
         }
     }
 
+    private func presentFreeFireTest() {
+        let test = FreeFireTestViewController()
+        let navigation = UINavigationController(rootViewController: test)
+        navigation.modalPresentationStyle = .formSheet
+        present(navigation, animated: true)
+    }
+
     /// Actualiza el contador de tiempo restante en el header.
     func setCountdownText(_ text: String) {
         headerView.countdownText = text
@@ -430,11 +437,14 @@ final class ViewController: UIViewController {
             "✓ Modo remoto: \(selectedMode.displayName)",
             gameReady ? "✓ Juego detectado" : "! Juego no detectado"
         ])
-        let gameToOpen = selectedGame
-        screen.onOpenGame = { [weak self] in
-            self?.openGame(gameToOpen)
-        }
-        operationView = screen
+	        let gameToOpen = selectedGame
+	        screen.onOpenGame = { [weak self] in
+	            self?.openGame(gameToOpen)
+	        }
+		screen.onFreeFireTest = { [weak self] in
+			self?.presentFreeFireTest()
+		}
+	        operationView = screen
         display(screen, animated: animated)
     }
 

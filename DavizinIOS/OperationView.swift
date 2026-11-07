@@ -23,9 +23,11 @@ final class OperationView: UIView {
     private let injectButton = DavizinButton(title: "MANTÉN PARA INYECTAR", style: .primary)
 
     // Estado 2 (despues de inyectar con exito): solo estos dos son visibles.
-    private let cleanButton = DavizinButton(title: "LIMPIAR SESIÓN", style: .destructive)
-    private let openGameButton = DavizinButton(title: "ABRIR JUEGO")
-    var onOpenGame: (() -> Void)?
+	private let cleanButton = DavizinButton(title: "LIMPIAR SESIÓN", style: .destructive)
+	private let openGameButton = DavizinButton(title: "ABRIR JUEGO")
+	var onOpenGame: (() -> Void)?
+	private let freeFireTestButton = DavizinButton(title: "PRUEBA API FREE FIRE", style: .secondary)
+	var onFreeFireTest: (() -> Void)?
 
     private let statusDot = UIView()
     private let statusLabel = UILabel()
@@ -262,12 +264,15 @@ final class OperationView: UIView {
         injectButton.accessibilityLabel = "Mantener presionado para activar la configuración"
         cleanButton.accessibilityIdentifier = "operation.clean"
         cleanButton.accessibilityLabel = "Limpiar sesión"
-        openGameButton.accessibilityIdentifier = "operation.opengame"
-        openGameButton.accessibilityLabel = "Abrir juego"
+		openGameButton.accessibilityIdentifier = "operation.opengame"
+		openGameButton.accessibilityLabel = "Abrir juego"
+		freeFireTestButton.accessibilityIdentifier = "operation.freeFireAPI"
+		freeFireTestButton.accessibilityLabel = "Abrir prueba de API de Free Fire"
 
         runButton.addTarget(self, action: #selector(runTapped), for: .touchUpInside)
-        cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
-        openGameButton.addTarget(self, action: #selector(openGameTapped), for: .touchUpInside)
+		cleanButton.addTarget(self, action: #selector(cleanTapped), for: .touchUpInside)
+		openGameButton.addTarget(self, action: #selector(openGameTapped), for: .touchUpInside)
+		freeFireTestButton.addTarget(self, action: #selector(freeFireTestTapped), for: .touchUpInside)
 
 		// Eventos directos de UIButton son más confiables que un
 		// UILongPressGestureRecognizer con duración cero: no se pierde el toque
@@ -306,9 +311,10 @@ final class OperationView: UIView {
         stackView.addArrangedSubview(runButton)
         stackView.addArrangedSubview(injectButton)
         stackView.addArrangedSubview(successCard)
-        stackView.addArrangedSubview(cleanButton)
-        stackView.addArrangedSubview(openGameButton)
-        stackView.addArrangedSubview(statusRow)
+		stackView.addArrangedSubview(cleanButton)
+		stackView.addArrangedSubview(openGameButton)
+		stackView.addArrangedSubview(freeFireTestButton)
+		stackView.addArrangedSubview(statusRow)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
         cardView.useTransparentAppearance()
@@ -324,8 +330,9 @@ final class OperationView: UIView {
             stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 380.0 : 240.0),
             runButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
             injectButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
-            cleanButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
-            openGameButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
+			cleanButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
+			openGameButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
+			freeFireTestButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
         ])
 
         showPreInjectButtons(animated: false)
@@ -472,8 +479,12 @@ final class OperationView: UIView {
         delegate?.operationView(self, didTap: .clean)
     }
 
-    @objc private func openGameTapped() {
-        SoundService.shared.playClick()
-        onOpenGame?()
-    }
+	@objc private func openGameTapped() {
+		SoundService.shared.playClick()
+		onOpenGame?()
+	}
+
+	@objc private func freeFireTestTapped() {
+		onFreeFireTest?()
+	}
 }
