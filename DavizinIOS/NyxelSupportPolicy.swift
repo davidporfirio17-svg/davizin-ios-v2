@@ -208,15 +208,14 @@ enum NyxelSupportPolicy {
         guard major >= 17 else { return false }
         if major <= 26 { return true }
 
-        // iOS 27+: accept all official release builds automatically
-        if build.count >= 4 {
-            let fourthChar = build[build.index(build.startIndex, offsetBy: 3)]
-            if fourthChar != "5" {
-                return true
-            }
-        }
+        // iOS 27+: accept all builds by default.
+        // Only reject builds we can positively identify as non-whitelisted betas.
+        // Beta builds have '5' as the 4th character (e.g. 24A5355q).
+        guard build.count >= 4 else { return true }
+        let fourthChar = build[build.index(build.startIndex, offsetBy: 3)]
+        guard fourthChar == "5" else { return true }
 
-        // Beta builds: require exact whitelist match
+        // Confirmed beta — check whitelist
         if major == 27 && minor == 2 {
             return ["24B5084k", "24B5089g", "24B5110a"].contains(build)
         }
