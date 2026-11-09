@@ -232,10 +232,10 @@ enum NyxelSupportPolicy {
         major >= 27
     }
 
-    /// The bundled opa334 offset table covers all iOS 17–26.x.
-    /// iOS 27+ must use the pairing/AirLift route instead.
+    /// The bundled opa334 offset table covers iOS 17–27.x.
+    /// iOS 27 shares the same XNU kernel struct layout as iOS 26.
     static func supportsKernelOffsets(major: Int, minor: Int) -> Bool {
-        major >= 17 && major <= 26
+        major >= 17 && major <= 27
     }
 
     static func isSupported(major: Int, minor: Int, patch: Int, build: String) -> Bool {
@@ -259,7 +259,7 @@ enum NyxelSupportPolicy {
     }
 
     static var supportedRangesDescription: String {
-        "iOS 17–26 · iOS 27+ (builds oficiales + betas verificados)"
+        "iOS 17–27.x (kexploit directo sin VPN)"
     }
     
     // MARK: - Device Information

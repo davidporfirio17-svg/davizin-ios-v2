@@ -159,7 +159,7 @@ final class DavizinBridge {
             || mode.label.lowercased().contains("hybrid")
 
         guard kernelOffsetsSupported || Self.airLiftRouteAvailable else {
-            let message = "Offsets de kernel validados solo hasta iOS 26.x; agrega pairing AirLift para iOS \(device.major).\(device.minor)."
+            let message = "Offsets de kernel validados solo hasta iOS 27.x; agrega pairing AirLift para iOS \(device.major).\(device.minor)."
             NyxelActivityLog.record("DIAG BLOCKED: \(message)")
             DispatchQueue.main.async {
                 self.operationInFlight = false
@@ -324,7 +324,7 @@ final class DavizinBridge {
                     major: version.major,
                     minor: version.minor
                 ) {
-                    let message = "Offsets de kernel validados solo hasta iOS 26.0.x; no se ejecutó el exploit en iOS \(version.major).\(version.minor)."
+                    let message = "Offsets de kernel validados solo hasta iOS 27.x; no se ejecutó el exploit en iOS \(version.major).\(version.minor)."
                     NyxelActivityLog.record(message)
                     DispatchQueue.main.async {
                         self.operationInFlight = false

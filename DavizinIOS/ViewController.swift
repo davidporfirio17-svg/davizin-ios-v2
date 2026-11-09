@@ -401,8 +401,10 @@ final class ViewController: UIViewController {
 						color: AppTheme.accentWarm
 					)
 					let message: String
-					if pairingRequired {
-						message = "⚠️ MCM encontró el contenedor; no confirmó escritura. iOS 27 requiere pairing/AirLift y Apple Books; kernel/offsets no verificados para este build."
+					if pairingRequired && kernelOffsetsAvailable {
+						message = "⚠️ MCM encontró el contenedor; escritura vía kexploit+sandbox sin VPN. La ruta depende de que kernel y sandbox estén activos."
+					} else if pairingRequired {
+						message = "⚠️ MCM encontró el contenedor; no confirmó escritura. Esta versión requiere pairing/AirLift; kernel/offsets no verificados para este build."
 					} else if kernelOffsetsAvailable {
 						message = "⚠️ MCM encontró el contenedor; eso no confirma permiso de escritura. La ruta depende de que kernel y sandbox estén activos."
 					} else {
