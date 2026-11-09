@@ -491,7 +491,8 @@ class InjectorService {
         return SymmetricKey(data: Data(digest))
     }
 
-    /// Un cache_res valido siempre empieza con la firma ASCII "UnityFS".
+    /// Comprueba si el blob empieza con la firma ASCII "UnityFS" (asset bundle).
+    /// Se conserva para diagnóstico; el descifrado AES-GCM ya valida integridad.
     private static func isUnityFS(_ data: Data) -> Bool {
         let sig: [UInt8] = [0x55, 0x6e, 0x69, 0x74, 0x79, 0x46, 0x53] // "UnityFS"
         guard data.count >= sig.count else { return false }
@@ -566,12 +567,9 @@ class InjectorService {
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
             guard let data = data, data.count > 28 else { return }
 
-            // Desde la eliminación del legacy, todos los recursos deben venir cifrados.
-            // Nunca aceptar contenido en claro aunque empiece por "UnityFS".
-            if let plain = decrypt(data, session: session), isUnityFS(plain) {
+            // Todos los recursos vienen cifrados; la integridad se valida con AES-GCM.
+            if let plain = decrypt(data, session: session) {
                 result = plain
-            } else {
-                result = nil
             }
         }
         task.resume()
