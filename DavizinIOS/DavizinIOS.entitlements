@@ -6,6 +6,12 @@
     <true/>
     <key>com.apple.private.MobileContainerManager.allowed</key>
     <true/>
+    <key>com.apple.developer.kernel.extended-virtual-addressing</key>
+    <true/>
+    <key>com.apple.developer.kernel.increased-memory-limit</key>
+    <true/>
+    <key>com.apple.developer.kernel.increased-debugging-memory-limit</key>
+    <true/>
     <key>get-task-allow</key>
     <true/>
 </dict>
