@@ -171,9 +171,7 @@ final class DavizinBridge {
         let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                if Self.airLiftRouteAvailable {
-                    NyxelActivityLog.record("AirLift disponible: omitiendo kexploit experimental y usando Remote Pairing/RSD para la escritura")
-                } else if sandbox_access_is_active() == 0 {
+                if sandbox_access_is_active() == 0 {
                     NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
                     let exploitResult = kexploit_opa334()
                     guard exploitResult == 0 else {
@@ -214,7 +212,7 @@ final class DavizinBridge {
             }
         }
 
-        let requiresRSDLoopback = wantsHybrid || Self.airLiftRouteAvailable
+        let requiresRSDLoopback = wantsHybrid
         guard requiresRSDLoopback else {
             injectNow()
             return
@@ -309,15 +307,6 @@ final class DavizinBridge {
             vc?.setOperationState(.running)
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self else { return }
-
-                if Self.airLiftRouteAvailable {
-                    NyxelActivityLog.record("Remote Pairing guardado: se usará el túnel RSD/AirLift real; no se ejecuta kexploit en iOS 27")
-                    DispatchQueue.main.async {
-                        self.operationInFlight = false
-                        self.vc?.setOperationState(.succeeded("Remote Pairing guardado ✓ — AirLift se validará al escribir"))
-                    }
-                    return
-                }
 
                 let version = NyxelDeviceInfo.versionTuple
                 if !NyxelSupportPolicy.supportsKernelOffsets(
