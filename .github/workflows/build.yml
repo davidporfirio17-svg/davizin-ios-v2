@@ -17,7 +17,7 @@ on:
 jobs:
   build:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.target != 'admin' }}
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -110,6 +110,7 @@ jobs:
           BUILD_DIR=/tmp/davizin_build \
           LIBRARY_SEARCH_PATHS=/tmp/airlift \
           FRAMEWORK_SEARCH_PATHS=/tmp/airlift \
+          OTHER_LDFLAGS='$(inherited) -ld_classic' \
           build > /tmp/build.log 2>&1
         status=$?
         set -e
@@ -151,6 +152,7 @@ jobs:
           -o "$APPEX_DIR/ExternalTunnel" \
           -application-extension \
           -Xlinker -e -Xlinker _NSExtensionMain \
+          -Xlinker -ld_classic \
           -framework Foundation \
           -framework NetworkExtension \
           ExternalTunnel/PacketTunnelProvider.swift
