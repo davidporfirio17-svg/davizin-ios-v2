@@ -486,6 +486,7 @@ final class DavizinBridge {
         case 22: return "Memory entry falló (pe_v1)"
         case 23: return "Port dealloc falló (pe_v1)"
         case 24: return "Timeout pe_v1 (race no ganó en 90s)"
+        case 25: return "Timeout global (dispatch timer expiró)"
         case 31: return "VM alloc falló (pe_v2)"
         case 32: return "VM alloc search falló (pe_v2)"
         case 33: return "Memory entry falló (pe_v2)"
