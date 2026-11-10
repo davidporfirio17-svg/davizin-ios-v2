@@ -64,8 +64,7 @@ class KeyValidator {
     }
 
     static func getAppBuild() -> String {
-        Bundle.main.object(forInfoDictionaryKey: "NyxelBuildNumber") as? String
-            ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
     }
 
     /// Añade identidad de instalación, build y sesión a cada solicitud sensible.
