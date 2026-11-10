@@ -353,7 +353,8 @@ final class ProfileView: UIView {
             return
         }
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        let build = Bundle.main.object(forInfoDictionaryKey: "NyxelBuildNumber") as? String
+            ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
         let report = "Nyxel External · versión \(version) · IPA #\(build)\nRegistros locales sanitizados\n\n\(entries)"
         delegate?.profileView(self, didRequestShareDiagnostics: report)
     }
