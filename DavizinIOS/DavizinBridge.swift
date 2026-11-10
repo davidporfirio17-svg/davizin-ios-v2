@@ -223,10 +223,10 @@ final class DavizinBridge {
             guard let self = self else { return }
             switch result {
             case .success:
-                NyxelActivityLog.record("Hybrid VPN verificado; ruta TCP RSD alcanzable")
+                NyxelActivityLog.record("Hybrid verificado; ruta TCP RSD alcanzable")
                 injectNow()
             case .failure(let error):
-                let message = "Inyección detenida: el loopback VPN/RSD no está listo. \(error.localizedDescription)"
+                let message = "Inyección detenida: el loopback RSD no está listo. \(error.localizedDescription)"
                 NyxelActivityLog.record(message)
                 DispatchQueue.main.async {
                     self.hapticFeedback(success: false)

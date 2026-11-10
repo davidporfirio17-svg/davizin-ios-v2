@@ -3,20 +3,16 @@ import UIKit
 final class DavizinBottomNavView: UIView {
     var onModes: (() -> Void)?
     var onProfile: (() -> Void)?
-    var onVPN: (() -> Void)?
     var onHelp: (() -> Void)?
 
     private let modesButton = UIButton(type: .system)
     private let profileButton = UIButton(type: .system)
-    private let vpnButton = UIButton(type: .system)
     private let helpButton = UIButton(type: .system)
     private let modesLabel = UILabel()
     private let profileLabel = UILabel()
-    private let vpnLabel = UILabel()
     private let helpLabel = UILabel()
     private let modesIndicator = UIView()
     private let profileIndicator = UIView()
-    private let vpnIndicator = UIView()
     private let helpIndicator = UIView()
 
     override init(frame: CGRect) {
@@ -34,21 +30,18 @@ final class DavizinBottomNavView: UIView {
         let normalColor = AppTheme.secondaryText
         modesButton.tintColor = item == .modes ? selectedColor : normalColor
         profileButton.tintColor = item == .profile ? selectedColor : normalColor
-        vpnButton.tintColor = item == .vpn ? selectedColor : normalColor
         helpButton.tintColor = item == .help ? selectedColor : normalColor
         modesLabel.textColor = item == .modes ? selectedColor : normalColor
         profileLabel.textColor = item == .profile ? selectedColor : normalColor
-        vpnLabel.textColor = item == .vpn ? selectedColor : normalColor
         helpLabel.textColor = item == .help ? selectedColor : normalColor
         UIView.animate(withDuration: AppTheme.durationPopover) {
             self.modesIndicator.alpha = item == .modes ? 1.0 : 0.0
             self.profileIndicator.alpha = item == .profile ? 1.0 : 0.0
-            self.vpnIndicator.alpha = item == .vpn ? 1.0 : 0.0
             self.helpIndicator.alpha = item == .help ? 1.0 : 0.0
         }
     }
 
-    enum Item { case modes, profile, vpn, help }
+    enum Item { case modes, profile, help }
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
@@ -64,13 +57,11 @@ final class DavizinBottomNavView: UIView {
 
         configureButton(modesButton, image: "square.grid.2x2.fill", label: modesLabel, text: "MODOS", accessibility: "Modos", action: #selector(modesTapped))
         configureButton(profileButton, image: "person.crop.circle.fill", label: profileLabel, text: "PERFIL", accessibility: "Perfil", action: #selector(profileTapped))
-        configureButton(vpnButton, image: "iphone", label: vpnLabel, text: "iOS 27", accessibility: "iOS 27", action: #selector(vpnTapped))
         configureButton(helpButton, image: "questionmark.circle.fill", label: helpLabel, text: "AYUDA", accessibility: "Centro de ayuda", action: #selector(helpTapped))
 
         let stack = UIStackView(arrangedSubviews: [
             makeItem(button: modesButton, label: modesLabel, indicator: modesIndicator),
             makeItem(button: profileButton, label: profileLabel, indicator: profileIndicator),
-            makeItem(button: vpnButton, label: vpnLabel, indicator: vpnIndicator),
             makeItem(button: helpButton, label: helpLabel, indicator: helpIndicator)
         ])
         stack.axis = .horizontal
@@ -123,6 +114,5 @@ final class DavizinBottomNavView: UIView {
 
     @objc private func modesTapped() { onModes?() }
     @objc private func profileTapped() { onProfile?() }
-    @objc private func vpnTapped() { onVPN?() }
     @objc private func helpTapped() { onHelp?() }
 }

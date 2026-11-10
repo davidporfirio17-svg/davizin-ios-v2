@@ -5,7 +5,7 @@ import AVFoundation
 /// para ver "2424", y sin una sesión de audio activa iOS suspende la app en
 /// segundos y mata el NWListener. Usa un buffer silencioso en bucle, igual
 /// que External (declara UIBackgroundModes = audio). Solo vive mientras dura
-/// el emparejamiento; no afecta nada fuera de la pestaña VPN.
+/// el emparejamiento.
 enum NixelPairingKeepAlive {
     private static let player: AVAudioPlayer? = {
         let frameCount = 4410

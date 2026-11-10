@@ -306,9 +306,6 @@ final class ViewController: UIViewController {
         bottomNavView.onProfile = { [weak self] in
             self?.showProfile(animated: true)
         }
-        bottomNavView.onVPN = { [weak self] in
-            self?.showVPN(animated: true)
-        }
         bottomNavView.onHelp = { [weak self] in
             self?.showHelp(animated: true)
         }
@@ -504,18 +501,6 @@ final class ViewController: UIViewController {
         if NyxelCleanupFlow.hasPendingWork {
             screen.applyCleanupStage(NyxelCleanupFlow.stage)
         }
-    }
-
-    private func showVPN(animated: Bool) {
-        stageBeforeProfile = currentStage == .profile ? stageBeforeProfile : currentStage
-        currentStage = .profile
-        setBottomNavigation(visible: true, selected: .vpn)
-        headerView.title = "iOS 27"
-        headerView.showsBackButton = true
-        headerView.showsAvatarButton = false
-        let screen = NyxelVPNView()
-        screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds)
-        display(screen, animated: animated)
     }
 
     /// Perfil: accesible desde el avatar del header en cualquier pantalla (excepto login).

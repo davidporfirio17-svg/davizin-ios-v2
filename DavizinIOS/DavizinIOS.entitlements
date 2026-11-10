@@ -14,10 +14,6 @@
         <string>dns-proxy</string>
         <string>dns-settings</string>
     </array>
-    <key>com.apple.developer.networking.vpn.api</key>
-    <array>
-        <string>allow-vpn</string>
-    </array>
     <key>com.apple.developer.kernel.extended-virtual-addressing</key>
     <true/>
     <key>com.apple.developer.kernel.increased-memory-limit</key>

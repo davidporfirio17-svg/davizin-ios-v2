@@ -110,7 +110,7 @@ final class NixelUnavailableExploitBackend: NixelExploitBackend {
 
 /// Evalúa prerequisitos sin ejecutar código de exploit. El acceso al kernel
 /// solo podrá pasar a activo mediante un backend verificado que devuelva una
-/// señal explícita; no se infiere desde una carpeta, VPN o pairing.
+/// señal explícita; no se infiere desde una carpeta o pairing.
 enum NixelExploitCoordinator {
     static func assess() -> NixelExploitAssessment {
         let system = NyxelSupportPolicy.currentSystemDescription
@@ -285,7 +285,7 @@ final class NixelPairingProbe {
 
 /// Guarda el registro de pairing como blob opaco en Keychain. El protocolo
 /// que lo produce/consume se mantiene separado para no mezclar credenciales
-/// con la UI o con la configuración VPN.
+/// con la UI.
 final class NixelPairingRecordStore {
     static let shared = NixelPairingRecordStore()
     private let service = "com.apple.mobile.MobileHouseArrest.nyxel.pairing"
@@ -622,24 +622,14 @@ final class NixelPairingSession {
 }
 
 /// Punto único para el flujo Hybrid/Jailbreak.
-///
-/// La VPN es una dependencia de coordinación; una conexión exitosa no se
-/// interpreta por sí sola como jailbreak exitoso. Pairing y Developer Mode
-/// quedan expresamente sin verificar hasta integrar el transporte con el iPad.
 enum NixelHybridCoordinator {
     private enum StartError: LocalizedError {
-        case vpnStart(String)
-        case vpnConnectionTimeout
         case rsdEndpointUnreachable(String)
 
         var errorDescription: String? {
             switch self {
-            case .vpnStart(let detail):
-                return "No se pudo iniciar el VPN local: \(detail). No se ejecutó la inyección."
-            case .vpnConnectionTimeout:
-                return "El VPN no llegó al estado Conectado dentro de 15 segundos. No se ejecutó la inyección."
             case .rsdEndpointUnreachable(let detail):
-                return "AirLift no pudo abrir RSD por TCP 49152 en ninguno de sus endpoints (\(detail)). Confirma que el pairing terminó y que RSD está disponible; el estado VPN activo no garantiza que RSD responda. No se ejecutó la inyección."
+                return "AirLift no pudo abrir RSD por TCP 49152 en ninguno de sus endpoints (\(detail)). Confirma que el pairing terminó y que RSD está disponible. No se ejecutó la inyección."
             }
         }
     }
@@ -649,14 +639,13 @@ enum NixelHybridCoordinator {
 
     static func diagnostics() -> NixelHybridDiagnostics {
         let device = UIDevice.current
-        let vpn = NixelVPNManager.shared
         return NixelHybridDiagnostics(
             deviceModel: device.localizedModel,
             systemVersion: device.systemVersion,
             jailbreakIndicator: NixelJailbreakEnvironment.indicator(),
-            tunnelStatus: NixelVPNManager.statusText(vpn.status),
-            tunnelConfigured: vpn.isConfigured,
-            tunnelPluginPresent: vpn.tunnelPluginPresent,
+            tunnelStatus: "N/A",
+            tunnelConfigured: false,
+            tunnelPluginPresent: false,
             pairing: .notChecked,
             developerMode: .notChecked
         )
@@ -666,40 +655,10 @@ enum NixelHybridCoordinator {
         let before = diagnostics()
         NyxelActivityLog.record("Hybrid diagnóstico: \(before.summary)")
         NyxelActivityLog.record(NixelExploitCoordinator.assess().summary)
-
-        let vpn = NixelVPNManager.shared
-        if vpn.status == .connected {
-            completion(.success(()))
-            return
-        }
-        if vpn.status == .connecting || vpn.status == .reasserting || vpn.status == .disconnecting {
-            waitForVPNConnected(until: Date().addingTimeInterval(15), completion: completion)
-            return
-        }
-
-        if isExternalVPNActive() {
-            NyxelActivityLog.record("Hybrid VPN: VPN externo detectado; pairing puede continuar sin exigir RSD")
-            completion(.success(()))
-            return
-        }
-
-        let deadline = Date().addingTimeInterval(15)
-        vpn.start { result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success:
-                    NyxelActivityLog.record("Hybrid VPN: solicitud aceptada; esperando estado Conectado")
-                    waitForVPNConnected(until: deadline, completion: completion)
-                case .failure(let error):
-                    NyxelActivityLog.record("Hybrid VPN: error de inicio — \(error.localizedDescription)")
-                    completion(.failure(StartError.vpnStart(error.localizedDescription)))
-                }
-            }
-        }
+        completion(.success(()))
     }
 
-    /// El flujo de Developer Mode solo necesita que la preparación del VPN
-    /// termine; RSD se valida después, en la ruta de inyección AirLift.
+    /// RSD se valida en la ruta de inyección AirLift.
     static func startForAirLift(completion: @escaping (Result<Void, Error>) -> Void) {
         start { result in
             switch result {
@@ -708,24 +667,6 @@ enum NixelHybridCoordinator {
             case .failure(let error):
                 completion(.failure(error))
             }
-        }
-    }
-
-    private static func waitForVPNConnected(
-        until deadline: Date,
-        completion: @escaping (Result<Void, Error>) -> Void
-    ) {
-        if NixelVPNManager.shared.status == .connected {
-            completion(.success(()))
-            return
-        }
-        guard Date() < deadline else {
-            NyxelActivityLog.record("Hybrid VPN: no llegó a Conectado en 15s")
-            completion(.failure(StartError.vpnConnectionTimeout))
-            return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            waitForVPNConnected(until: deadline, completion: completion)
         }
     }
 
@@ -741,7 +682,7 @@ enum NixelHybridCoordinator {
         guard index < rsdProbeHosts.count,
               let port = NWEndpoint.Port(rawValue: 49152) else {
             let detail = failures.joined(separator: "; ")
-            NyxelActivityLog.record("Hybrid VPN: ningún endpoint RSD respondió: \(detail)")
+            NyxelActivityLog.record("Hybrid: ningún endpoint RSD respondió: \(detail)")
             completion(.failure(StartError.rsdEndpointUnreachable(detail)))
             return
         }
@@ -767,14 +708,14 @@ enum NixelHybridCoordinator {
                 finished = true
                 timeout.cancel()
                 connection.cancel()
-                NyxelActivityLog.record("Hybrid VPN: endpoint RSD TCP 49152 reachable at \(host)")
+                NyxelActivityLog.record("Hybrid: endpoint RSD TCP 49152 reachable at \(host)")
                 completion(.success(()))
             case .failed(let error):
                 finished = true
                 timeout.cancel()
                 connection.cancel()
                 let failure = "\(host): \(error.localizedDescription)"
-                NyxelActivityLog.record("Hybrid VPN: probe RSD falló — \(failure)")
+                NyxelActivityLog.record("Hybrid: probe RSD falló — \(failure)")
                 probeRSDLoopback(
                     at: index + 1,
                     failures: failures + [failure],
@@ -789,37 +730,8 @@ enum NixelHybridCoordinator {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.25, execute: timeout)
     }
 
-    static func isExternalVPNActive() -> Bool {
-        var addrs: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&addrs) == 0, let first = addrs else { return false }
-        defer { freeifaddrs(first) }
-        var cursor: UnsafeMutablePointer<ifaddrs>? = first
-        while let ifa = cursor {
-            let name = String(cString: ifa.pointee.ifa_name)
-            if name.hasPrefix("utun") || name.hasPrefix("ipsec") || name.hasPrefix("ppp") {
-                NyxelActivityLog.record("VPN externo detectado en interfaz: \(name)")
-                return true
-            }
-            cursor = ifa.pointee.ifa_next
-        }
-        return false
-    }
-
     static func stop() {
         NixelPairingSession.shared.stop()
-        NixelVPNManager.shared.stop()
-    }
-
-    static var status: NEVPNStatus {
-        NixelVPNManager.shared.status
-    }
-
-    static var statusText: String {
-        NixelVPNManager.statusText(status)
-    }
-
-    static var isActive: Bool {
-        NixelVPNManager.shared.isActive
     }
 }
 
