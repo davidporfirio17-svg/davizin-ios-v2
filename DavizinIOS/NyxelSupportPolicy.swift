@@ -227,10 +227,11 @@ enum NyxelSupportPolicy {
         return false
     }
 
-    /// Desde iOS 27, las operaciones sobre otro contenedor deben pasar por
-    /// un registro de pairing y el túnel RSD/AirLift.
+    /// Desde iOS 26+, las operaciones sobre otro contenedor deben pasar por
+    /// container_query directo (sin kexploit). iOS 27.x reporta majorVersion=26
+    /// vía ProcessInfo, por lo que el threshold debe ser >= 26.
     static func requiresPairingTunnel(major: Int, minor: Int, patch: Int, build: String) -> Bool {
-        major >= 27
+        major >= 26
     }
 
     /// The bundled opa334 offset table covers iOS 17–27.x.

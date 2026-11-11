@@ -469,6 +469,7 @@ class InjectorService {
 
     static func isBundleAvailable(for game: DavizinGame) -> Bool {
         guard NyxelSupportPolicy.isCurrentSystemSupported else { return false }
+        guard NyxelInstalledGames.isInstalled(for: game) else { return false }
         var error: NSString?
         if let container = DavizinGetContainerPath(bundleID(for: game), &error) {
             if FileManager.default.fileExists(atPath: container) {
