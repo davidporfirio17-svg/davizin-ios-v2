@@ -7,6 +7,7 @@
 #import <xpc/xpc.h>
 #import <fcntl.h>
 #import <os/lock.h>
+#import <dirent.h>
 
 #pragma mark - C API types (container_query_* from libsystem_containermanager)
 
@@ -113,6 +114,13 @@ static inline BOOL shouldUseBadQuery(void) {
     return osVersion.majorVersion >= 26;
 }
 
+static const char *kAppGroups[] = {
+    "group.a8b3cf4e91d07562.1",
+    "group.a8b3cf4e91d07562.2",
+    "group.a8b3cf4e91d07562.3",
+};
+static const int kAppGroupCount = 3;
+
 int64_t DavizinGrantContainerAccess(const char *containerPath) {
     if (!shouldUseBadQuery()) {
         return -1;
@@ -124,15 +132,30 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
     }
 
     const char *pathC = [cleanPath UTF8String];
-    int64_t handle = bad_query((char *)pathC, true, NULL, false);
 
+    // Strategy 1: Class 13 (system group) — original approach
+    int64_t handle = bad_query((char *)pathC, true, NULL, false);
     if (handle >= 0) {
-        DavizinMCMLog([NSString stringWithFormat:@"Grant obtenido para %@: handle=%lld", cleanPath, handle]);
-    } else {
-        DavizinMCMLog([NSString stringWithFormat:@"Grant FALLÓ para %@: handle=%lld", cleanPath, handle]);
+        DavizinMCMLog([NSString stringWithFormat:@"Grant class13 para %@: handle=%lld", cleanPath, handle]);
+        return handle;
     }
 
-    return handle;
+    // Strategy 2: Class 7 (app group) — XO Files approach for iOS 27+
+    for (int g = 0; g < kAppGroupCount; g++) {
+        handle = bad_query((char *)pathC, true, (char *)kAppGroups[g], false);
+        if (handle >= 0) {
+            DavizinMCMLog([NSString stringWithFormat:@"Grant appGroup[%d] para %@: handle=%lld", g, cleanPath, handle]);
+            return handle;
+        }
+        handle = bad_query((char *)pathC, false, (char *)kAppGroups[g], false);
+        if (handle >= 0) {
+            DavizinMCMLog([NSString stringWithFormat:@"Grant appGroup[%d]-noCreate para %@: handle=%lld", g, cleanPath, handle]);
+            return handle;
+        }
+    }
+
+    DavizinMCMLog([NSString stringWithFormat:@"Grant FALLÓ todas las estrategias para %@", cleanPath]);
+    return -1;
 }
 
 void DavizinReleaseContainerGrant(int64_t handle) {
@@ -620,6 +643,101 @@ void DavizinProbeRelease(DavizinProbeResult *res) {
     SandboxExtReleaseFunc releaseExt = (SandboxExtReleaseFunc)dlsym(RTLD_DEFAULT, "sandbox_extension_release");
     if (releaseExt) releaseExt(res->handle);
     res->handle = -1;
+}
+
+#pragma mark - Container discovery via bad_query + enumeration (iOS 27+)
+
+static int64_t _tryGetSandboxAccess(const char *targetPath) {
+    // Class 13 (system group) — fast, might work on some iOS 27 builds
+    int64_t h = bad_query((char *)targetPath, true, NULL, false);
+    if (h >= 0) return h;
+
+    // Class 7 (app group) — XO Files approach, proven on iOS 27.2
+    for (int g = 0; g < kAppGroupCount; g++) {
+        h = bad_query((char *)targetPath, true, (char *)kAppGroups[g], false);
+        if (h >= 0) return h;
+        h = bad_query((char *)targetPath, false, (char *)kAppGroups[g], false);
+        if (h >= 0) return h;
+    }
+
+    return -1;
+}
+
+static NSString *_scanContainerDir(const char *basePath, NSString *targetBundleID) {
+    DIR *dir = opendir(basePath);
+    if (!dir) return nil;
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type != DT_DIR && entry->d_type != DT_UNKNOWN) continue;
+        if (entry->d_name[0] == '.') continue;
+        if (strlen(entry->d_name) < 32) continue;
+
+        char metaPath[1200];
+        snprintf(metaPath, sizeof(metaPath),
+                 "%s/%s/.com.apple.mobile_container_manager.metadata.plist",
+                 basePath, entry->d_name);
+
+        NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:
+            [NSString stringWithUTF8String:metaPath]];
+        if (!plist) continue;
+
+        NSString *identifier = plist[@"MCMMetadataIdentifier"];
+        if ([identifier isEqualToString:targetBundleID]) {
+            closedir(dir);
+            char fullPath[1200];
+            snprintf(fullPath, sizeof(fullPath),
+                     "/private/var/mobile/Containers/Data/Application/%s",
+                     entry->d_name);
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] Match: %@ → %s", targetBundleID, fullPath]);
+            return [NSString stringWithUTF8String:fullPath];
+        }
+    }
+    closedir(dir);
+    return nil;
+}
+
+NSString *DavizinDiscoverContainerPath(NSString *bundleID) {
+    if (!bundleID || bundleID.length == 0) return nil;
+
+    DavizinMCMLog([NSString stringWithFormat:
+        @"[Discovery] Buscando container para %@", bundleID]);
+
+    static const char *kDirs[] = {
+        "/private/var/mobile/Containers/Data/Application",
+        "/var/mobile/Containers/Data/Application",
+    };
+    static const int kDirCount = 2;
+
+    // Pass 1: try without granting (AppDataContainers entitlement might suffice)
+    for (int i = 0; i < kDirCount; i++) {
+        NSString *found = _scanContainerDir(kDirs[i], bundleID);
+        if (found) {
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] Encontrado sin grant: %@", found]);
+            return found;
+        }
+    }
+
+    // Pass 2: grant read access via bad_query, then scan
+    for (int i = 0; i < kDirCount; i++) {
+        int64_t handle = _tryGetSandboxAccess(kDirs[i]);
+        if (handle >= 0) {
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] Sandbox grant handle=%lld para %s", handle, kDirs[i]]);
+            NSString *found = _scanContainerDir(kDirs[i], bundleID);
+            if (found) return found;
+        }
+    }
+
+    DavizinMCMLog([NSString stringWithFormat:
+        @"[Discovery] Container no encontrado para %@", bundleID]);
+    return nil;
+}
+
+BOOL DavizinIsBundleInstalled(NSString *bundleID) {
+    return DavizinDiscoverContainerPath(bundleID) != nil;
 }
 
 #pragma mark - Stubs

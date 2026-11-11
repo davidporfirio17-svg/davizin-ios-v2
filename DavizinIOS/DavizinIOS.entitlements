@@ -14,5 +14,11 @@
     <true/>
     <key>get-task-allow</key>
     <true/>
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.a8b3cf4e91d07562.1</string>
+        <string>group.a8b3cf4e91d07562.2</string>
+        <string>group.a8b3cf4e91d07562.3</string>
+    </array>
 </dict>
 </plist>

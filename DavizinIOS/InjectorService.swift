@@ -469,16 +469,24 @@ class InjectorService {
 
     static func isBundleAvailable(for game: DavizinGame) -> Bool {
         guard NyxelSupportPolicy.isCurrentSystemSupported else { return false }
-        guard NyxelInstalledGames.isInstalled(for: game) else { return false }
+
+        let bid = bundleID(for: game)
+
+        // Try MCM first (fast on iOS <= 25, returns nil on iOS 27.2)
         var error: NSString?
-        if let container = DavizinGetContainerPath(bundleID(for: game), &error) {
+        if let container = DavizinGetContainerPath(bid, &error) {
             if FileManager.default.fileExists(atPath: container) {
                 return true
             }
         }
+
+        // iOS 27+ fallback: discover container via bad_query + directory enumeration
         if requiresPairingTransportOnCurrentDevice() {
-            return NixelAirLiftFileChannel.isAvailable
+            if DavizinDiscoverContainerPath(bid) != nil {
+                return true
+            }
         }
+
         return false
     }
 
@@ -610,14 +618,18 @@ class InjectorService {
         var container = getContainerPathWithTimeout(bundleID: bid, timeout: 25, error: &mcmErr)
 
         if container == nil && pairingRequired {
-            if let airLiftContainer = resolveContainerViaAirLift(bundleID: bid) {
+            // iOS 27+ fallback: enumerate containers via bad_query + app groups
+            if let discovered = DavizinDiscoverContainerPath(bid) {
+                container = discovered
+                NyxelActivityLog.record("DIAG container resuelto via Discovery (enum): \(discovered)")
+            } else if let airLiftContainer = resolveContainerViaAirLift(bundleID: bid) {
                 container = airLiftContainer
                 NyxelActivityLog.record("DIAG container resuelto via AirLift InstProxy: \(airLiftContainer)")
             } else if NixelAirLiftFileChannel.isAvailable {
-                NyxelActivityLog.record("DIAG MCM+AirLift container lookup fallaron en iOS 27; continuando sin container local")
+                NyxelActivityLog.record("DIAG MCM+Discovery+AirLift container lookup fallaron en iOS 27; continuando sin container local")
             } else {
                 let detail = mcmErr ?? "container_query devolvió nil"
-                NyxelActivityLog.record("DIAG MCM fallo en iOS 27+ sin AirLift: \(detail). El juego puede no estar instalado o MCM rechazó la consulta.")
+                NyxelActivityLog.record("DIAG MCM+Discovery fallo en iOS 27+: \(detail). El juego puede no estar instalado o MCM rechazó la consulta.")
                 return InjectorResult(success: false, message: "MCM-27: \(detail)")
             }
         } else if container == nil {
@@ -943,10 +955,20 @@ class InjectorService {
 
 		let bundles = ["com.dts.freefiremax", "com.dts.freefireth"]
 
+        // Try MCM (fast, works on iOS <= 25)
         for bid in bundles {
             var err: NSString?
             if let _ = DavizinGetContainerPath(bid, &err) {
                 return .compatible
+            }
+        }
+
+        // iOS 27+ fallback: discover containers via bad_query + app groups
+        if requiresPairingTransportOnCurrentDevice() {
+            for bid in bundles {
+                if DavizinDiscoverContainerPath(bid) != nil {
+                    return .compatible
+                }
             }
         }
 

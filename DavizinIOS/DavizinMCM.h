@@ -32,6 +32,13 @@ void DavizinProbeRelease(DavizinProbeResult *result);
 /// Log completo de la última ejecución del probe (todas las estrategias intentadas).
 const char * _Nonnull DavizinLastProbeDiagnostic(void);
 
+/// Descubre el path del container de una app enumerando directorios con bad_query.
+/// Fallback cuando DavizinGetContainerPath() devuelve nil (iOS 27+).
+NSString * _Nullable DavizinDiscoverContainerPath(NSString *bundleID);
+
+/// Verifica si un bundle está instalado enumerando containers con acceso sandbox.
+BOOL DavizinIsBundleInstalled(NSString *bundleID);
+
 /// Stub for backward compatibility
 NSString * _Nullable DavizinPrepareInjectionQuery(NSString *bundleID,
                                                   NSString * _Nullable * _Nullable error);
