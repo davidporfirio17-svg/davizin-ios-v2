@@ -39,6 +39,10 @@ NSString * _Nullable DavizinDiscoverContainerPath(NSString *bundleID);
 /// Verifica si un bundle está instalado enumerando containers con acceso sandbox.
 BOOL DavizinIsBundleInstalled(NSString *bundleID);
 
+/// Intenta obtener acceso sandbox via worse_query symlink (sin kernel exploit).
+/// Retorna YES si sandbox_access_is_active() pasa después del intento.
+BOOL DavizinTrySymlinkEscape(void);
+
 /// Stub for backward compatibility
 NSString * _Nullable DavizinPrepareInjectionQuery(NSString *bundleID,
                                                   NSString * _Nullable * _Nullable error);

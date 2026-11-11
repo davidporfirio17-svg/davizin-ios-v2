@@ -174,8 +174,10 @@ final class DavizinBridge {
             DispatchQueue.global(qos: .userInitiated).async {
                 if sandbox_access_is_active() != 0 {
                     NyxelActivityLog.record("Sandbox ya activo, omitiendo kexploit")
+                } else if DavizinTrySymlinkEscape() {
+                    NyxelActivityLog.record("WQ-SYM sandbox escape exitoso (sin kernel exploit)")
                 } else {
-                    NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar (iOS27+: kexploit habilitado)...")
+                    NyxelActivityLog.record("Sandbox no activo, WQ-SYM falló, ejecutando kexploit...")
                     let exploitResult = kexploit_opa334()
                     guard exploitResult == 0 else {
                         let code = abs(exploitResult)
@@ -343,7 +345,18 @@ final class DavizinBridge {
                     return
                 }
 
-                NyxelActivityLog.record("Iniciando kexploit_opa334...")
+                NyxelActivityLog.record("Intentando WQ-SYM sandbox escape (sin kernel exploit)...")
+                if DavizinTrySymlinkEscape() {
+                    NyxelActivityLog.record("WQ-SYM sandbox escape exitoso")
+                    DispatchQueue.main.async {
+                        self.operationInFlight = false
+                        self.hapticFeedback(success: true)
+                        self.vc?.setOperationState(.succeeded("Sistema preparado (WQ-SYM) ✓"))
+                    }
+                    return
+                }
+                NyxelActivityLog.record("WQ-SYM falló, iniciando kexploit_opa334...")
+
                 let exploitResult = kexploit_opa334()
                 guard exploitResult == 0 else {
                     let code = abs(exploitResult)
