@@ -14,10 +14,13 @@
 typedef void *(*MCMQueryCreate_t)(void);
 typedef void  (*MCMQuerySetU64_t)(void *, uint64_t);
 typedef void  (*MCMQuerySetXPC_t)(void *, xpc_object_t);
+typedef void  (*MCMQuerySetCString_t)(void *, const char *);
 typedef void *(*MCMQueryGetSingle_t)(void *);
 typedef void *(*MCMQueryGetError_t)(void *);
+typedef bool  (*MCMQueryIterate_t)(void *, bool (^)(void *));
 typedef void  (*MCMQueryFree_t)(void *);
 typedef const char *(*MCMObjectGetPath_t)(void *);
+typedef const char *(*MCMObjectGetIdentifier_t)(void *);
 typedef void *(*MCMObjectCopy_t)(void *);
 typedef char *(*MCMObjectCopyToken_t)(void *);
 typedef bool  (*MCMObjectActivate_t)(void *, bool);
@@ -30,12 +33,16 @@ typedef struct {
     MCMQueryCreate_t    queryCreate;
     MCMQuerySetU64_t    querySetClass;
     MCMQuerySetXPC_t    querySetIdentifiers;
+    MCMQuerySetXPC_t    querySetGroupIdentifiers;
     MCMQuerySetU64_t    querySetFlags;
     MCMQuerySetU64_t    querySetPart;
+    MCMQuerySetCString_t querySetPartDomain;
     MCMQueryGetSingle_t queryGetSingle;
     MCMQueryGetError_t  queryGetLastError;
+    MCMQueryIterate_t   queryIterate;
     MCMQueryFree_t      queryFree;
     MCMObjectGetPath_t  objectGetPath;
+    MCMObjectGetIdentifier_t objectGetIdentifier;
     MCMObjectCopy_t     objectCopy;
     MCMObjectCopyToken_t objectCopyToken;
     MCMObjectActivate_t objectActivate;
@@ -52,21 +59,25 @@ static MCMAPI *MCMGetAPI(void) {
                             RTLD_NOW | RTLD_LOCAL);
         void *h = api.handle ? api.handle : RTLD_DEFAULT;
 #define LOAD(f, sym) api.f = (__typeof(api.f))dlsym(h, sym)
-        LOAD(queryCreate,        "container_query_create");
-        LOAD(querySetClass,      "container_query_set_class");
-        LOAD(querySetIdentifiers,"container_query_set_identifiers");
-        LOAD(querySetFlags,      "container_query_operation_set_flags");
-        LOAD(queryGetSingle,     "container_query_get_single_result");
-        LOAD(queryGetLastError,  "container_query_get_last_error");
-        LOAD(queryFree,          "container_query_free");
-        LOAD(objectGetPath,      "container_object_get_path");
-        LOAD(objectCopy,         "container_object_copy");
-        LOAD(objectCopyToken,    "container_copy_sandbox_token");
-        LOAD(objectActivate,     "container_object_sandbox_extension_activate");
-        LOAD(objectFree,         "container_object_free");
-        LOAD(querySetPart,       "container_query_operation_set_part");
-        LOAD(errorGetPOSIX,      "container_error_get_posix_errno");
-        LOAD(errorGetMessage,    "container_error_get_message");
+        LOAD(queryCreate,            "container_query_create");
+        LOAD(querySetClass,          "container_query_set_class");
+        LOAD(querySetIdentifiers,    "container_query_set_identifiers");
+        LOAD(querySetGroupIdentifiers,"container_query_set_group_identifiers");
+        LOAD(querySetFlags,          "container_query_operation_set_flags");
+        LOAD(querySetPart,           "container_query_operation_set_part");
+        LOAD(querySetPartDomain,     "container_query_operation_set_part_domain");
+        LOAD(queryGetSingle,         "container_query_get_single_result");
+        LOAD(queryGetLastError,      "container_query_get_last_error");
+        LOAD(queryIterate,           "container_query_iterate_results_sync");
+        LOAD(queryFree,              "container_query_free");
+        LOAD(objectGetPath,          "container_object_get_path");
+        LOAD(objectGetIdentifier,    "container_object_get_identifier");
+        LOAD(objectCopy,             "container_object_copy");
+        LOAD(objectCopyToken,        "container_copy_sandbox_token");
+        LOAD(objectActivate,         "container_object_sandbox_extension_activate");
+        LOAD(objectFree,             "container_object_free");
+        LOAD(errorGetPOSIX,          "container_error_get_posix_errno");
+        LOAD(errorGetMessage,        "container_error_get_message");
 #undef LOAD
     });
     return &api;
@@ -133,6 +144,50 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
 
     const char *pathC = [cleanPath UTF8String];
 
+    // Strategy 0: MCM class-7 app group native activation (Filza technique)
+    // Activating an app group sandbox extension may grant access to the target path
+    MCMAPI *api = MCMGetAPI();
+    if (api->queryCreate && api->querySetGroupIdentifiers && api->objectActivate) {
+        for (int g = 0; g < kAppGroupCount; g++) {
+            static const uint64_t kGrantFlags[] = { 0x900000000ULL, 0x8100000000ULL };
+            for (int fi = 0; fi < 2; fi++) {
+                void *q = api->queryCreate();
+                if (!q) continue;
+                api->querySetClass(q, 7);
+                xpc_object_t xid = xpc_string_create(kAppGroups[g]);
+                api->querySetGroupIdentifiers(q, xid);
+                api->querySetFlags(q, kGrantFlags[fi]);
+                if (api->querySetPart) api->querySetPart(q, 0);
+                void *res = api->queryGetSingle(q);
+                if (res && api->objectCopy) {
+                    void *act = api->objectCopy(res);
+                    if (act) {
+                        char *token = api->objectCopyToken ? api->objectCopyToken(act) : NULL;
+                        bool activated = false;
+                        if (token && token[0] != '\0')
+                            activated = api->objectActivate(act, false);
+                        free(token);
+                        if (activated) {
+                            int fd = open(pathC, O_RDONLY | O_CLOEXEC);
+                            if (fd >= 0) {
+                                close(fd);
+                                DavizinMCMLog([NSString stringWithFormat:
+                                    @"Grant MCM C7[%d] f=%d activado → acceso OK para %@", g, fi, cleanPath]);
+                                // Keep query+activation alive, return sentinel handle
+                                _storeLease(api, q, act, kAppGroups[g], pathC);
+                                xpc_release(xid);
+                                return 9000 + g;
+                            }
+                        }
+                        if (api->objectFree) api->objectFree(act);
+                    }
+                }
+                xpc_release(xid);
+                api->queryFree(q);
+            }
+        }
+    }
+
     // Strategy 1: Class 13 (system group) — original approach
     int64_t handle = bad_query((char *)pathC, true, NULL, false);
     if (handle >= 0) {
@@ -140,7 +195,7 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
         return handle;
     }
 
-    // Strategy 2: Class 7 (app group) — XO Files approach for iOS 27+
+    // Strategy 2: Class 7 (app group) via bad_query — XO Files approach for iOS 27+
     for (int g = 0; g < kAppGroupCount; g++) {
         handle = bad_query((char *)pathC, true, (char *)kAppGroups[g], false);
         if (handle >= 0) {
@@ -159,9 +214,12 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
 }
 
 void DavizinReleaseContainerGrant(int64_t handle) {
+    if (handle >= 9000) {
+        // MCM lease handle — kept alive in sLeases, don't release via bad_query
+        return;
+    }
     if (handle >= 0) {
         bad_query_release(handle);
-        DavizinMCMLog([NSString stringWithFormat:@"Grant liberado: handle=%lld", handle]);
     }
 }
 
@@ -538,38 +596,132 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
         }
     }
 
-    // ── Strategy 1.5: MCM with different part values (1,2,3) ──
-    if (api->queryCreate && api->querySetPart) {
-        for (uint64_t part = 1; part <= 3; part++) {
-            void *q = api->queryCreate();
-            if (!q) continue;
+    // ── Strategy 1.5: MCM with kMCMReadWritePartFlags (0x8100000000) ──
+    if (api->queryCreate) {
+        _probeDiagAppend("S1.5:RW | ");
+        void *q = api->queryCreate();
+        if (q) {
             api->querySetClass(q, 2);
             xpc_object_t xid = xpc_string_create(bidC);
             api->querySetIdentifiers(q, xid);
-            api->querySetFlags(q, 0x900000000ULL);
-            api->querySetPart(q, part);
-
+            api->querySetFlags(q, 0x8100000000ULL);
+            if (api->querySetPart) api->querySetPart(q, 0);
             void *res = api->queryGetSingle(q);
-            if (res && api->objectCopyToken) {
-                char *token = api->objectCopyToken(res);
-                if (token && token[0]) {
-                    int64_t h = consumeExt(token);
-                    _probeDiagAppend("S1.5p%llu:h=%lld ", (unsigned long long)part, (long long)h);
-                    if (h >= 0 && _mcmProbeCanWrite(pathC)) {
-                        result.method = 6; result.handle = h; result.writeOK = YES;
-                        snprintf(result.detail, sizeof(result.detail),
-                                 "MCM part=%llu consume VERIFIED h=%lld", (unsigned long long)part, (long long)h);
-                        _probeDiagAppend("*** SUCCESS S1.5 ***");
-                        free(token); _storeLease(api, q, NULL, bidC, pathC);
-                        xpc_release(xid);
-                        return result;
+            if (res) {
+                if (api->objectCopy && api->objectActivate) {
+                    void *act = api->objectCopy(res);
+                    if (act) {
+                        bool ok = api->objectActivate(act, false);
+                        _probeDiagAppend("1.5a=%d ", ok);
+                        if (ok && _mcmProbeCanWrite(pathC)) {
+                            result.method = 6; result.handle = 0; result.writeOK = YES;
+                            strlcpy(result.detail, "MCM RW-flags activate VERIFIED", sizeof(result.detail));
+                            _probeDiagAppend("*** SUCCESS 1.5a ***");
+                            _storeLease(api, q, act, bidC, pathC);
+                            xpc_release(xid);
+                            return result;
+                        }
+                        if (api->objectFree) api->objectFree(act);
                     }
-                    if (h >= 0 && releaseExt) releaseExt(h);
                 }
-                free(token);
+                if (api->objectCopyToken) {
+                    char *token = api->objectCopyToken(res);
+                    if (token && token[0]) {
+                        int64_t h = consumeExt(token);
+                        _probeDiagAppend("1.5b:h=%lld ", (long long)h);
+                        if (h >= 0 && _mcmProbeCanWrite(pathC)) {
+                            result.method = 6; result.handle = h; result.writeOK = YES;
+                            snprintf(result.detail, sizeof(result.detail),
+                                     "MCM RW-flags consume VERIFIED h=%lld", (long long)h);
+                            _probeDiagAppend("*** SUCCESS 1.5b ***");
+                            free(token); _storeLease(api, q, NULL, bidC, pathC);
+                            xpc_release(xid);
+                            return result;
+                        }
+                        if (h >= 0 && releaseExt) releaseExt(h);
+                    }
+                    free(token);
+                }
             }
             xpc_release(xid);
             api->queryFree(q);
+        }
+    }
+
+    // ── Strategy 1.6: MCM with different part values (1,2,3) ──
+    if (api->queryCreate && api->querySetPart) {
+        static const uint64_t kFlagSets[] = { 0x900000000ULL, 0x8100000000ULL };
+        for (int fi = 0; fi < 2; fi++) {
+            for (uint64_t part = 1; part <= 3; part++) {
+                void *q = api->queryCreate();
+                if (!q) continue;
+                api->querySetClass(q, 2);
+                xpc_object_t xid = xpc_string_create(bidC);
+                api->querySetIdentifiers(q, xid);
+                api->querySetFlags(q, kFlagSets[fi]);
+                api->querySetPart(q, part);
+
+                void *res = api->queryGetSingle(q);
+                if (res && api->objectCopyToken) {
+                    char *token = api->objectCopyToken(res);
+                    if (token && token[0]) {
+                        int64_t h = consumeExt(token);
+                        _probeDiagAppend("S1.6f%dp%llu:h=%lld ", fi, (unsigned long long)part, (long long)h);
+                        if (h >= 0 && _mcmProbeCanWrite(pathC)) {
+                            result.method = 7; result.handle = h; result.writeOK = YES;
+                            snprintf(result.detail, sizeof(result.detail),
+                                     "MCM flags=0x%llx part=%llu VERIFIED h=%lld",
+                                     kFlagSets[fi], (unsigned long long)part, (long long)h);
+                            _probeDiagAppend("*** SUCCESS S1.6 ***");
+                            free(token); _storeLease(api, q, NULL, bidC, pathC);
+                            xpc_release(xid);
+                            return result;
+                        }
+                        if (h >= 0 && releaseExt) releaseExt(h);
+                    }
+                    free(token);
+                }
+                xpc_release(xid);
+                api->queryFree(q);
+            }
+        }
+    }
+
+    // ── Strategy 1.7: MCM class-7 app group query → activate → open target container ──
+    if (api->queryCreate && api->querySetGroupIdentifiers) {
+        _probeDiagAppend("S1.7:C7 | ");
+        for (int g = 0; g < kAppGroupCount; g++) {
+            static const uint64_t kC7Flags[] = { 0x900000000ULL, 0x8100000000ULL };
+            for (int fi = 0; fi < 2; fi++) {
+                void *q = api->queryCreate();
+                if (!q) continue;
+                api->querySetClass(q, 7);
+                xpc_object_t xid = xpc_string_create(kAppGroups[g]);
+                api->querySetGroupIdentifiers(q, xid);
+                api->querySetFlags(q, kC7Flags[fi]);
+                if (api->querySetPart) api->querySetPart(q, 0);
+
+                void *res = api->queryGetSingle(q);
+                if (res && api->objectCopy && api->objectActivate) {
+                    void *act = api->objectCopy(res);
+                    if (act) {
+                        bool ok = api->objectActivate(act, false);
+                        _probeDiagAppend("C7[%d]f%d=%d ", g, fi, ok);
+                        if (ok && _mcmProbeCanWrite(pathC)) {
+                            result.method = 8; result.handle = 0; result.writeOK = YES;
+                            snprintf(result.detail, sizeof(result.detail),
+                                     "MCM C7 group[%d] flags=0x%llx VERIFIED", g, kC7Flags[fi]);
+                            _probeDiagAppend("*** SUCCESS S1.7 ***");
+                            _storeLease(api, q, act, bidC, pathC);
+                            xpc_release(xid);
+                            return result;
+                        }
+                        if (api->objectFree) api->objectFree(act);
+                    }
+                }
+                xpc_release(xid);
+                api->queryFree(q);
+            }
         }
     }
 
@@ -645,7 +797,99 @@ void DavizinProbeRelease(DavizinProbeResult *res) {
     res->handle = -1;
 }
 
-#pragma mark - Container discovery via bad_query + enumeration (iOS 27+)
+#pragma mark - MCM native enumeration (Filza technique)
+
+static NSString *_mcmQueryContainerPath(uint64_t containerClass, NSString *identifier,
+                                        BOOL group, uint64_t flags) {
+    MCMAPI *api = MCMGetAPI();
+    if (!api->queryCreate || !api->queryGetSingle || !api->objectGetPath) return nil;
+
+    void *q = api->queryCreate();
+    if (!q) return nil;
+
+    api->querySetClass(q, containerClass);
+    xpc_object_t xid = xpc_string_create(identifier.UTF8String);
+    if (group && api->querySetGroupIdentifiers)
+        api->querySetGroupIdentifiers(q, xid);
+    else
+        api->querySetIdentifiers(q, xid);
+    api->querySetFlags(q, flags);
+    if (api->querySetPart) api->querySetPart(q, 0);
+
+    void *res = api->queryGetSingle(q);
+    NSString *path = nil;
+    if (res) {
+        const char *raw = api->objectGetPath(res);
+        if (raw) path = [NSString stringWithUTF8String:raw];
+        if (path && ([path isEqualToString:@"/var"] || [path hasPrefix:@"/var/"]))
+            path = [@"/private" stringByAppendingString:path];
+
+        // Try to activate sandbox extension (may fail on iOS 26+ but path is still valid)
+        if (api->objectCopy && api->objectActivate) {
+            void *act = api->objectCopy(res);
+            if (act) {
+                char *token = api->objectCopyToken ? api->objectCopyToken(act) : NULL;
+                bool activated = false;
+                if (token && token[0] != '\0')
+                    activated = api->objectActivate(act, false);
+                free(token);
+                if (activated) {
+                    _storeLease(api, q, act, identifier.UTF8String, path.UTF8String);
+                    DavizinMCMLog([NSString stringWithFormat:
+                        @"[MCMQuery] class=%llu id=%@ activated OK: %@", containerClass, identifier, path]);
+                    xpc_release(xid);
+                    return path;
+                }
+                if (api->objectFree) api->objectFree(act);
+            }
+        }
+
+        // iOS 26 workaround: path may be accessible even without sandbox token
+        if (path.length > 0) {
+            int fd = open(path.fileSystemRepresentation, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+            if (fd >= 0) {
+                close(fd);
+                DavizinMCMLog([NSString stringWithFormat:
+                    @"[MCMQuery] class=%llu id=%@ no token but open() OK: %@", containerClass, identifier, path]);
+                api->queryFree(q);
+                xpc_release(xid);
+                return path;
+            }
+        }
+    }
+
+    api->queryFree(q);
+    xpc_release(xid);
+    return path;
+}
+
+static NSArray<NSString *> *_mcmEnumerateIdentifiers(uint64_t containerClass, NSUInteger limit) {
+    MCMAPI *api = MCMGetAPI();
+    if (!api->queryCreate || !api->queryIterate || !api->objectGetIdentifier || limit == 0)
+        return @[];
+
+    void *q = api->queryCreate();
+    if (!q) return @[];
+
+    api->querySetClass(q, containerClass);
+    api->querySetFlags(q, 0x100000000ULL);
+    if (api->querySetPart) api->querySetPart(q, 0);
+
+    NSMutableOrderedSet<NSString *> *identifiers = [NSMutableOrderedSet orderedSet];
+    api->queryIterate(q, ^bool(void *object) {
+        const char *raw = object ? api->objectGetIdentifier(object) : NULL;
+        NSString *identifier = raw ? [NSString stringWithUTF8String:raw] : nil;
+        if (identifier.length) [identifiers addObject:identifier];
+        return identifiers.count < limit;
+    });
+
+    api->queryFree(q);
+    DavizinMCMLog([NSString stringWithFormat:
+        @"[MCMEnum] class=%llu found %lu identifiers", containerClass, (unsigned long)identifiers.count]);
+    return identifiers.array;
+}
+
+#pragma mark - Container discovery via MCM enum + bad_query + filesystem (iOS 27+)
 
 static int64_t _tryGetSandboxAccess(const char *targetPath) {
     // Class 13 (system group) — fast, might work on some iOS 27 builds
@@ -703,6 +947,30 @@ NSString *DavizinDiscoverContainerPath(NSString *bundleID) {
 
     DavizinMCMLog([NSString stringWithFormat:
         @"[Discovery] Buscando container para %@", bundleID]);
+
+    // Pass 0: MCM class-2 direct query (may fail on iOS 27.2 but try both flag sets)
+    {
+        static const uint64_t kFlagSets[] = { 0x900000000ULL, 0x8100000000ULL };
+        for (int f = 0; f < 2; f++) {
+            NSString *path = _mcmQueryContainerPath(2, bundleID, NO, kFlagSets[f]);
+            if (path.length > 0 && path.isAbsolutePath) {
+                DavizinMCMLog([NSString stringWithFormat:
+                    @"[Discovery] MCM class-2 flags=0x%llx: %@", kFlagSets[f], path]);
+                return path;
+            }
+        }
+    }
+
+    // Pass 0b: MCM enumeration — enumerate class-2 identifiers to find our target
+    {
+        NSArray<NSString *> *identifiers = _mcmEnumerateIdentifiers(2, 500);
+        if ([identifiers containsObject:bundleID]) {
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] MCM enum confirmed %@ exists, re-querying", bundleID]);
+            NSString *path = _mcmQueryContainerPath(2, bundleID, NO, 0x900000000ULL);
+            if (path.length > 0) return path;
+        }
+    }
 
     static const char *kDirs[] = {
         "/private/var/mobile/Containers/Data/Application",
