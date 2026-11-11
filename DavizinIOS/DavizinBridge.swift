@@ -172,10 +172,10 @@ final class DavizinBridge {
         let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                if pairingRequired {
-                    NyxelActivityLog.record("iOS 27+ detectado — omitiendo kexploit, usando MCM + container_query directo")
-                } else if sandbox_access_is_active() == 0 {
-                    NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
+                if sandbox_access_is_active() != 0 {
+                    NyxelActivityLog.record("Sandbox ya activo, omitiendo kexploit")
+                } else {
+                    NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar (iOS27+: kexploit habilitado)...")
                     let exploitResult = kexploit_opa334()
                     guard exploitResult == 0 else {
                         let code = abs(exploitResult)
@@ -192,6 +192,10 @@ final class DavizinBridge {
                     let escapeResult = sandbox_escape(selfProc)
                     let sandboxActive = sandbox_access_is_active() != 0
                     NyxelActivityLog.record("Exploit pre-inyección: sandbox_escape=\(escapeResult), activo=\(sandboxActive)")
+
+                    let platResult = sandbox_set_platform_binary(selfProc)
+                    NyxelActivityLog.record("DIAG CS_PLATFORM_BINARY: result=\(platResult)")
+
                     guard escapeResult == 0 && sandboxActive else {
                         let message = "SBX-001 — El exploit terminó, pero el sandbox escape no quedó activo (\(escapeResult))."
                         DispatchQueue.main.async {
@@ -317,16 +321,6 @@ final class DavizinBridge {
                     patch: version.patch, build: NyxelSupportPolicy.currentBuild
                 )
 
-                if pairingRequired {
-                    NyxelActivityLog.record("iOS 27+ detectado — kexploit innecesario, acceso sandbox via container_query por operación")
-                    DispatchQueue.main.async {
-                        self.operationInFlight = false
-                        self.hapticFeedback(success: true)
-                        self.vc?.setOperationState(.succeeded("iOS 27+ — Sistema listo ✓"))
-                    }
-                    return
-                }
-
                 if !NyxelSupportPolicy.supportsKernelOffsets(
                     major: version.major,
                     minor: version.minor
@@ -367,6 +361,9 @@ final class DavizinBridge {
                 let escapeResult = sandbox_escape(selfProc)
                 let active = sandbox_access_is_active() != 0
                 NyxelActivityLog.record("sandbox_escape return=\(escapeResult), activo: \(active)")
+
+                let platResult = sandbox_set_platform_binary(selfProc)
+                NyxelActivityLog.record("DIAG CS_PLATFORM_BINARY: result=\(platResult)")
 
                 DispatchQueue.main.async {
                     self.operationInFlight = false
