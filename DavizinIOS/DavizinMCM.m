@@ -547,6 +547,40 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
         }
     }
 
+    // ── DIAGNOSTIC: Code signing identity and platform binary status ──
+    {
+        typedef CFTypeRef SecTaskRef_t;
+        SecTaskRef_t (*_stCreate)(CFAllocatorRef) =
+            (SecTaskRef_t (*)(CFAllocatorRef))dlsym(RTLD_DEFAULT, "SecTaskCreateFromSelf");
+        CFStringRef (*_stCopySign)(SecTaskRef_t, CFErrorRef *) =
+            (CFStringRef (*)(SecTaskRef_t, CFErrorRef *))dlsym(RTLD_DEFAULT, "SecTaskCopySigningIdentifier");
+        if (_stCreate && _stCopySign) {
+            SecTaskRef_t task = _stCreate(kCFAllocatorDefault);
+            if (task) {
+                CFErrorRef cfErr = NULL;
+                CFStringRef sid = _stCopySign(task, &cfErr);
+                const char *sidC = sid ? [(__bridge NSString *)sid UTF8String] : "nil";
+                _probeDiagAppend("sign_id=%s ", sidC);
+                if (sid) CFRelease(sid);
+                if (cfErr) CFRelease(cfErr);
+                CFRelease(task);
+            } else {
+                _probeDiagAppend("sign_id=no_task ");
+            }
+        } else {
+            _probeDiagAppend("sign_id=no_api ");
+        }
+        int (*_csops)(pid_t, unsigned int, void *, size_t) =
+            (int (*)(pid_t, unsigned int, void *, size_t))dlsym(RTLD_DEFAULT, "csops");
+        if (_csops) {
+            uint32_t csf = 0;
+            _csops(getpid(), 0, &csf, sizeof(csf));
+            _probeDiagAppend("cs=0x%x(v=%d p=%d a=%d) ",
+                csf, (csf & 0x1) != 0, (csf & 0x04000000) != 0, (csf & 0x2) != 0);
+        }
+        _probeDiagAppend("| ");
+    }
+
     // ── Strategy 0: sandbox_extension_issue_file (self-issued extension) ──
     // As com.apple.mobile.MobileHouseArrest, we may have entitlement to issue file extensions
     {
@@ -676,7 +710,8 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
                     char testFile[1200];
                     snprintf(testFile, sizeof(testFile), "%s/.mcm_implicit_test", pathC);
                     int fd = open(testFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                    _probeDiagAppend("1d:fd=%d ", fd);
+                    int fdErr = fd < 0 ? errno : 0;
+                    _probeDiagAppend("1d:fd=%d(e=%d) ", fd, fdErr);
                     if (fd >= 0) {
                         const char *payload = "implicitOK";
                         write(fd, payload, 10);
@@ -836,6 +871,55 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
         }
     }
 
+    // ── Strategy SYS: Basic system container query (no partDomain) — verify MCM trust ──
+    {
+        _probeDiagAppend("SSYS | ");
+        static const struct { uint64_t cls; const char *id; bool grp; const char *lbl; } sysQ[] = {
+            { 12, "com.apple.geod", false, "C12" },
+            { 13, "systemgroup.com.apple.mobilegestaltcache", true, "C13" },
+        };
+        for (int si = 0; si < 2; si++) {
+            if (!api->queryCreate) continue;
+            void *sq = api->queryCreate();
+            if (!sq) continue;
+            api->querySetClass(sq, sysQ[si].cls);
+            xpc_object_t sxid = xpc_string_create(sysQ[si].id);
+            if (sysQ[si].grp && api->querySetGroupIdentifiers)
+                api->querySetGroupIdentifiers(sq, sxid);
+            else
+                api->querySetIdentifiers(sq, sxid);
+            api->querySetFlags(sq, 0x900000000ULL);
+            if (api->querySetPart) api->querySetPart(sq, 0);
+            void *sres = api->queryGetSingle(sq);
+            if (sres) {
+                const char *sp = api->objectGetPath ? api->objectGetPath(sres) : NULL;
+                char *stok = api->objectCopyToken ? api->objectCopyToken(sres) : NULL;
+                bool sHasTok = stok && stok[0];
+                _probeDiagAppend("%s:p=%d t=%d ", sysQ[si].lbl, sp ? 1 : 0, sHasTok);
+                if (api->objectCopy && api->objectActivate) {
+                    void *sact = api->objectCopy(sres);
+                    if (sact) {
+                        bool sok = api->objectActivate(sact, false);
+                        _probeDiagAppend("a=%d ", sok);
+                        if (sp) {
+                            int sfd = open(sp, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+                            _probeDiagAppend("o=%d ", sfd >= 0 ? 1 : 0);
+                            if (sfd >= 0) close(sfd);
+                        }
+                        if (api->objectFree) api->objectFree(sact);
+                    }
+                }
+                free(stok);
+            } else {
+                void *sqErr = api->queryGetLastError ? api->queryGetLastError(sq) : NULL;
+                int spos = sqErr && api->errorGetPOSIX ? api->errorGetPOSIX(sqErr) : 0;
+                _probeDiagAppend("%s:null(e%d) ", sysQ[si].lbl, spos);
+            }
+            xpc_release(sxid);
+            api->queryFree(sq);
+        }
+    }
+
     // ── Strategy WQ: worse_query — scoped MCM partDomain traversal ──
     {
         _probeDiagAppend("SWQ:wq | ");
@@ -900,7 +984,9 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
                         if (api->objectFree) api->objectFree(act);
                     }
                 } else {
-                    _probeDiagAppend("WQ[%s]=null ", a->label);
+                    void *qErr = api->queryGetLastError ? api->queryGetLastError(q) : NULL;
+                    int posix = qErr && api->errorGetPOSIX ? api->errorGetPOSIX(qErr) : 0;
+                    _probeDiagAppend("WQ[%s]=null(e%d) ", a->label, posix);
                 }
 
                 xpc_release(xid);
@@ -964,7 +1050,9 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
                         if (api->objectFree) api->objectFree(act);
                     }
                 } else {
-                    _probeDiagAppend("WQp[%s]=null ", a->label);
+                    void *qErr = api->queryGetLastError ? api->queryGetLastError(q) : NULL;
+                    int posix = qErr && api->errorGetPOSIX ? api->errorGetPOSIX(qErr) : 0;
+                    _probeDiagAppend("WQp[%s]=null(e%d) ", a->label, posix);
                 }
 
                 xpc_release(xid);

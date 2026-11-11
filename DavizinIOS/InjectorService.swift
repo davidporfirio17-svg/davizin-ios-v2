@@ -144,6 +144,7 @@ private let kCacheBaseURL = "https://dz.davidporfirio17.workers.dev"
 
 class InjectorService {
     private static let mcmLookupQueue = DispatchQueue(label: "com.davizin.mcm-container-lookup", qos: .userInitiated)
+    private static var airLiftFailedOnce = false
 
     /// Bundle ID del contenedor segun el juego.
     private static func bundleID(for game: DavizinGame) -> String {
@@ -267,7 +268,10 @@ class InjectorService {
 
             // ── PASO B: AirLift via VPN (fallback) ──
             var airliftNote = "AirLift: no disponible"
-            if NixelAirLiftFileChannel.isAvailable {
+            if Self.airLiftFailedOnce {
+                airliftNote = "AirLift: skipped (failed previously in this session)"
+                NyxelActivityLog.record("DIAG AirLift write skipped (failed previously in this session)")
+            } else if NixelAirLiftFileChannel.isAvailable {
                 switch NixelAirLiftFileChannel.write(data, toRelativePath: relPath, bundleID: bundleID) {
                 case .success:
                     // VERIFICACIÓN: leer el archivo de vuelta para confirmar que aterrizó
@@ -290,6 +294,7 @@ class InjectorService {
                         return nil
                     }
                 case .failure(let error):
+                    Self.airLiftFailedOnce = true
                     airliftNote = "AirLift fallo: \(error.message)"
                     NyxelActivityLog.record("AirLift write fallo (\(relPath)): \(error.message); intentando bad_query fallback")
                 }
@@ -417,14 +422,17 @@ class InjectorService {
                 }
             }
 
-            if NixelAirLiftFileChannel.isAvailable {
+            if NixelAirLiftFileChannel.isAvailable && !Self.airLiftFailedOnce {
                 switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
                 case .success(let data):
                     NyxelActivityLog.record("DIAG read succeeded via AirLift fallback bytes=\(data.count)")
                     return data
                 case .failure(let error):
+                    Self.airLiftFailedOnce = true
                     NyxelActivityLog.record("DIAG AirLift fallback read also failed: \(error.message)")
                 }
+            } else if Self.airLiftFailedOnce {
+                NyxelActivityLog.record("DIAG AirLift read skipped (failed previously in this session)")
             }
 
             let detail = container.isEmpty ? "container vacio, sin bad_query ni AirLift" : "bad_query y AirLift fallaron"
