@@ -469,12 +469,16 @@ class InjectorService {
 
     static func isBundleAvailable(for game: DavizinGame) -> Bool {
         guard NyxelSupportPolicy.isCurrentSystemSupported else { return false }
+        var error: NSString?
+        if let container = DavizinGetContainerPath(bundleID(for: game), &error) {
+            if FileManager.default.fileExists(atPath: container) {
+                return true
+            }
+        }
         if requiresPairingTransportOnCurrentDevice() {
             return NixelAirLiftFileChannel.isAvailable
         }
-        var error: NSString?
-        guard let container = DavizinGetContainerPath(bundleID(for: game), &error) else { return false }
-        return FileManager.default.fileExists(atPath: container)
+        return false
     }
 
     /// Ruta del Worker para cada modo y juego (descarga desde KV).
@@ -611,9 +615,9 @@ class InjectorService {
             } else if NixelAirLiftFileChannel.isAvailable {
                 NyxelActivityLog.record("DIAG MCM+AirLift container lookup fallaron en iOS 27; continuando sin container local")
             } else {
-                let msg = mcmErr ?? "MCM fallo - container nil"
-                NyxelActivityLog.record("DIAG MCM fallo fatal: \(msg)")
-                return InjectorResult(success: false, message: msg)
+                let detail = mcmErr ?? "container_query devolvió nil"
+                NyxelActivityLog.record("DIAG MCM fallo en iOS 27+ sin AirLift: \(detail). El juego puede no estar instalado o MCM rechazó la consulta.")
+                return InjectorResult(success: false, message: "MCM-27: \(detail)")
             }
         } else if container == nil {
             let msg = mcmErr ?? "MCM fallo - container nil"

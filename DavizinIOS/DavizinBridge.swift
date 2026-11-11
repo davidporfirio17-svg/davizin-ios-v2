@@ -172,7 +172,9 @@ final class DavizinBridge {
         let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                if sandbox_access_is_active() == 0 {
+                if pairingRequired {
+                    NyxelActivityLog.record("iOS 27+ detectado — omitiendo kexploit, usando MCM + container_query directo")
+                } else if sandbox_access_is_active() == 0 {
                     NyxelActivityLog.record("Sandbox no activo, ejecutando exploit antes de inyectar...")
                     let exploitResult = kexploit_opa334()
                     guard exploitResult == 0 else {
