@@ -578,6 +578,34 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
             _probeDiagAppend("cs=0x%x(v=%d p=%d a=%d) ",
                 csf, (csf & 0x1) != 0, (csf & 0x04000000) != 0, (csf & 0x2) != 0);
         }
+        // Check which entitlements the kernel actually honors for this process
+        typedef CFTypeRef SecTaskRef_t2;
+        SecTaskRef_t2 (*_stCreate2)(CFAllocatorRef) =
+            (SecTaskRef_t2 (*)(CFAllocatorRef))dlsym(RTLD_DEFAULT, "SecTaskCreateFromSelf");
+        CFTypeRef (*_stCopyEnt)(SecTaskRef_t2, CFStringRef, CFErrorRef *) =
+            (CFTypeRef (*)(SecTaskRef_t2, CFStringRef, CFErrorRef *))dlsym(RTLD_DEFAULT, "SecTaskCopyValueForEntitlement");
+        if (_stCreate2 && _stCopyEnt) {
+            SecTaskRef_t2 task2 = _stCreate2(kCFAllocatorDefault);
+            if (task2) {
+                static const char *ekeys[] = {
+                    "com.apple.private.security.container-manager",
+                    "com.apple.private.security.storage.AppDataContainers",
+                    "com.apple.private.MobileContainerManager.allowed",
+                    "platform-application",
+                    "com.apple.private.security.no-container",
+                };
+                static const char *elabels[] = { "cm", "adc", "mcm", "pa", "nc" };
+                _probeDiagAppend("ent:");
+                for (int ei = 0; ei < 5; ei++) {
+                    CFStringRef ekey = CFStringCreateWithCString(kCFAllocatorDefault, ekeys[ei], kCFStringEncodingUTF8);
+                    CFTypeRef eval = _stCopyEnt(task2, ekey, NULL);
+                    _probeDiagAppend("%s=%d ", elabels[ei], eval ? 1 : 0);
+                    if (eval) CFRelease(eval);
+                    CFRelease(ekey);
+                }
+                CFRelease(task2);
+            }
+        }
         _probeDiagAppend("| ");
     }
 
@@ -905,6 +933,28 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
                             int sfd = open(sp, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
                             _probeDiagAppend("o=%d ", sfd >= 0 ? 1 : 0);
                             if (sfd >= 0) close(sfd);
+                            // Write test: try creating a temp file in this container
+                            char wtest[1024];
+                            snprintf(wtest, sizeof(wtest), "%s/.davizin_wtest", sp);
+                            int wfd = open(wtest, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+                            _probeDiagAppend("w=%d ", wfd >= 0 ? 1 : 0);
+                            if (wfd >= 0) { close(wfd); unlink(wtest); }
+                            // After activating system container, test if target app container opens
+                            int tfd = open(pathC, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+                            _probeDiagAppend("tgt=%d ", tfd >= 0 ? 1 : 0);
+                            if (tfd >= 0) {
+                                close(tfd);
+                                if (_mcmProbeCanWrite(pathC)) {
+                                    result.method = 8; result.handle = 0; result.writeOK = YES;
+                                    snprintf(result.detail, sizeof(result.detail),
+                                             "SSYS %s pivot → target WRITE OK", sysQ[si].lbl);
+                                    _probeDiagAppend("*** SUCCESS SSYS-pivot ***");
+                                    _storeLease(api, sq, sact, sysQ[si].id, sp);
+                                    free(stok);
+                                    xpc_release(sxid);
+                                    return result;
+                                }
+                            }
                         }
                         if (api->objectFree) api->objectFree(sact);
                     }
