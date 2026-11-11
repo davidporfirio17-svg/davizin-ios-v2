@@ -500,6 +500,9 @@ final class DavizinBridge {
         case 56: return "Escritura kernel setsockopt falló"
         case 61: return "Socket addr no encontrado"
         case 62: return "Kernel base no encontrado (scan agotado)"
+        case 65: return "PCB de control inválido"
+        case 66: return "Puntero pcbinfo inválido (offsets incorrectos?)"
+        case 67: return "ipi_zone inválido (offsets incorrectos?)"
         case 81: return "OOB read VM map falló"
         case 82: return "OOB write VM map falló"
         default:
