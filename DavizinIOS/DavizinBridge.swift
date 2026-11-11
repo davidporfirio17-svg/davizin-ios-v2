@@ -504,7 +504,7 @@ final class DavizinBridge {
         case 31: return "VM alloc falló (pe_v2)"
         case 32: return "VM alloc search falló (pe_v2)"
         case 33: return "Memory entry falló (pe_v2)"
-        case 34: return "Timeout pe_v2 (race no ganó en 90s)"
+        case 34: return "Timeout pe_v2 (race no ganó en 600s)"
         case 41: return "Socket corrupt getsockopt falló"
         case 51: return "Control setsockopt falló"
         case 52: return "Target setsockopt falló"
