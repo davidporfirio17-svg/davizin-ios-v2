@@ -312,6 +312,21 @@ final class DavizinBridge {
                 guard let self else { return }
 
                 let version = NyxelDeviceInfo.versionTuple
+                let pairingRequired = NyxelSupportPolicy.requiresPairingTunnel(
+                    major: version.major, minor: version.minor,
+                    patch: version.patch, build: NyxelSupportPolicy.currentBuild
+                )
+
+                if pairingRequired {
+                    NyxelActivityLog.record("iOS 27+ detectado — kexploit innecesario, acceso sandbox via container_query por operación")
+                    DispatchQueue.main.async {
+                        self.operationInFlight = false
+                        self.hapticFeedback(success: true)
+                        self.vc?.setOperationState(.succeeded("iOS 27+ — Sistema listo ✓"))
+                    }
+                    return
+                }
+
                 if !NyxelSupportPolicy.supportsKernelOffsets(
                     major: version.major,
                     minor: version.minor

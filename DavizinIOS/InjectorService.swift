@@ -394,43 +394,42 @@ class InjectorService {
 
         NyxelActivityLog.record("DIAG readFromContainer relPath=\(relPath) pairingRequired=\(pairingRequired)")
 
-        // --- iOS 27+: AirLift primero, fallback a bad_query + lectura directa ---
+        // --- iOS 27+: bad_query + lectura directa PRIMERO, AirLift como fallback ---
         if pairingRequired {
-            if NixelAirLiftFileChannel.isAvailable {
-                switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
-                case .success(let data):
-                    NyxelActivityLog.record("DIAG read succeeded via AirLift bytes=\(data.count)")
+            if !container.isEmpty {
+                NyxelActivityLog.record("DIAG iOS 27+ bad_query read directo para \(relPath)")
+                let handleRoot = DavizinGrantContainerAccess(container)
+                let handleDir = DavizinGrantContainerAccess(parentDir)
+                let handleFile = DavizinGrantContainerAccess(fullPath)
+                let url = URL(fileURLWithPath: fullPath)
+                do {
+                    let data = try Data(contentsOf: url)
+                    DavizinReleaseContainerGrant(handleFile)
+                    DavizinReleaseContainerGrant(handleDir)
+                    DavizinReleaseContainerGrant(handleRoot)
+                    NyxelActivityLog.record("DIAG iOS 27+ bad_query read OK bytes=\(data.count)")
                     return data
-                case .failure(let error):
-                    NyxelActivityLog.record("DIAG AirLift read failed, trying bad_query fallback: \(error.message)")
+                } catch {
+                    DavizinReleaseContainerGrant(handleFile)
+                    DavizinReleaseContainerGrant(handleDir)
+                    DavizinReleaseContainerGrant(handleRoot)
+                    NyxelActivityLog.record("DIAG iOS 27+ bad_query read failed: \(error.localizedDescription), trying AirLift fallback")
                 }
             }
 
-            guard !container.isEmpty else {
-                NyxelActivityLog.record("DIAG bad_query read fallback omitido: container vacio")
-                onFailure?("AirLift read fallo y no hay container para bad_query fallback")
-                return nil
-            }
-            NyxelActivityLog.record("DIAG iOS 27+ bad_query read fallback para \(relPath)")
-            let handleRoot = DavizinGrantContainerAccess(container)
-            let handleDir = DavizinGrantContainerAccess(parentDir)
-            let handleFile = DavizinGrantContainerAccess(fullPath)
-            defer {
-                DavizinReleaseContainerGrant(handleFile)
-                DavizinReleaseContainerGrant(handleDir)
-                DavizinReleaseContainerGrant(handleRoot)
+            if NixelAirLiftFileChannel.isAvailable {
+                switch NixelAirLiftFileChannel.read(relativePath: relPath, bundleID: bundleID) {
+                case .success(let data):
+                    NyxelActivityLog.record("DIAG read succeeded via AirLift fallback bytes=\(data.count)")
+                    return data
+                case .failure(let error):
+                    NyxelActivityLog.record("DIAG AirLift fallback read also failed: \(error.message)")
+                }
             }
 
-            let url = URL(fileURLWithPath: fullPath)
-            do {
-                let data = try Data(contentsOf: url)
-                NyxelActivityLog.record("DIAG iOS 27+ bad_query read OK bytes=\(data.count)")
-                return data
-            } catch {
-                NyxelActivityLog.record("DIAG iOS 27+ bad_query read FAILED: \(error.localizedDescription)")
-                onFailure?(error.localizedDescription)
-                return nil
-            }
+            let detail = container.isEmpty ? "container vacio, sin bad_query ni AirLift" : "bad_query y AirLift fallaron"
+            onFailure?(detail)
+            return nil
         }
 
         // --- iOS <= 26: intentar AirLift, fallback a lectura directa ---
