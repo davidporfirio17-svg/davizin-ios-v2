@@ -43,6 +43,28 @@ struct FreeFireLookupSummary {
     let warnings: [String]
 }
 
+struct FreeFireClothingItem: Decodable {
+    let id: String
+    let name: String
+    let category: String
+}
+
+enum FreeFireClothingCatalog {
+    // Metadata: https://github.com/0xMe/ItemID2 (MIT); game content remains Garena property.
+    private static let itemsByID: [String: FreeFireClothingItem] = {
+        guard let url = Bundle.main.url(forResource: "FreeFireClothingCatalog", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let items = try? JSONDecoder().decode([FreeFireClothingItem].self, from: data) else {
+            return [:]
+        }
+        return Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }()
+
+    static func item(for id: String) -> FreeFireClothingItem? {
+        itemsByID[id]
+    }
+}
+
 private enum FreeFireStatsError: LocalizedError {
     case service(String)
     case invalidResponse

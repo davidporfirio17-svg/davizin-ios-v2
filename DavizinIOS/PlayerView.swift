@@ -96,10 +96,10 @@ final class PlayerView: UIView {
         seasonValueLabel.text = summary.season ?? "—"
 
         brPointsLabel.text = Self.formatted(summary.brPoints) ?? "—"
-        brCodeLabel.text = "Rango / código  \(summary.brRankCode ?? "—")"
+        brCodeLabel.text = "Código del API  \(summary.brRankCode ?? "—")"
         brSeasonLabel.text = summary.season.map { "Temporada \($0) · dato del API" } ?? "Puntos de Battle Royale"
         csPointsLabel.text = Self.formatted(summary.csPoints) ?? "—"
-        csCodeLabel.text = "Rango / código  \(summary.csRankCode ?? "—")"
+        csCodeLabel.text = "Código del API  \(summary.csRankCode ?? "—")"
         csSeasonLabel.text = summary.season.map { "Temporada \($0) · dato del API" } ?? "Puntos de Clash Squad"
 
         let statsByKey = Dictionary(uniqueKeysWithValues: summary.modes.map { ($0.key, $0) })
@@ -377,7 +377,7 @@ final class PlayerView: UIView {
             makeRankCard(title: "BATTLE ROYALE", symbol: "shield.lefthalf.filled", points: brPointsLabel, code: brCodeLabel, season: brSeasonLabel),
             makeRankCard(title: "CLASH SQUAD", symbol: "bolt.shield.fill", points: csPointsLabel, code: csCodeLabel, season: csSeasonLabel)
         ], axis: isPad ? .horizontal : .vertical)
-        contentStack.addArrangedSubview(sectionHeading("RANGOS Y PUNTOS", subtitle: "Códigos y valores tal como los entrega el API"))
+        contentStack.addArrangedSubview(sectionHeading("RANGOS Y PUNTOS", subtitle: "Puntos y códigos del API; no hay un mapeo fiable del código a una insignia vigente"))
         contentStack.addArrangedSubview(rankRow)
 
         let modeRow = row([
@@ -424,7 +424,7 @@ final class PlayerView: UIView {
         contentStack.addArrangedSubview(makeInfoCard(title: "CLAN", symbol: "person.3.sequence.fill", label: clanLabel))
         contentStack.addArrangedSubview(makeInfoCard(title: "FIRMA", symbol: "quote.opening", label: signatureLabel))
 
-        contentStack.addArrangedSubview(sectionHeading("ROPA Y ASSETS", subtitle: "Imágenes reales cargadas desde el servicio oficial de assets del API"))
+        contentStack.addArrangedSubview(sectionHeading("ROPA Y ASSETS", subtitle: "Imágenes del servicio Free Fire Community y nombres de un catálogo comunitario"))
         contentStack.addArrangedSubview(makeOutfitCard())
     }
 
@@ -546,7 +546,7 @@ final class PlayerView: UIView {
         outfitGridStack.alignment = .fill
         outfitGridStack.distribution = .fill
         outfitGridStack.spacing = 9
-        let note = label("Se muestran todos los objetos de ropa que devuelve el API. La respuesta no especifica si cada imagen corresponde a pecho, pantalón, calzado o maquillaje.", size: 10, weight: .regular, color: AppTheme.secondaryText)
+        let note = label("Se muestran todos los objetos devueltos. Nombres y tipos provienen de un catálogo comunitario y pueden no estar actualizados.", size: 10, weight: .regular, color: AppTheme.secondaryText)
         note.numberOfLines = 0
         let stack = UIStackView(arrangedSubviews: [outfitGridStack, note])
         stack.axis = .vertical
@@ -590,6 +590,7 @@ final class PlayerView: UIView {
     }
 
     private func makeOutfitCell(itemID: String, generation: Int) -> UIView {
+        let metadata = FreeFireClothingCatalog.item(for: itemID)
         let cell = UIView()
         cell.translatesAutoresizingMaskIntoConstraints = false
         cell.backgroundColor = AppTheme.background.withAlphaComponent(0.52)
@@ -604,25 +605,71 @@ final class PlayerView: UIView {
         image.tintColor = AppTheme.tertiaryText
         cell.addSubview(image)
 
-        let caption = label("ID \(itemID)", size: 8, weight: .bold, color: AppTheme.tertiaryText)
-        caption.translatesAutoresizingMaskIntoConstraints = false
-        caption.textAlignment = .center
-        caption.lineBreakMode = .byTruncatingMiddle
-        cell.addSubview(caption)
+        let nameLabel = label(metadata?.name ?? "Prenda sin nombre en catálogo", size: 9, weight: .semibold, color: AppTheme.primaryText)
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        nameLabel.textAlignment = .center
+        nameLabel.numberOfLines = 2
+        nameLabel.lineBreakMode = .byTruncatingTail
+        cell.addSubview(nameLabel)
+
+        let categoryLabel = label(metadata?.category ?? "Tipo no identificado", size: 8, weight: .bold, color: AppTheme.readableAccent)
+        categoryLabel.translatesAutoresizingMaskIntoConstraints = false
+        categoryLabel.textAlignment = .center
+        categoryLabel.lineBreakMode = .byTruncatingTail
+        cell.addSubview(categoryLabel)
+
+        let idLabel = label("ID \(itemID)", size: 7, weight: .medium, color: AppTheme.tertiaryText)
+        idLabel.translatesAutoresizingMaskIntoConstraints = false
+        idLabel.textAlignment = .center
+        cell.addSubview(idLabel)
+
+        let imageStatusLabel = label("Imagen no disponible", size: 7, weight: .medium, color: AppTheme.accentWarm)
+        imageStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        imageStatusLabel.textAlignment = .center
+        imageStatusLabel.isHidden = true
+        cell.addSubview(imageStatusLabel)
+
+        let spinner = UIActivityIndicatorView(style: .medium)
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        spinner.color = AppTheme.readableAccent
+        spinner.hidesWhenStopped = true
+        spinner.startAnimating()
+        cell.addSubview(spinner)
 
         NSLayoutConstraint.activate([
-            cell.heightAnchor.constraint(equalToConstant: isPad ? 118 : 100),
+            cell.heightAnchor.constraint(equalToConstant: isPad ? 148 : 136),
             image.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 5),
             image.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -5),
             image.topAnchor.constraint(equalTo: cell.topAnchor, constant: 5),
-            image.bottomAnchor.constraint(equalTo: caption.topAnchor, constant: -2),
-            caption.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 3),
-            caption.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -3),
-            caption.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -5),
-            caption.heightAnchor.constraint(equalToConstant: 11)
+            image.bottomAnchor.constraint(equalTo: nameLabel.topAnchor, constant: -2),
+            nameLabel.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 3),
+            nameLabel.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -3),
+            nameLabel.heightAnchor.constraint(equalToConstant: 27),
+            categoryLabel.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 3),
+            categoryLabel.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -3),
+            categoryLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 1),
+            categoryLabel.heightAnchor.constraint(equalToConstant: 11),
+            idLabel.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 3),
+            idLabel.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -3),
+            idLabel.topAnchor.constraint(equalTo: categoryLabel.bottomAnchor, constant: 1),
+            idLabel.heightAnchor.constraint(equalToConstant: 9),
+            imageStatusLabel.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 3),
+            imageStatusLabel.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -3),
+            imageStatusLabel.topAnchor.constraint(equalTo: idLabel.bottomAnchor, constant: 1),
+            imageStatusLabel.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -3),
+            spinner.centerXAnchor.constraint(equalTo: image.centerXAnchor),
+            spinner.centerYAnchor.constraint(equalTo: image.centerYAnchor)
         ])
 
-        requestAsset(itemID, into: image, generation: generation)
+        cell.accessibilityLabel = "\(metadata?.name ?? "Prenda sin nombre"), \(metadata?.category ?? "tipo no identificado"), ID \(itemID)"
+        requestAsset(itemID, into: image, generation: generation) { imageLoaded in
+            spinner.stopAnimating()
+            imageStatusLabel.isHidden = imageLoaded
+            if !imageLoaded {
+                image.image = UIImage(systemName: "photo.badge.exclamationmark")
+                image.tintColor = AppTheme.accentWarm
+            }
+        }
         return cell
     }
 
@@ -696,16 +743,23 @@ final class PlayerView: UIView {
         return label
     }
 
-    private func requestAsset(_ itemID: String?, into imageView: UIImageView, generation: Int) {
+    private func requestAsset(_ itemID: String?, into imageView: UIImageView, generation: Int, completion: ((Bool) -> Void)? = nil) {
         guard let itemID, !itemID.isEmpty else {
             imageView.image = UIImage(systemName: imageView === avatarImageView ? "person.crop.square.fill" : "sparkles")
+            completion?(false)
             return
         }
         imageView.image = UIImage(systemName: imageView === avatarImageView ? "person.crop.square.fill" : "photo")
-        guard let onAssetRequested else { return }
+        guard let onAssetRequested else {
+            completion?(false)
+            return
+        }
         onAssetRequested(itemID) { [weak self, weak imageView] image in
-            guard let self, self.renderGeneration == generation, let image else { return }
-            imageView?.image = image
+            guard let self, self.renderGeneration == generation else { return }
+            if let image {
+                imageView?.image = image
+            }
+            completion?(image != nil)
         }
     }
 
