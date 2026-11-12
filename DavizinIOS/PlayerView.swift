@@ -3,6 +3,7 @@ import UIKit
 final class PlayerView: UIView {
     var onLookupRequested: ((String, String) -> Void)?
     var onAssetRequested: ((String, @escaping (UIImage?) -> Void) -> Void)?
+    var onBanCheckRequested: ((String, @escaping (Result<FreeFireBanCheck, Error>) -> Void) -> Void)?
 
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
@@ -36,6 +37,8 @@ final class PlayerView: UIView {
     private let duoStatsLabel = UILabel()
     private let squadStatsLabel = UILabel()
     private let statsStatusLabel = UILabel()
+    private let banCheckStatusLabel = UILabel()
+    private let banCheckButton = UIButton(type: .system)
     private let clanLabel = UILabel()
     private let signatureLabel = UILabel()
     private let outfitImages = (0..<4).map { _ in UIImageView() }
@@ -81,6 +84,8 @@ final class PlayerView: UIView {
             .compactMap { $0 }
             .joined(separator: "  ·  ")
         heroUIDLabel.text = "UID  \(summary.uid)"
+        banCheckStatusLabel.text = "Estado sin consultar para este UID."
+        banCheckStatusLabel.textColor = AppTheme.secondaryText
         copyUIDButton.isHidden = summary.uid.isEmpty
         heroLevelPill.text = summary.level.map { "NIVEL \($0)" } ?? "PERFIL PÚBLICO"
         heroRegionPill.text = summary.region?.uppercased() ?? "FREE FIRE"
@@ -377,6 +382,9 @@ final class PlayerView: UIView {
         contentStack.addArrangedSubview(statsStatusLabel)
         contentStack.addArrangedSubview(modeRow)
 
+        contentStack.addArrangedSubview(sectionHeading("ESTADO DE LA CUENTA", subtitle: "Ban Check · consulta manual · información del proveedor"))
+        contentStack.addArrangedSubview(makeBanCheckCard())
+
         contentStack.addArrangedSubview(sectionHeading("CLAN Y PERFIL", subtitle: "Información pública asociada al UID"))
         contentStack.addArrangedSubview(makeInfoCard(title: "CLAN", symbol: "person.3.sequence.fill", label: clanLabel))
         contentStack.addArrangedSubview(makeInfoCard(title: "FIRMA", symbol: "quote.opening", label: signatureLabel))
@@ -548,6 +556,35 @@ final class PlayerView: UIView {
         return card
     }
 
+    private func makeBanCheckCard() -> UIView {
+        let card = DavizinCardView()
+        card.useTransparentAppearance()
+        card.contentInsets = UIEdgeInsets(top: 15, left: 16, bottom: 15, right: 16)
+
+        let note = label("Consulta de solo lectura. El resultado no es una verificación oficial de Garena.", size: 10, weight: .regular, color: AppTheme.secondaryText)
+        note.numberOfLines = 0
+
+        banCheckButton.setTitle("CONSULTAR ESTADO DE CUENTA", for: .normal)
+        banCheckButton.setTitleColor(AppTheme.accentForeground, for: .normal)
+        banCheckButton.titleLabel?.font = .systemFont(ofSize: 10, weight: .heavy)
+        banCheckButton.backgroundColor = AppTheme.readableAccent
+        banCheckButton.layer.cornerRadius = 11
+        banCheckButton.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        banCheckButton.addTarget(self, action: #selector(banCheckTapped), for: .touchUpInside)
+        banCheckButton.accessibilityLabel = "Consultar estado de baneo reportado por el proveedor"
+
+        banCheckStatusLabel.text = "La consulta se ejecuta solo cuando tocas el botón."
+        banCheckStatusLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        banCheckStatusLabel.textColor = AppTheme.secondaryText
+        banCheckStatusLabel.numberOfLines = 0
+
+        let stack = UIStackView(arrangedSubviews: [note, banCheckButton, banCheckStatusLabel])
+        stack.axis = .vertical
+        stack.spacing = 10
+        card.addContent(stack)
+        return card
+    }
+
     private func sectionHeading(_ title: String, subtitle: String) -> UIView {
         let heading = label(title, size: 11, weight: .heavy, color: AppTheme.readableAccent)
         let note = label(subtitle, size: 10, weight: .regular, color: AppTheme.secondaryText)
@@ -641,5 +678,49 @@ final class PlayerView: UIView {
         UIPasteboard.general.string = value
         setLookupLoading(false, message: "UID copiado al portapapeles.")
         statusLabel.textColor = AppTheme.success
+    }
+
+    @objc private func banCheckTapped() {
+        endEditing(true)
+        let uid = (uidField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard uid.range(of: "^\\d{5,15}$", options: .regularExpression) != nil else {
+            banCheckStatusLabel.text = "Escribe un UID numérico válido de 5 a 15 dígitos."
+            banCheckStatusLabel.textColor = AppTheme.accentWarm
+            return
+        }
+        guard let onBanCheckRequested else {
+            banCheckStatusLabel.text = "La consulta Ban Check aún no está conectada."
+            banCheckStatusLabel.textColor = AppTheme.accentWarm
+            return
+        }
+
+        banCheckButton.isEnabled = false
+        banCheckButton.alpha = 0.62
+        banCheckButton.setTitle("CONSULTANDO…", for: .normal)
+        banCheckStatusLabel.text = "Validando sesión de Nyxel y consultando al proveedor…"
+        banCheckStatusLabel.textColor = AppTheme.readableAccent
+        onBanCheckRequested(uid) { [weak self] result in
+            guard let self else { return }
+            self.banCheckButton.isEnabled = true
+            self.banCheckButton.alpha = 1
+            self.banCheckButton.setTitle("CONSULTAR ESTADO DE CUENTA", for: .normal)
+            switch result {
+            case .success(let result):
+                if result.isBanned {
+                    var message = "El proveedor reporta un baneo activo."
+                    if let period = result.period {
+                        message += "\nValor de período (tal como lo devuelve la API): \(period)"
+                    }
+                    self.banCheckStatusLabel.text = message
+                    self.banCheckStatusLabel.textColor = AppTheme.accentWarm
+                } else {
+                    self.banCheckStatusLabel.text = "El proveedor no reporta un baneo activo. Esto no garantiza el estado oficial de la cuenta."
+                    self.banCheckStatusLabel.textColor = AppTheme.success
+                }
+            case .failure(let error):
+                self.banCheckStatusLabel.text = "No se pudo consultar: \(error.localizedDescription)"
+                self.banCheckStatusLabel.textColor = AppTheme.accentWarm
+            }
+        }
     }
 }

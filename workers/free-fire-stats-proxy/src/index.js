@@ -4,6 +4,7 @@ const NYXEL_CHECK_URL = "https://dz.davidporfirio17.workers.dev/check";
 const SUPPORTED_REGIONS = new Set(["sg", "ind", "br"]);
 const CACHE_TTL_SECONDS = 300;
 const ASSET_CACHE_TTL_SECONDS = 86400;
+const BAN_CHECK_CACHE_TTL_SECONDS = 60;
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -177,6 +178,81 @@ async function fetchFreeFireAsset(itemID, apiKey) {
   }
 }
 
+async function fetchFreeFireBanCheck(uid, apiKey) {
+  try {
+    const url = new URL(`${FREE_FIRE_API}/bancheck`);
+    url.searchParams.set("uid", uid);
+    url.searchParams.set("lang", "es");
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        "User-Agent": FREE_FIRE_USER_AGENT,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+    const rawBody = await response.text();
+    let body = null;
+    try {
+      body = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      body = null;
+    }
+    if (!response.ok || body?.status === "error") {
+      const status = response.status >= 400 ? response.status : 502;
+      const rawMessage = rawBody.replaceAll(apiKey, "[redacted]").trim().slice(0, 180);
+      let message = String(body?.message || body?.error || rawMessage || `Error ${status} del proveedor.`)
+        .replaceAll(apiKey, "[redacted]");
+      if (status === 429) message = "El proveedor limitó las consultas. Espera antes de volver a intentarlo.";
+      return { ok: false, status, message };
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return { ok: false, status: 502, message: "El proveedor devolvió una respuesta de Ban Check no válida." };
+    }
+    return { ok: true, data: body?.data ?? body };
+  } catch {
+    return { ok: false, status: 502, message: "No hubo respuesta del proveedor para el estado de baneo." };
+  }
+}
+
+async function handleBanCheckRequest(payload, request, env, ctx) {
+  const uid = String(payload.uid || "").trim();
+  if (!/^\d{5,15}$/.test(uid)) {
+    return json({ success: false, message: "El UID debe tener entre 5 y 15 dígitos." }, 400, corsHeaders());
+  }
+
+  const auth = await validateNyxelKey(payload, request, env);
+  if (!auth.ok) return json({ success: false, code: "NYXEL_AUTH", message: auth.message }, auth.status, corsHeaders());
+
+  const cacheKey = new Request(`https://ff-bancheck-cache.invalid/bancheck?uid=${encodeURIComponent(uid)}&lang=es`);
+  let cache = null;
+  try {
+    cache = caches.default;
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+      const data = await parseJson(cached);
+      return json({ success: true, data, cached: true }, 200, corsHeaders());
+    }
+  } catch {
+    cache = null;
+  }
+
+  const result = await fetchFreeFireBanCheck(uid, env.FREE_FIRE_API_KEY);
+  if (!result.ok) {
+    return json({ success: false, code: "BAN_CHECK_ERROR", message: result.message }, result.status >= 400 && result.status < 600 ? result.status : 502, corsHeaders());
+  }
+
+  const cacheResponse = new Response(JSON.stringify(result.data), {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": `public, max-age=${BAN_CHECK_CACHE_TTL_SECONDS}`,
+    },
+  });
+  if (cache) ctx.waitUntil(cache.put(cacheKey, cacheResponse).catch(() => {}));
+  return json({ success: true, data: result.data, cached: false }, 200, corsHeaders());
+}
+
 async function handleAssetRequest(payload, request, env, ctx) {
   const itemID = String(payload.item_id || payload.itemID || "").trim();
   if (!/^\d{5,15}$/.test(itemID)) {
@@ -229,7 +305,7 @@ export default {
     if (request.method === "GET" && url.pathname === "/health") {
       return json({ ok: true, apiKeyConfigured: Boolean(env.FREE_FIRE_API_KEY) });
     }
-    if (request.method !== "POST" || !["/lookup", "/asset"].includes(url.pathname)) {
+    if (request.method !== "POST" || !["/lookup", "/asset", "/bancheck"].includes(url.pathname)) {
       return json({ success: false, message: "Ruta no encontrada." }, 404);
     }
     if (!env.FREE_FIRE_API_KEY) {
@@ -245,6 +321,9 @@ export default {
 
     if (url.pathname === "/asset") {
       return handleAssetRequest(payload, request, env, ctx);
+    }
+    if (url.pathname === "/bancheck") {
+      return handleBanCheckRequest(payload, request, env, ctx);
     }
 
     const uid = String(payload.uid || "").trim();

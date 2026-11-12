@@ -11,6 +11,7 @@ final class ViewController: UIViewController {
     var onOperation: ((DavizinOperationKind) -> Void)?
     var onFreeFireLookup: ((String, String) -> Void)?
     var onFreeFireAsset: ((String, @escaping (UIImage?) -> Void) -> Void)?
+    var onFreeFireBanCheck: ((String, @escaping (Result<FreeFireBanCheck, Error>) -> Void) -> Void)?
     var onClose: (() -> Void)?
 
     private let videoBackgroundView = DavizinLoginVideoView()
@@ -599,6 +600,13 @@ final class ViewController: UIViewController {
                 return
             }
             onFreeFireAsset(itemID, completion)
+        }
+        screen.onBanCheckRequested = { [weak self] uid, completion in
+            guard let self, let onFreeFireBanCheck = self.onFreeFireBanCheck else {
+                completion(.failure(NSError(domain: "FreeFireBanCheck", code: 1, userInfo: [NSLocalizedDescriptionKey: "La consulta Ban Check no está conectada."])))
+                return
+            }
+            onFreeFireBanCheck(uid, completion)
         }
         playerView = screen
         display(screen, animated: animated)

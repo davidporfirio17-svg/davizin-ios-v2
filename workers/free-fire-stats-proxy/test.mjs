@@ -26,7 +26,14 @@ globalThis.fetch = async (input, init = {}) => {
   assert.equal(userAgent, "NyxelExternal/1.5 (+https://nyxel-freefire-stats.davidporfirio17.workers.dev)");
   assert.ok(userAgent.length >= 10);
   assert.ok(!/python|requests|aiohttp|httpx|urllib|node-fetch|axios|got|undici|okhttp|java|curl|wget|bot|crawl|spider|scrapy|puppeteer|playwright|selenium|postman|insomnia|httpie/i.test(userAgent));
-  upstreamCalls.push({ path: url.pathname, apiKey: headers.get("x-api-key"), itemID: url.searchParams.get("itemID") });
+  upstreamCalls.push({
+    path: url.pathname,
+    apiKey: headers.get("x-api-key"),
+    itemID: url.searchParams.get("itemID"),
+    uid: url.searchParams.get("uid"),
+    region: url.searchParams.get("region"),
+    lang: url.searchParams.get("lang"),
+  });
 
   if (url.pathname.endsWith("/image")) {
     if (providerMode === "asset-missing") return Response.json({ error: "Item not found" }, { status: 404 });
@@ -35,6 +42,10 @@ globalThis.fetch = async (input, init = {}) => {
       status: 200,
       headers: { "Content-Type": "image/png" },
     });
+  }
+  if (url.pathname.endsWith("/bancheck")) {
+    if (providerMode === "bancheck-fails") return Response.json({ status: "error", message: "Ban check unavailable" }, { status: 502 });
+    return Response.json({ status: "success", data: { is_banned: 0, period: 0 } });
   }
   if (providerMode === "non-json") return new Response("not-json", { status: 200 });
   if (providerMode === "rate-limit") {
@@ -99,6 +110,20 @@ function makeAssetRequest(itemID, overrides = {}) {
   });
 }
 
+function makeBanCheckRequest(overrides = {}) {
+  const payload = { uid: "665951869", ...securityPayload(), ...overrides };
+  return new Request("https://nyxel-freefire-stats.davidporfirio17.workers.dev/bancheck", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-DZ-Build": "5",
+      "X-DZ-Installation": "install-test",
+      "X-DZ-Session": "session-test",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 const env = {
   FREE_FIRE_API_KEY: "local-test-secret",
   DZ_WORKER: {
@@ -126,29 +151,45 @@ assert.equal(result.success, true);
 assert.equal(result.data.profile.name, "TestPlayer");
 assert.equal(result.data.stats.solo.kd, 6.97);
 assert.equal(upstreamCalls.length, 2);
+const callsAfterInitialLookup = upstreamCalls.length;
 assert.ok(upstreamCalls.every((call) => call.apiKey === "local-test-secret"));
 assert.ok(!JSON.stringify(result).includes("local-test-secret"));
+
+const banCheck = await worker.fetch(makeBanCheckRequest(), env, ctx);
+assert.equal(banCheck.status, 200);
+assert.deepEqual((await banCheck.json()).data, { is_banned: 0, period: 0 });
+assert.equal(upstreamCalls.at(-1).path, "/api/v1/bancheck");
+assert.equal(upstreamCalls.at(-1).uid, "665951869");
+assert.equal(upstreamCalls.at(-1).lang, "es");
+assert.equal(upstreamCalls.at(-1).region, null, "BanCheck uses UID and lang, without region");
+const callsAfterBanCheck = upstreamCalls.length;
+const cachedBanCheck = await worker.fetch(makeBanCheckRequest(), env, ctx);
+assert.equal(cachedBanCheck.status, 200);
+assert.equal((await cachedBanCheck.json()).cached, true);
+assert.equal(upstreamCalls.length, callsAfterBanCheck, "a recent BanCheck result should be served from cache");
 
 const cached = await worker.fetch(makeRequest(), env, ctx);
 assert.equal(cached.status, 200);
 assert.equal((await cached.json()).cached, true);
-assert.equal(upstreamCalls.length, 2, "the cached lookup must not call the provider again");
+assert.equal(upstreamCalls.length, callsAfterBanCheck, "the cached lookup must not call the provider again");
 
 for (const uid of ["64466722", "12345", "123456789012345"]) {
   const response = await worker.fetch(makeRequest({ uid }), env, ctx);
   assert.equal(response.status, 200, `UID ${uid.length} digits should be accepted`);
   assert.equal((await response.json()).success, true);
 }
-assert.equal(upstreamCalls.length, 8, "the 8-digit UID and documented 5/15-digit boundaries should be queried once");
+assert.equal(upstreamCalls.length, callsAfterInitialLookup + 6 + 1, "valid lookups and the one BanCheck should call the provider once per endpoint");
 
 for (const uid of ["1234", "1234567890123456"]) {
   const response = await worker.fetch(makeRequest({ uid }), env, ctx);
   assert.equal(response.status, 400, `UID ${uid.length} digits should be rejected`);
 }
-assert.equal(upstreamCalls.length, 8, "invalid-length UIDs must not call the provider");
+assert.equal(upstreamCalls.length, callsAfterInitialLookup + 6 + 1, "invalid-length UIDs must not call the provider");
 
 const badRegion = await worker.fetch(makeRequest({ region: "mx" }), env, ctx);
 assert.equal(badRegion.status, 400);
+const invalidBanUID = await worker.fetch(makeBanCheckRequest({ uid: "1234" }), env, ctx);
+assert.equal(invalidBanUID.status, 400);
 
 authMode = "non-json";
 const invalidAuthBody = await worker.fetch(makeRequest({ uid: "33333333" }), env, ctx);
@@ -164,10 +205,15 @@ assert.equal(upstreamCalls.length, callsBeforeUnauthorized);
 const unauthorizedAsset = await worker.fetch(makeAssetRequest("102000015"), env, ctx);
 assert.equal(unauthorizedAsset.status, 401);
 assert.equal(upstreamCalls.length, callsBeforeUnauthorized, "unauthorized asset requests must not call the provider");
+const unauthorizedBanCheck = await worker.fetch(makeBanCheckRequest({ uid: "12345678" }), env, ctx);
+assert.equal(unauthorizedBanCheck.status, 401);
+assert.equal(upstreamCalls.length, callsBeforeUnauthorized, "unauthorized BanCheck requests must not call the provider");
 authSuccess = true;
 
 const unconfigured = await worker.fetch(makeRequest({ uid: "123456789" }), {}, ctx);
 assert.equal(unconfigured.status, 503);
+const unconfiguredBanCheck = await worker.fetch(makeBanCheckRequest(), {}, ctx);
+assert.equal(unconfiguredBanCheck.status, 503);
 
 providerMode = "secret-leak";
 const secretLeak = await worker.fetch(makeRequest({ uid: "66666666" }), env, ctx);

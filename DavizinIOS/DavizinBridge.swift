@@ -76,6 +76,13 @@ final class DavizinBridge {
             }
             self.loadFreeFireAsset(itemID: itemID, completion: completion)
         }
+        viewController.onFreeFireBanCheck = { [weak self] uid, completion in
+            guard let self else {
+                completion(.failure(NSError(domain: "FreeFireBanCheck", code: 1, userInfo: [NSLocalizedDescriptionKey: "La sesión de Nyxel no está disponible."])))
+                return
+            }
+            self.checkFreeFireBanStatus(uid: uid, completion: completion)
+        }
 
         viewController.onClose = {
             // Nada - no cerramos
@@ -151,6 +158,25 @@ final class DavizinBridge {
             return
         }
         FreeFireStatsService.shared.loadAsset(itemID: itemID, key: sessionKey, hwid: sessionHWID, completion: completion)
+    }
+
+    private func checkFreeFireBanStatus(
+        uid: String,
+        completion: @escaping (Result<FreeFireBanCheck, Error>) -> Void
+    ) {
+        guard !sessionKey.isEmpty, !sessionHWID.isEmpty else {
+            DispatchQueue.main.async {
+                completion(.failure(NSError(domain: "FreeFireBanCheck", code: 2, userInfo: [NSLocalizedDescriptionKey: "Inicia sesión en Nyxel para consultar el estado de la cuenta."])))
+            }
+            return
+        }
+        FreeFireStatsService.shared.checkBanStatus(uid: uid, key: sessionKey, hwid: sessionHWID) { [weak self] result in
+            if case .success = result {
+                NyxelActivityLog.record("Consulta Ban Check de Free Fire")
+            }
+            self?.vc?.view.setNeedsLayout()
+            completion(result)
+        }
     }
 
     private func continueAfterLogin() {

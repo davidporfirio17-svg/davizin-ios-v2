@@ -12,6 +12,11 @@ struct FreeFireModeStats {
     let metrics: [FreeFireMetric]
 }
 
+struct FreeFireBanCheck {
+    let isBanned: Bool
+    let period: String?
+}
+
 struct FreeFireLookupSummary {
     let uid: String
     let nickname: String?
@@ -107,6 +112,66 @@ final class FreeFireStatsService {
                     return
                 }
                 completion(.success(Self.makeSummary(uid: uid, data: dataObject)))
+            }
+        }.resume()
+    }
+
+    func checkBanStatus(
+        uid: String,
+        key: String,
+        hwid: String,
+        completion: @escaping (Result<FreeFireBanCheck, Error>) -> Void
+    ) {
+        let body = securityPayload(key: key, hwid: hwid).merging(["uid": uid]) { _, newValue in newValue }
+        let request: URLRequest
+        do {
+            request = try makeRequest(path: "/bancheck", body: body)
+        } catch {
+            DispatchQueue.main.async { completion(.failure(FreeFireStatsError.service("No se pudo preparar la consulta de Ban Check."))) }
+            return
+        }
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error {
+                    completion(.failure(FreeFireStatsError.service("No se pudo conectar para consultar el estado: \(error.localizedDescription)")))
+                    return
+                }
+                guard let data,
+                      let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                    completion(.failure(FreeFireStatsError.invalidResponse))
+                    return
+                }
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                guard (200..<300).contains(status), root["success"] as? Bool == true else {
+                    completion(.failure(FreeFireStatsError.service(root["message"] as? String ?? "El proveedor no pudo consultar el estado de la cuenta.")))
+                    return
+                }
+                let wrapper = root["data"] as? [String: Any] ?? [:]
+                let result = wrapper["data"] as? [String: Any] ?? wrapper
+                let rawFlag = result["is_banned"]
+                let flag: Int?
+                if let value = rawFlag as? Int {
+                    flag = value
+                } else if let value = rawFlag as? String {
+                    flag = Int(value)
+                } else {
+                    flag = nil
+                }
+                guard let flag, flag == 0 || flag == 1 else {
+                    completion(.failure(FreeFireStatsError.service("La respuesta de Ban Check no incluyó un estado válido.")))
+                    return
+                }
+                let periodValue = result["period"]
+                let period: String?
+                if let value = periodValue as? String {
+                    period = value
+                } else if let value = periodValue as? NSNumber {
+                    period = value.stringValue
+                } else {
+                    period = nil
+                }
+                completion(.success(FreeFireBanCheck(isBanned: flag == 1, period: period)))
             }
         }.resume()
     }
