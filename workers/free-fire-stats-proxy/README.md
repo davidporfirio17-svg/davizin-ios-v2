@@ -4,11 +4,13 @@ Worker independiente de `dz`, usado por la sección «Free Fire · Estadísticas
 
 ## Qué hace
 
-- Acepta únicamente `POST /lookup` y valida UID numérico de 8–14 dígitos y región `sg`, `ind` o `br`.
+- Acepta únicamente `POST /lookup` y valida UID numérico de 5–15 dígitos y región `sg`, `ind` o `br`.
 - Revalida la key/HWID/build de Nyxel con el endpoint existente `/check`, sin cambiar el Worker `dz`.
 - Consulta `/info` y `/stats` en la API comunitaria de Free Fire.
 - Lee `FREE_FIRE_API_KEY` como secreto del entorno de Cloudflare; no va en la IPA ni en GitHub.
+- Envía un `User-Agent` propio, requerido por el firewall del proveedor, sin nombres de librerías o bots.
 - Devuelve el perfil y las estadísticas como datos de solo lectura, con caché breve por UID/región.
+- Maneja timeouts, respuestas no JSON y HTTP 429; si llega `Retry-After`, el mensaje indica cuándo volver a intentar.
 
 ## Configuración
 
@@ -23,4 +25,6 @@ Las pruebas simuladas se ejecutan con `npm test` desde esta carpeta; no llaman a
 
 La OpenAPI enumera `sg`, `ind` y `br`. La indicación enviada por el proveedor amplía `br` a Brasil, Estados Unidos, Norteamérica y LATAM; la app muestra «BR / NA» pero envía el código `br`. No usar credenciales de Free Fire: sólo se envían UID/región a la API de estadísticas.
 
-La app y el Worker aceptan UIDs de 8–14 dígitos porque su longitud puede variar. La OpenAPI publicada muestra un patrón más estrecho (9–10); el proveedor aún podría aplicar su propia validación al consultar.
+El portal de desarrolladores vigente documenta UIDs de 5–15 dígitos, por lo que el UID de 8 dígitos también es válido para la validación local. Algunos materiales anteriores del kit muestran un patrón más estrecho; se sigue la documentación vigente.
+
+El plan Trial Pass publica límites de 300 solicitudes por 24 horas, 20 por minuto y 100 por hora. Cada consulta nueva pide `/info` y `/stats` (dos solicitudes); el Worker conserva la respuesta en caché durante cinco minutos.

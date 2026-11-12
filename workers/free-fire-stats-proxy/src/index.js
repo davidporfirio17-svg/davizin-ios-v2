@@ -1,4 +1,5 @@
 const FREE_FIRE_API = "https://developers.freefirecommunity.com/api/v1";
+const FREE_FIRE_USER_AGENT = "NyxelExternal/1.5 (+https://nyxel-freefire-stats.davidporfirio17.workers.dev)";
 const NYXEL_CHECK_URL = "https://dz.davidporfirio17.workers.dev/check";
 const SUPPORTED_REGIONS = new Set(["sg", "ind", "br"]);
 const CACHE_TTL_SECONDS = 300;
@@ -85,12 +86,36 @@ async function fetchFreeFire(endpoint, uid, region, apiKey) {
     url.searchParams.set("region", region);
     const response = await fetch(url, {
       method: "GET",
-      headers: { "x-api-key": apiKey, Accept: "application/json" },
+      headers: {
+        "x-api-key": apiKey,
+        "User-Agent": FREE_FIRE_USER_AGENT,
+        Accept: "application/json",
+      },
       signal: AbortSignal.timeout(12000),
     });
-    const body = await parseJson(response);
+    const rawBody = await response.text();
+    let body = null;
+    try {
+      body = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      body = null;
+    }
+    const retryAfter = response.headers.get("retry-after");
     if (!response.ok || body?.status === "error") {
-      return { ok: false, status: response.status, message: String(body?.message || `Error ${response.status} del proveedor.`) };
+      const status = response.status >= 400 ? response.status : 502;
+      const rawMessage = rawBody.replaceAll(apiKey, "[redacted]").trim().slice(0, 180);
+      let message = String(body?.message || body?.error || rawMessage || `Error ${status} del proveedor.`)
+        .replaceAll(apiKey, "[redacted]");
+      if (status === 429) {
+        const retryHint = retryAfter
+          ? (/^\d+$/.test(retryAfter) ? ` Inténtalo en ${retryAfter} segundos.` : ` Reintenta después de ${retryAfter}.`)
+          : " Espera antes de volver a intentarlo.";
+        message = `El proveedor limitó las consultas.${retryHint}`;
+      }
+      return { ok: false, status, message };
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return { ok: false, status: 502, message: "El proveedor devolvió una respuesta no JSON o vacía." };
     }
     return { ok: true, data: body?.data ?? body };
   } catch {
@@ -124,8 +149,8 @@ export default {
 
     const uid = String(payload.uid || "").trim();
     const region = String(payload.region || "").trim().toLowerCase();
-    if (!/^\d{8,14}$/.test(uid)) {
-      return json({ success: false, message: "El UID debe tener entre 8 y 14 dígitos." }, 400, corsHeaders());
+    if (!/^\d{5,15}$/.test(uid)) {
+      return json({ success: false, message: "El UID debe tener entre 5 y 15 dígitos." }, 400, corsHeaders());
     }
     if (!SUPPORTED_REGIONS.has(region)) {
       return json({ success: false, message: "La documentación de esta API solo declara sg, ind y br." }, 400, corsHeaders());

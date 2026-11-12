@@ -90,31 +90,61 @@ final class FreeFireStatsService {
         let profile = profileRoot["data"] as? [String: Any] ?? profileRoot
         let statsRoot = data["stats"] as? [String: Any] ?? [:]
         let stats = statsRoot["data"] as? [String: Any] ?? statsRoot
-        var lines = ["UID: \(text(profile["uid"]) ?? uid)"]
+        let basicInfo = profile["basicInfo"] as? [String: Any] ?? profile
+        let clanInfo = profile["clanBasicInfo"] as? [String: Any] ?? profile
+        let socialInfo = profile["socialInfo"] as? [String: Any] ?? profile
+        var lines = ["UID: \(text(basicInfo["accountId"]) ?? text(profile["uid"]) ?? uid)"]
 
-        let name = text(profile["name"])
-        let level = text(profile["level"])
-        let rank = text(profile["rank"]) ?? text(profile["tier"])
-        let identity = [name, level.map { "Nv. \($0)" }, rank.map { "Rango \($0)" }].compactMap { $0 }
+        let name = text(basicInfo["nickname"]) ?? text(profile["name"])
+        let level = text(basicInfo["level"]) ?? text(profile["level"])
+        let rank = text(basicInfo["rank"]) ?? text(profile["rank"]) ?? text(profile["tier"])
+        let region = text(basicInfo["region"]) ?? text(profile["region"])
+        var identity: [String] = []
+        if let name { identity.append(name) }
+        if let level { identity.append("Nv. \(level)") }
+        if let rank { identity.append("Rango \(rank)") }
+        if let region { identity.append("Región \(region)") }
         if !identity.isEmpty { lines.append(identity.joined(separator: " • ")) }
 
-        let guild = text(profile["guild"])
-        let likes = text(profile["likes"])
-        let social = [guild.map { "Clan: \($0)" }, likes.map { "Me gusta: \($0)" }].compactMap { $0 }
+        let clan = text(clanInfo["clanName"]) ?? text(profile["guild"])
+        let clanLevel = text(clanInfo["clanLevel"])
+        let memberCount = text(clanInfo["memberNum"])
+        var clanDetails: [String] = []
+        if let clan { clanDetails.append("Clan: \(clan)") }
+        if let clanLevel { clanDetails.append("Nivel de clan: \(clanLevel)") }
+        if let memberCount { clanDetails.append("Miembros: \(memberCount)") }
+        if !clanDetails.isEmpty { lines.append(clanDetails.joined(separator: " • ")) }
+
+        let signature = text(socialInfo["signature"])
+        let likes = text(socialInfo["likes"]) ?? text(profile["likes"])
+        let social = [signature.map { "Firma: \($0)" }, likes.map { "Me gusta: \($0)" }].compactMap { $0 }
         if !social.isEmpty { lines.append(social.joined(separator: " • ")) }
 
-        let modeNames = [("solo", "Solo"), ("duo", "Dúo"), ("squad", "Escuadra")]
-        let ratios = modeNames.compactMap { item -> String? in
-            guard let mode = stats[item.0] as? [String: Any], let kd = text(mode["kd"]) else { return nil }
-            return "\(item.1) \(kd)"
+        let documentedModes = [("brCareer_solo", "Solo"), ("brCareer_duo", "Dúo"), ("brCareer_squad", "Escuadra")]
+        let legacyModes = [("solo", "Solo"), ("duo", "Dúo"), ("squad", "Escuadra")]
+        let modeNames = documentedModes.contains { stats[$0.0] != nil } ? documentedModes : legacyModes
+        let modeSummaries = modeNames.compactMap { item -> String? in
+            guard let mode = stats[item.0] as? [String: Any] else { return nil }
+            let fields = mode.keys.sorted().compactMap { key -> String? in
+                guard let value = text(mode[key]) else { return nil }
+                return "\(displayName(key)): \(value)"
+            }.prefix(4)
+            guard !fields.isEmpty else { return nil }
+            return "\(item.1): " + fields.joined(separator: " · ")
         }
-        if !ratios.isEmpty { lines.append("K/D · " + ratios.joined(separator: "   ")) }
+        if !modeSummaries.isEmpty { lines.append(modeSummaries.joined(separator: "   |   ")) }
 
         if let warnings = data["warnings"] as? [String], !warnings.isEmpty {
             lines.append("Aviso: datos parciales (\(warnings.joined(separator: "; ")))")
         }
         if lines.count == 1 { lines.append("El proveedor no devolvió detalles de perfil o estadísticas.") }
         return lines.joined(separator: "\n")
+    }
+
+    private static func displayName(_ key: String) -> String {
+        key.replacingOccurrences(of: "([a-z0-9])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
     }
 
     private static func text(_ value: Any?) -> String? {

@@ -332,9 +332,9 @@ final class ProfileView: UIView {
         note.textColor = AppTheme.secondaryText
         note.numberOfLines = 0
 
-        freeFireUIDField.placeholder = "UID de Free Fire (8–14 dígitos)"
+        freeFireUIDField.placeholder = "UID de Free Fire (5–15 dígitos)"
         freeFireUIDField.attributedPlaceholder = NSAttributedString(
-            string: "UID de Free Fire (8–14 dígitos)",
+            string: "UID de Free Fire (5–15 dígitos)",
             attributes: [.foregroundColor: AppTheme.tertiaryText]
         )
         freeFireUIDField.keyboardType = .numberPad
@@ -381,8 +381,8 @@ final class ProfileView: UIView {
     @objc private func freeFireLookupTapped() {
         endEditing(true)
         let uid = (freeFireUIDField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard uid.range(of: "^\\d{8,14}$", options: .regularExpression) != nil else {
-            setFreeFireLookupState(loading: false, message: "Escribe un UID numérico de 8 a 14 dígitos.", success: false)
+        guard uid.range(of: "^\\d{5,15}$", options: .regularExpression) != nil else {
+            setFreeFireLookupState(loading: false, message: "Escribe un UID numérico de 5 a 15 dígitos.", success: false)
             return
         }
         let regions = ["sg", "ind", "br"]
