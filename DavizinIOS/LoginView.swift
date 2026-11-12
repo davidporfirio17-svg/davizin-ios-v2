@@ -43,6 +43,7 @@ final class LoginView: UIView {
     weak var delegate: LoginViewDelegate?
 
     private let videoBackground = DavizinLoginVideoView()
+    private let loginIceBlue = UIColor(red: 0.37, green: 0.80, blue: 1.0, alpha: 1.0)
     private let videoOverlay = UIView()
     private let videoGradient = CAGradientLayer()
     private let vignetteGradient = CAGradientLayer()
@@ -278,9 +279,9 @@ final class LoginView: UIView {
         videoOverlay.isUserInteractionEnabled = false
         videoOverlay.backgroundColor = .clear
         videoGradient.colors = [
+            UIColor.black.withAlphaComponent(0.10).cgColor,
             UIColor.black.withAlphaComponent(0.20).cgColor,
-            UIColor.black.withAlphaComponent(0.32).cgColor,
-            UIColor.black.withAlphaComponent(0.80).cgColor
+            UIColor.black.withAlphaComponent(0.46).cgColor
         ]
         videoGradient.locations = [0.0, 0.48, 1.0]
         videoGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
@@ -327,21 +328,21 @@ final class LoginView: UIView {
         subtitleLabel.adjustsFontForContentSizeCategory = true
 
         keyField.translatesAutoresizingMaskIntoConstraints = false
-        keyField.backgroundColor = UIColor.black.withAlphaComponent(0.42)
-        keyField.textColor = AppTheme.primaryText
-        keyField.tintColor = AppTheme.primaryText
+        keyField.backgroundColor = UIColor(red: 0.05, green: 0.38, blue: 0.62, alpha: 0.34)
+        keyField.textColor = .white
+        keyField.tintColor = loginIceBlue
         keyField.font = AppTheme.bodyFont()
         keyField.layer.cornerRadius = AppTheme.controlCornerRadius
         keyField.layer.cornerCurve = .continuous
         keyField.layer.borderWidth = 1.0
-        keyField.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
-        keyField.layer.shadowColor = AppTheme.accent.cgColor
+        keyField.layer.borderColor = loginIceBlue.withAlphaComponent(0.82).cgColor
+        keyField.layer.shadowColor = loginIceBlue.cgColor
         keyField.layer.shadowOffset = .zero
         keyField.layer.shadowRadius = 12.0
-        keyField.layer.shadowOpacity = 0.0
+        keyField.layer.shadowOpacity = 0.12
         keyField.attributedPlaceholder = NSAttributedString(
             string: "INGRESA TU KEY DE ACCESO",
-            attributes: [.foregroundColor: UIColor.white.withAlphaComponent(0.42)]
+            attributes: [.foregroundColor: UIColor(red: 0.76, green: 0.91, blue: 1.0, alpha: 0.88)]
         )
         keyField.isSecureTextEntry = true
         keyField.autocorrectionType = .no
@@ -355,7 +356,7 @@ final class LoginView: UIView {
 		keyField.text = NyxelKeychain.key
         keyField.setLeftPadding(14.0)
         keyVisibilityButton.setImage(UIImage(systemName: "eye.slash.fill"), for: .normal)
-        keyVisibilityButton.tintColor = UIColor.white.withAlphaComponent(0.58)
+        keyVisibilityButton.tintColor = loginIceBlue.withAlphaComponent(0.94)
         keyVisibilityButton.frame = CGRect(x: 0.0, y: 0.0, width: 42.0, height: AppTheme.controlHeight)
         keyVisibilityButton.accessibilityLabel = "Mostrar key"
         keyVisibilityButton.addTarget(self, action: #selector(toggleKeyVisibility), for: .touchUpInside)
@@ -498,15 +499,15 @@ final class LoginView: UIView {
     func textFieldDidBeginEditing(_ textField: UITextField) {
         guard textField === keyField else { return }
         let borderPulse = CABasicAnimation(keyPath: "borderColor")
-        borderPulse.fromValue = UIColor.white.withAlphaComponent(0.22).cgColor
-        borderPulse.toValue = AppTheme.accent.cgColor
+        borderPulse.fromValue = loginIceBlue.withAlphaComponent(0.56).cgColor
+        borderPulse.toValue = UIColor.white.cgColor
         borderPulse.duration = 0.85
         borderPulse.autoreverses = true
         borderPulse.repeatCount = .greatestFiniteMagnitude
         keyField.layer.add(borderPulse, forKey: "nyxel.key.borderPulse")
         UIView.animate(withDuration: 0.18) {
-            self.keyField.backgroundColor = UIColor.black.withAlphaComponent(0.18)
-            self.keyField.layer.borderColor = AppTheme.accent.cgColor
+            self.keyField.backgroundColor = UIColor(red: 0.07, green: 0.46, blue: 0.72, alpha: 0.48)
+            self.keyField.layer.borderColor = UIColor.white.cgColor
             self.keyField.layer.shadowOpacity = 0.28
         }
     }
@@ -515,9 +516,9 @@ final class LoginView: UIView {
         guard textField === keyField else { return }
         keyField.layer.removeAnimation(forKey: "nyxel.key.borderPulse")
         UIView.animate(withDuration: 0.18) {
-            self.keyField.backgroundColor = UIColor.black.withAlphaComponent(0.28)
-            self.keyField.layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
-            self.keyField.layer.shadowOpacity = 0.0
+            self.keyField.backgroundColor = UIColor(red: 0.05, green: 0.38, blue: 0.62, alpha: 0.34)
+            self.keyField.layer.borderColor = self.loginIceBlue.withAlphaComponent(0.82).cgColor
+            self.keyField.layer.shadowOpacity = 0.12
         }
     }
 
