@@ -1,0 +1,4 @@
+name = "nyxel-freefire-stats"
+main = "src/index.js"
+compatibility_date = "2026-11-12"
+workers_dev = true

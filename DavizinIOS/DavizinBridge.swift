@@ -66,6 +66,10 @@ final class DavizinBridge {
             self?.handleOperation(operation)
         }
 
+        viewController.onFreeFireLookup = { [weak self] uid, region in
+            self?.lookupFreeFireStats(uid: uid, region: region)
+        }
+
         viewController.onClose = {
             // Nada - no cerramos
         }
@@ -112,6 +116,24 @@ final class DavizinBridge {
                 } else {
                     self?.vc?.setLoginStatus(message ?? "Key invalida", success: false)
                 }
+            }
+        }
+    }
+
+    private func lookupFreeFireStats(uid: String, region: String) {
+        guard !sessionKey.isEmpty, !sessionHWID.isEmpty else {
+            vc?.setFreeFireLookupState(loading: false, message: "Inicia sesión en Nyxel para consultar estadísticas.", success: false)
+            return
+        }
+        vc?.setFreeFireLookupState(loading: true, message: "Validando sesión y consultando…", success: false)
+        FreeFireStatsService.shared.lookup(uid: uid, region: region, key: sessionKey, hwid: sessionHWID) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let summary):
+                NyxelActivityLog.record("Consulta de estadísticas de Free Fire")
+                self.vc?.setFreeFireLookupState(loading: false, message: summary.text, success: true)
+            case .failure(let error):
+                self.vc?.setFreeFireLookupState(loading: false, message: error.localizedDescription, success: false)
             }
         }
     }

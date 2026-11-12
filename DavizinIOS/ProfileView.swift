@@ -99,6 +99,7 @@ final class ProfileView: UIView {
     weak var delegate: ProfileViewDelegate?
     var onRefreshRequested: (() -> Void)?
     var onAppearanceChanged: (() -> Void)?
+    var onFreeFireLookupRequested: ((String, String) -> Void)?
 
     private let avatarCircle = UIView()
     private let avatarImageView = UIImageView()
@@ -120,6 +121,10 @@ final class ProfileView: UIView {
     private let diagnosticsLabel = UILabel()
     private let refreshDiagnosticsButton = UIButton(type: .system)
     private let shareDiagnosticsButton = UIButton(type: .system)
+    private let freeFireUIDField = UITextField()
+    private let freeFireRegionControl = UISegmentedControl(items: ["SG", "IND", "BR / NA"])
+    private let freeFireLookupButton = UIButton(type: .system)
+    private let freeFireResultLabel = UILabel()
     private let logoutButton = DavizinButton(title: "CERRAR SESIÓN", style: .destructive)
     private let scrollView = UIScrollView()
     private let progressTrack = CAShapeLayer()
@@ -281,10 +286,11 @@ final class ProfileView: UIView {
         )
 
         let accountSection = ProfileDisclosureSection(title: "CUENTA", views: [keyRow, countryRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel])
+        let freeFireSection = makeFreeFireSection()
         let appearanceSection = ProfileDisclosureSection(title: "APARIENCIA", views: [themeRow, accentRow])
         let securitySection = ProfileDisclosureSection(title: "SEGURIDAD", views: [biometricRow])
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
-        let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, appearanceSection, securitySection, audioSection, diagnosticsSection, refreshButton, logoutButton])
+        let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, freeFireSection, appearanceSection, securitySection, audioSection, diagnosticsSection, refreshButton, logoutButton])
         stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: heroStack)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -317,6 +323,87 @@ final class ProfileView: UIView {
             logoutButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight)
         ])
         refresh()
+    }
+
+    private func makeFreeFireSection() -> UIView {
+        let note = UILabel()
+        note.text = "Consulta de perfil y estadísticas públicas. No modifica tu cuenta ni el juego."
+        note.font = .systemFont(ofSize: 11, weight: .regular)
+        note.textColor = AppTheme.secondaryText
+        note.numberOfLines = 0
+
+        freeFireUIDField.placeholder = "UID de Free Fire (9–10 dígitos)"
+        freeFireUIDField.attributedPlaceholder = NSAttributedString(
+            string: "UID de Free Fire (9–10 dígitos)",
+            attributes: [.foregroundColor: AppTheme.tertiaryText]
+        )
+        freeFireUIDField.keyboardType = .numberPad
+        freeFireUIDField.autocorrectionType = .no
+        freeFireUIDField.backgroundColor = AppTheme.background.withAlphaComponent(0.72)
+        freeFireUIDField.textColor = AppTheme.primaryText
+        freeFireUIDField.font = AppTheme.monoFont(13)
+        freeFireUIDField.layer.cornerRadius = 12
+        freeFireUIDField.layer.borderWidth = 1
+        freeFireUIDField.layer.borderColor = AppTheme.hairlineStrong.cgColor
+        freeFireUIDField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 1))
+        freeFireUIDField.leftViewMode = .always
+        freeFireUIDField.heightAnchor.constraint(equalToConstant: 48).isActive = true
+
+        freeFireRegionControl.selectedSegmentIndex = UISegmentedControl.noSegment
+        freeFireRegionControl.selectedSegmentTintColor = AppTheme.accent
+        freeFireRegionControl.setTitleTextAttributes([.foregroundColor: AppTheme.primaryText], for: .normal)
+        freeFireRegionControl.setTitleTextAttributes([.foregroundColor: AppTheme.accentForeground], for: .selected)
+        freeFireRegionControl.heightAnchor.constraint(equalToConstant: 36).isActive = true
+
+        freeFireLookupButton.setTitle("CONSULTAR PERFIL", for: .normal)
+        freeFireLookupButton.setTitleColor(AppTheme.accent, for: .normal)
+        freeFireLookupButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .heavy)
+        freeFireLookupButton.backgroundColor = AppTheme.accentDim.withAlphaComponent(0.72)
+        freeFireLookupButton.layer.cornerRadius = 11
+        freeFireLookupButton.layer.borderWidth = 1
+        freeFireLookupButton.layer.borderColor = AppTheme.accent.withAlphaComponent(0.36).cgColor
+        freeFireLookupButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        freeFireLookupButton.addTarget(self, action: #selector(freeFireLookupTapped), for: .touchUpInside)
+
+        freeFireResultLabel.text = "Regiones: SG / IND / BR. El proveedor indica que BR también cubre US, NA y LATAM."
+        freeFireResultLabel.font = AppTheme.monoFont(11)
+        freeFireResultLabel.textColor = AppTheme.secondaryText
+        freeFireResultLabel.numberOfLines = 0
+        freeFireResultLabel.lineBreakMode = .byWordWrapping
+
+        return ProfileDisclosureSection(
+            title: "FREE FIRE · ESTADÍSTICAS",
+            views: [note, freeFireUIDField, makeCaptionLabel("REGIÓN DEL SERVIDOR"), freeFireRegionControl, freeFireLookupButton, freeFireResultLabel],
+            expanded: true
+        )
+    }
+
+    @objc private func freeFireLookupTapped() {
+        endEditing(true)
+        let uid = (freeFireUIDField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard uid.range(of: "^\\d{9,10}$", options: .regularExpression) != nil else {
+            setFreeFireLookupState(loading: false, message: "Escribe un UID numérico de 9 o 10 dígitos.", success: false)
+            return
+        }
+        let regions = ["sg", "ind", "br"]
+        guard regions.indices.contains(freeFireRegionControl.selectedSegmentIndex) else {
+            setFreeFireLookupState(loading: false, message: "Selecciona la región real de la cuenta.", success: false)
+            return
+        }
+        guard let onFreeFireLookupRequested else {
+            setFreeFireLookupState(loading: false, message: "La consulta aún no está conectada al servicio.", success: false)
+            return
+        }
+        setFreeFireLookupState(loading: true, message: "Consultando el perfil…", success: false)
+        onFreeFireLookupRequested(uid, regions[freeFireRegionControl.selectedSegmentIndex])
+    }
+
+    func setFreeFireLookupState(loading: Bool, message: String, success: Bool) {
+        freeFireLookupButton.isEnabled = !loading
+        freeFireLookupButton.alpha = loading ? 0.62 : 1.0
+        freeFireLookupButton.setTitle(loading ? "CONSULTANDO…" : "CONSULTAR PERFIL", for: .normal)
+        freeFireResultLabel.text = message
+        freeFireResultLabel.textColor = success ? AppTheme.success : (loading ? AppTheme.accent : AppTheme.secondaryText)
     }
 
     private func makeRow(label: String, valueLabel: UILabel) -> UIView {

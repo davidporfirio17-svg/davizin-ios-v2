@@ -9,6 +9,7 @@ final class ViewController: UIViewController {
     var onGameSelected: ((DavizinGame) -> Void)?
     var onModeSelected: ((DavizinMode) -> Void)?
     var onOperation: ((DavizinOperationKind) -> Void)?
+    var onFreeFireLookup: ((String, String) -> Void)?
     var onClose: (() -> Void)?
 
     private let videoBackgroundView = DavizinLoginVideoView()
@@ -114,6 +115,10 @@ final class ViewController: UIViewController {
 
     func setOperationProgress(_ message: String) {
         operationView?.setProgressMessage(message)
+    }
+
+    func setFreeFireLookupState(loading: Bool, message: String, success: Bool) {
+        profileView?.setFreeFireLookupState(loading: loading, message: message, success: success)
     }
 
     /// Actualiza el contador de tiempo restante en el header.
@@ -530,6 +535,13 @@ final class ViewController: UIViewController {
         let screen = ProfileView()
         screen.delegate = self
         screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds, countryCode: activeCountryCode)
+        screen.onFreeFireLookupRequested = { [weak self, weak screen] uid, region in
+            guard let self, let onFreeFireLookup = self.onFreeFireLookup else {
+                screen?.setFreeFireLookupState(loading: false, message: "El servicio aún no está configurado.", success: false)
+                return
+            }
+            onFreeFireLookup(uid, region)
+        }
         screen.onAppearanceChanged = { [weak self] in
             self?.overrideUserInterfaceStyle = NyxelAppearanceStore.uiStyle
             self?.showProfile(animated: true)

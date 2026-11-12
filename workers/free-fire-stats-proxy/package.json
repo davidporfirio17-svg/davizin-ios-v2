@@ -1,0 +1,8 @@
+{
+  "name": "nyxel-freefire-stats-proxy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test.mjs"
+  }
+}
