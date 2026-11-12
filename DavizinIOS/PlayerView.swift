@@ -35,6 +35,7 @@ final class PlayerView: UIView {
     private let soloStatsLabel = UILabel()
     private let duoStatsLabel = UILabel()
     private let squadStatsLabel = UILabel()
+    private let statsStatusLabel = UILabel()
     private let clanLabel = UILabel()
     private let signatureLabel = UILabel()
     private let outfitImages = (0..<4).map { _ in UIImageView() }
@@ -99,6 +100,22 @@ final class PlayerView: UIView {
         soloStatsLabel.text = Self.modeText(statsByKey["brCareer_solo"])
         duoStatsLabel.text = Self.modeText(statsByKey["brCareer_duo"])
         squadStatsLabel.text = Self.modeText(statsByKey["brCareer_squad"])
+        let statsWarning = summary.warnings.first { $0.localizedCaseInsensitiveContains("estadística") }
+        if let statsWarning {
+            let detail = statsWarning.replacingOccurrences(of: "Estadísticas:", with: "", options: [.caseInsensitive]).trimmingCharacters(in: .whitespaces)
+            if detail.localizedCaseInsensitiveContains("jwt") {
+                statsStatusLabel.text = "El proveedor no pudo abrir la sesión de estadísticas (error JWT). Inténtalo más tarde."
+            } else {
+                statsStatusLabel.text = "El proveedor no pudo cargar las estadísticas: \(detail)"
+            }
+            statsStatusLabel.textColor = AppTheme.accentWarm
+        } else if summary.modes.isEmpty {
+            statsStatusLabel.text = "El proveedor no devolvió estadísticas para estos modos."
+            statsStatusLabel.textColor = AppTheme.secondaryText
+        } else {
+            statsStatusLabel.text = "Estadísticas públicas devueltas por el proveedor."
+            statsStatusLabel.textColor = AppTheme.secondaryText
+        }
 
         let clanParts = [summary.clanName, summary.clanLevel.map { "Nv. \($0)" }, summary.clanMembers.map { "\($0) integrantes" }]
             .compactMap { $0 }
@@ -354,6 +371,10 @@ final class PlayerView: UIView {
             makeModeCard(title: "ESCUADRA", symbol: "person.3.fill", label: squadStatsLabel)
         ], axis: isPad ? .horizontal : .vertical)
         contentStack.addArrangedSubview(sectionHeading("ESTADÍSTICAS DE CARRERA", subtitle: "Solo, dúo y escuadra · cuando el proveedor las devuelve"))
+        statsStatusLabel.font = .systemFont(ofSize: 10, weight: .medium)
+        statsStatusLabel.textColor = AppTheme.secondaryText
+        statsStatusLabel.numberOfLines = 0
+        contentStack.addArrangedSubview(statsStatusLabel)
         contentStack.addArrangedSubview(modeRow)
 
         contentStack.addArrangedSubview(sectionHeading("CLAN Y PERFIL", subtitle: "Información pública asociada al UID"))
@@ -582,7 +603,7 @@ final class PlayerView: UIView {
     }
 
     private static func modeText(_ mode: FreeFireModeStats?) -> String {
-        guard let mode, !mode.metrics.isEmpty else { return "El proveedor no devolvió estadísticas para este modo." }
+        guard let mode, !mode.metrics.isEmpty else { return "Sin datos devueltos para este modo." }
         return mode.metrics.map { "\($0.title): \($0.value)" }.joined(separator: "\n")
     }
 
