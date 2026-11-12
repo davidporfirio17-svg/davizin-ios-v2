@@ -43,8 +43,7 @@ final class PlayerView: UIView {
     private let banCheckButton = UIButton(type: .system)
     private let clanLabel = UILabel()
     private let signatureLabel = UILabel()
-    private let outfitImages = (0..<4).map { _ in UIImageView() }
-    private let outfitPlaceholders = (0..<4).map { _ in UILabel() }
+    private let outfitGridStack = UIStackView()
 
     private var renderGeneration = 0
     private let isPad = UIDevice.current.userInterfaceIdiom == .pad
@@ -152,11 +151,7 @@ final class PlayerView: UIView {
 
         requestAsset(summary.bannerID, into: bannerImageView, generation: generation)
         requestAsset(summary.avatarID ?? summary.headPicID, into: avatarImageView, generation: generation)
-        for index in outfitImages.indices {
-            let itemID = summary.clothesIDs.indices.contains(index) ? summary.clothesIDs[index] : nil
-            outfitPlaceholders[index].text = itemID == nil ? "—" : "ROPA \(index + 1)"
-            requestAsset(itemID, into: outfitImages[index], generation: generation)
-        }
+        updateOutfitItems(summary.clothesIDs, generation: generation)
     }
 
     private func configure() {
@@ -547,53 +542,88 @@ final class PlayerView: UIView {
         let card = DavizinCardView()
         card.useTransparentAppearance()
         card.contentInsets = UIEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
-        let cells: [UIView] = outfitImages.indices.map { index in
-            let cell = UIView()
-            cell.translatesAutoresizingMaskIntoConstraints = false
-            cell.backgroundColor = AppTheme.background.withAlphaComponent(0.52)
-            cell.layer.cornerRadius = 14
-            cell.layer.borderWidth = 1
-            cell.layer.borderColor = AppTheme.hairlineStrong.cgColor
-            cell.clipsToBounds = true
-
-            let image = outfitImages[index]
-            image.translatesAutoresizingMaskIntoConstraints = false
-            image.contentMode = .scaleAspectFit
-            image.image = UIImage(systemName: "tshirt.fill")
-            image.tintColor = AppTheme.tertiaryText
-            cell.addSubview(image)
-
-            let caption = outfitPlaceholders[index]
-            caption.translatesAutoresizingMaskIntoConstraints = false
-            caption.font = .systemFont(ofSize: 8, weight: .bold)
-            caption.textColor = AppTheme.tertiaryText
-            caption.textAlignment = .center
-            cell.addSubview(caption)
-
-            NSLayoutConstraint.activate([
-                cell.heightAnchor.constraint(equalToConstant: isPad ? 110 : 88),
-                image.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 5),
-                image.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -5),
-                image.topAnchor.constraint(equalTo: cell.topAnchor, constant: 5),
-                image.bottomAnchor.constraint(equalTo: caption.topAnchor, constant: -2),
-                caption.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
-                caption.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
-                caption.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -5),
-                caption.heightAnchor.constraint(equalToConstant: 11)
-            ])
-            return cell
-        }
-        let assets = UIStackView(arrangedSubviews: cells)
-        assets.axis = .horizontal
-        assets.distribution = .fillEqually
-        assets.alignment = .fill
-        assets.spacing = 9
-        let note = label("Las miniaturas pueden tardar un momento en cargar.", size: 10, weight: .regular, color: AppTheme.secondaryText)
-        let stack = UIStackView(arrangedSubviews: [assets, note])
+        outfitGridStack.axis = .vertical
+        outfitGridStack.alignment = .fill
+        outfitGridStack.distribution = .fill
+        outfitGridStack.spacing = 9
+        let note = label("Se muestran todos los objetos de ropa que devuelve el API. La respuesta no especifica si cada imagen corresponde a pecho, pantalón, calzado o maquillaje.", size: 10, weight: .regular, color: AppTheme.secondaryText)
+        note.numberOfLines = 0
+        let stack = UIStackView(arrangedSubviews: [outfitGridStack, note])
         stack.axis = .vertical
         stack.spacing = 10
         card.addContent(stack)
         return card
+    }
+
+    private func updateOutfitItems(_ itemIDs: [String], generation: Int) {
+        for row in outfitGridStack.arrangedSubviews {
+            outfitGridStack.removeArrangedSubview(row)
+            row.removeFromSuperview()
+        }
+        let validIDs = itemIDs.filter { $0.range(of: "^\\d{5,15}$", options: .regularExpression) != nil }
+        guard !validIDs.isEmpty else {
+            let emptyLabel = label("El proveedor no devolvió imágenes de ropa para este perfil.", size: 11, weight: .medium, color: AppTheme.secondaryText)
+            emptyLabel.numberOfLines = 0
+            outfitGridStack.addArrangedSubview(emptyLabel)
+            return
+        }
+
+        let columns = isPad ? 4 : 3
+        for start in stride(from: 0, to: validIDs.count, by: columns) {
+            let row = UIStackView()
+            row.axis = .horizontal
+            row.distribution = .fillEqually
+            row.alignment = .fill
+            row.spacing = 9
+
+            let end = min(start + columns, validIDs.count)
+            for index in start..<end {
+                row.addArrangedSubview(makeOutfitCell(itemID: validIDs[index], generation: generation))
+            }
+            if end - start < columns {
+                for _ in (end - start)..<columns {
+                    row.addArrangedSubview(UIView())
+                }
+            }
+            outfitGridStack.addArrangedSubview(row)
+        }
+    }
+
+    private func makeOutfitCell(itemID: String, generation: Int) -> UIView {
+        let cell = UIView()
+        cell.translatesAutoresizingMaskIntoConstraints = false
+        cell.backgroundColor = AppTheme.background.withAlphaComponent(0.52)
+        cell.layer.cornerRadius = 14
+        cell.layer.borderWidth = 1
+        cell.layer.borderColor = AppTheme.hairlineStrong.cgColor
+        cell.clipsToBounds = true
+
+        let image = UIImageView(image: UIImage(systemName: "tshirt.fill"))
+        image.translatesAutoresizingMaskIntoConstraints = false
+        image.contentMode = .scaleAspectFit
+        image.tintColor = AppTheme.tertiaryText
+        cell.addSubview(image)
+
+        let caption = label("ID \(itemID)", size: 8, weight: .bold, color: AppTheme.tertiaryText)
+        caption.translatesAutoresizingMaskIntoConstraints = false
+        caption.textAlignment = .center
+        caption.lineBreakMode = .byTruncatingMiddle
+        cell.addSubview(caption)
+
+        NSLayoutConstraint.activate([
+            cell.heightAnchor.constraint(equalToConstant: isPad ? 118 : 100),
+            image.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 5),
+            image.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -5),
+            image.topAnchor.constraint(equalTo: cell.topAnchor, constant: 5),
+            image.bottomAnchor.constraint(equalTo: caption.topAnchor, constant: -2),
+            caption.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 3),
+            caption.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -3),
+            caption.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -5),
+            caption.heightAnchor.constraint(equalToConstant: 11)
+        ])
+
+        requestAsset(itemID, into: image, generation: generation)
+        return cell
     }
 
     private func makeBanCheckCard() -> UIView {
