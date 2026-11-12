@@ -53,10 +53,14 @@ final class SplashViewController: UIViewController {
     }
 
     private func configureFallbackBranding() {
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        let avatarSize: CGFloat = isIPad ? 110 : 120
+        let avatarRadius: CGFloat = avatarSize / 2
+
         portraitView.image = UIImage(named: "NyxelAvatar")
         portraitView.contentMode = .scaleAspectFill
         portraitView.clipsToBounds = true
-        portraitView.layer.cornerRadius = 76
+        portraitView.layer.cornerRadius = avatarRadius
         portraitView.layer.cornerCurve = .continuous
         portraitView.layer.borderWidth = 1.0
         portraitView.layer.borderColor = AppTheme.accent.withAlphaComponent(0.48).cgColor
@@ -69,7 +73,7 @@ final class SplashViewController: UIViewController {
         portraitView.translatesAutoresizingMaskIntoConstraints = false
 
         wordLabel.text = "NYXEL EXTERNAL"
-        wordLabel.font = .systemFont(ofSize: 15, weight: .bold)
+        wordLabel.font = .systemFont(ofSize: isIPad ? 13 : 15, weight: .bold)
         wordLabel.textColor = AppTheme.primaryText
         wordLabel.textAlignment = .center
         wordLabel.alpha = 0
@@ -85,8 +89,8 @@ final class SplashViewController: UIViewController {
         captionLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let track = CAShapeLayer()
-        let ringRect = CGRect(x: 0, y: 0, width: 164, height: 164)
-        let path = UIBezierPath(ovalIn: ringRect.insetBy(dx: 4, dy: 4))
+        let ringRect = CGRect(x: 0, y: 0, width: avatarSize, height: avatarSize)
+        let path = UIBezierPath(ovalIn: ringRect.insetBy(dx: 2, dy: 2))
         track.path = path.cgPath
         track.frame = ringRect
         track.strokeColor = AppTheme.hairlineStrong.cgColor
@@ -109,10 +113,10 @@ final class SplashViewController: UIViewController {
 
         NSLayoutConstraint.activate([
             portraitView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            portraitView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -34),
-            portraitView.widthAnchor.constraint(equalToConstant: 152),
-            portraitView.heightAnchor.constraint(equalToConstant: 152),
-            wordLabel.topAnchor.constraint(equalTo: portraitView.bottomAnchor, constant: 28),
+            portraitView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: isIPad ? -28 : -34),
+            portraitView.widthAnchor.constraint(equalToConstant: avatarSize),
+            portraitView.heightAnchor.constraint(equalToConstant: avatarSize),
+            wordLabel.topAnchor.constraint(equalTo: portraitView.bottomAnchor, constant: 22),
             wordLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             captionLabel.topAnchor.constraint(equalTo: wordLabel.bottomAnchor, constant: 8),
             captionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor)
@@ -135,8 +139,7 @@ final class SplashViewController: UIViewController {
         let layer = AVPlayerLayer(player: welcomePlayer)
         layer.frame = view.bounds
         layer.backgroundColor = view.backgroundColor?.cgColor
-        // El video es vertical: llena iPhone y conserva todos los textos en iPad.
-        layer.videoGravity = UIDevice.current.userInterfaceIdiom == .pad ? .resizeAspect : .resizeAspectFill
+        layer.videoGravity = .resizeAspectFill
         playerLayer = layer
         view.layer.insertSublayer(layer, at: 0)
         portraitView.isHidden = true
