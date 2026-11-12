@@ -1,6 +1,7 @@
 import UIKit
+import AVFoundation
 
-// MARK: - SplashViewController — presentación de marca Nyxel External.
+// MARK: - SplashViewController — bienvenida audiovisual de Nyxel External.
 final class SplashViewController: UIViewController {
     var onFinished: (() -> Void)?
 
@@ -8,11 +9,49 @@ final class SplashViewController: UIViewController {
     private let wordLabel = UILabel()
     private let captionLabel = UILabel()
     private let progressLayer = CAShapeLayer()
+    private var player: AVPlayer?
+    private var playerLayer: AVPlayerLayer?
+    private var endObserver: NSObjectProtocol?
+    private var failureObserver: NSObjectProtocol?
+    private var videoIsActive = false
+    private var fallbackHasStarted = false
+    private var didFinish = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = AppTheme.background
+        view.backgroundColor = UIColor(red: 0.012, green: 0.018, blue: 0.055, alpha: 1)
+        view.isAccessibilityElement = true
+        view.accessibilityLabel = "Bienvenido a Nyxel External. Iniciando la aplicación."
+        configureFallbackBranding()
+        installWelcomeVideo()
+    }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        playerLayer?.frame = view.bounds
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if videoIsActive {
+            player?.play()
+        } else {
+            animateFallbackSplash()
+        }
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        player?.pause()
+    }
+
+    deinit {
+        player?.pause()
+        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
+    }
+
+    private func configureFallbackBranding() {
         portraitView.image = UIImage(named: "NyxelAvatar")
         portraitView.contentMode = .scaleAspectFill
         portraitView.clipsToBounds = true
@@ -79,12 +118,57 @@ final class SplashViewController: UIViewController {
         ])
     }
 
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        animateSplash()
+    private func installWelcomeVideo() {
+        guard let url = Bundle.main.url(forResource: "nyxel_welcome", withExtension: "mp4") else { return }
+        let item = AVPlayerItem(url: url)
+        let welcomePlayer = AVPlayer(playerItem: item)
+        welcomePlayer.volume = 0.85
+        welcomePlayer.isMuted = false
+        player = welcomePlayer
+
+        let layer = AVPlayerLayer(player: welcomePlayer)
+        layer.frame = view.bounds
+        layer.backgroundColor = view.backgroundColor?.cgColor
+        // El video es vertical: llena iPhone y conserva todos los textos en iPad.
+        layer.videoGravity = UIDevice.current.userInterfaceIdiom == .pad ? .resizeAspect : .resizeAspectFill
+        playerLayer = layer
+        view.layer.insertSublayer(layer, at: 0)
+        portraitView.isHidden = true
+        wordLabel.isHidden = true
+        captionLabel.isHidden = true
+        videoIsActive = true
+
+        endObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.didPlayToEndTimeNotification,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            self?.finishSplash()
+        }
+        failureObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.failedToPlayToEndTimeNotification,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showFallbackSplash()
+        }
     }
 
-    private func animateSplash() {
+    private func showFallbackSplash() {
+        guard !didFinish else { return }
+        videoIsActive = false
+        player?.pause()
+        playerLayer?.isHidden = true
+        portraitView.isHidden = false
+        wordLabel.isHidden = false
+        captionLabel.isHidden = false
+        animateFallbackSplash()
+    }
+
+    private func animateFallbackSplash() {
+        guard !fallbackHasStarted else { return }
+        fallbackHasStarted = true
+
         let draw = CABasicAnimation(keyPath: "strokeEnd")
         draw.fromValue = 0
         draw.toValue = 1
@@ -103,11 +187,23 @@ final class SplashViewController: UIViewController {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.45) { [weak self] in
-            guard let self else { return }
-            UIView.animate(withDuration: 0.36, animations: {
-                self.view.alpha = 0
-            }, completion: { _ in self.onFinished?() })
+            self?.finishSplash()
         }
+    }
+
+    private func finishSplash() {
+        guard !didFinish else { return }
+        didFinish = true
+        player?.pause()
+        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
+        endObserver = nil
+        failureObserver = nil
+        UIView.animate(withDuration: 0.36, animations: {
+            self.view.alpha = 0
+        }, completion: { _ in
+            self.onFinished?()
+        })
     }
 
     private func applyKerning(to label: UILabel, value: CGFloat) {
