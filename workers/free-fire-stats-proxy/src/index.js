@@ -124,8 +124,8 @@ export default {
 
     const uid = String(payload.uid || "").trim();
     const region = String(payload.region || "").trim().toLowerCase();
-    if (!/^\d{9,10}$/.test(uid)) {
-      return json({ success: false, message: "El UID debe tener 9 o 10 dígitos." }, 400, corsHeaders());
+    if (!/^\d{8,14}$/.test(uid)) {
+      return json({ success: false, message: "El UID debe tener entre 8 y 14 dígitos." }, 400, corsHeaders());
     }
     if (!SUPPORTED_REGIONS.has(region)) {
       return json({ success: false, message: "La documentación de esta API solo declara sg, ind y br." }, 400, corsHeaders());

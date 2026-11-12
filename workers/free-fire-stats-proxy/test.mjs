@@ -80,6 +80,19 @@ assert.equal(cached.status, 200);
 assert.equal((await cached.json()).cached, true);
 assert.equal(upstreamCalls.length, 2, "the cached lookup must not call the provider again");
 
+for (const uid of ["12345678", "12345678901234"]) {
+  const response = await worker.fetch(makeRequest({ uid }), env, ctx);
+  assert.equal(response.status, 200, `UID ${uid.length} digits should be accepted`);
+  assert.equal((await response.json()).success, true);
+}
+assert.equal(upstreamCalls.length, 6, "both valid boundary UIDs should be queried once");
+
+for (const uid of ["1234567", "123456789012345"]) {
+  const response = await worker.fetch(makeRequest({ uid }), env, ctx);
+  assert.equal(response.status, 400, `UID ${uid.length} digits should be rejected`);
+}
+assert.equal(upstreamCalls.length, 6, "invalid-length UIDs must not call the provider");
+
 const badRegion = await worker.fetch(makeRequest({ region: "mx" }), env, ctx);
 assert.equal(badRegion.status, 400);
 
