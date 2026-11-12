@@ -709,7 +709,7 @@ final class PlayerView: UIView {
         titleLabel.adjustsFontForContentSizeCategory = true
         let idLabel = label("ID \(id)", size: 10, weight: .medium, color: AppTheme.secondaryText)
         idLabel.translatesAutoresizingMaskIntoConstraints = false
-        let spinner = UIActivityIndicatorView(style: .small)
+        let spinner = UIActivityIndicatorView(style: .medium)
         spinner.translatesAutoresizingMaskIntoConstraints = false
         spinner.color = AppTheme.readableAccent
         spinner.startAnimating()
