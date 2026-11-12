@@ -172,7 +172,9 @@ final class DavizinBridge {
         let injectNow: () -> Void = { [weak self] in
             guard let self = self else { return }
             DispatchQueue.global(qos: .userInitiated).async {
-                if sandbox_access_is_active() != 0 {
+                if pairingRequired {
+                    NyxelActivityLog.record("iOS 27+: per-container grants via worse_query (sin kernel exploit)")
+                } else if sandbox_access_is_active() != 0 {
                     NyxelActivityLog.record("Sandbox ya activo, omitiendo kexploit")
                 } else if DavizinTrySymlinkEscape() {
                     NyxelActivityLog.record("WQ-SYM sandbox escape exitoso (sin kernel exploit)")
@@ -332,6 +334,16 @@ final class DavizinBridge {
                     DispatchQueue.main.async {
                         self.operationInFlight = false
                         self.vc?.setOperationState(.failed(message))
+                    }
+                    return
+                }
+
+                if pairingRequired {
+                    NyxelActivityLog.record("iOS 27+: per-container grants via worse_query (exploit innecesario)")
+                    DispatchQueue.main.async {
+                        self.operationInFlight = false
+                        self.hapticFeedback(success: true)
+                        self.vc?.setOperationState(.succeeded("Sistema preparado (per-container) ✓"))
                     }
                     return
                 }
