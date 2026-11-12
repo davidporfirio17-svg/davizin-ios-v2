@@ -37,6 +37,8 @@ final class PlayerView: UIView {
     private let duoStatsLabel = UILabel()
     private let squadStatsLabel = UILabel()
     private let statsStatusLabel = UILabel()
+    private let statsStatusContainer = UIView()
+    private let statsStatusIcon = UIImageView()
     private let banCheckStatusLabel = UILabel()
     private let banCheckButton = UIButton(type: .system)
     private let clanLabel = UILabel()
@@ -102,24 +104,37 @@ final class PlayerView: UIView {
         csSeasonLabel.text = summary.season.map { "Temporada \($0) · dato del API" } ?? "Puntos de Clash Squad"
 
         let statsByKey = Dictionary(uniqueKeysWithValues: summary.modes.map { ($0.key, $0) })
-        soloStatsLabel.text = Self.modeText(statsByKey["brCareer_solo"])
-        duoStatsLabel.text = Self.modeText(statsByKey["brCareer_duo"])
-        squadStatsLabel.text = Self.modeText(statsByKey["brCareer_squad"])
         let statsWarning = summary.warnings.first { $0.localizedCaseInsensitiveContains("estadística") }
+        let providerStatsUnavailable = statsWarning != nil
+        soloStatsLabel.text = Self.modeText(statsByKey["brCareer_solo"], providerUnavailable: providerStatsUnavailable)
+        duoStatsLabel.text = Self.modeText(statsByKey["brCareer_duo"], providerUnavailable: providerStatsUnavailable)
+        squadStatsLabel.text = Self.modeText(statsByKey["brCareer_squad"], providerUnavailable: providerStatsUnavailable)
         if let statsWarning {
             let detail = statsWarning.replacingOccurrences(of: "Estadísticas:", with: "", options: [.caseInsensitive]).trimmingCharacters(in: .whitespaces)
             if detail.localizedCaseInsensitiveContains("jwt") {
-                statsStatusLabel.text = "El proveedor no pudo abrir la sesión de estadísticas (error JWT). Inténtalo más tarde."
+                statsStatusLabel.text = "El proveedor no pudo obtener su token de estadísticas (error JWT). No es un problema con tu sesión de Nyxel. El perfil y los assets disponibles siguen cargados; esto no significa 0 partidas. Inténtalo más tarde."
             } else {
-                statsStatusLabel.text = "El proveedor no pudo cargar las estadísticas: \(detail)"
+                statsStatusLabel.text = "El proveedor no pudo cargar las estadísticas: \(detail). No es un problema con tu sesión de Nyxel y no significa 0 partidas. El perfil y los assets disponibles siguen cargados."
             }
             statsStatusLabel.textColor = AppTheme.accentWarm
+            statsStatusIcon.image = UIImage(systemName: "exclamationmark.triangle.fill")
+            statsStatusIcon.tintColor = AppTheme.accentWarm
+            statsStatusContainer.backgroundColor = AppTheme.accentWarm.withAlphaComponent(0.10)
+            statsStatusContainer.layer.borderColor = AppTheme.accentWarm.withAlphaComponent(0.30).cgColor
         } else if summary.modes.isEmpty {
-            statsStatusLabel.text = "El proveedor no devolvió estadísticas para estos modos."
+            statsStatusLabel.text = "El proveedor no devolvió estadísticas para estos modos. Los datos faltantes no equivalen a 0 partidas."
             statsStatusLabel.textColor = AppTheme.secondaryText
+            statsStatusIcon.image = UIImage(systemName: "info.circle.fill")
+            statsStatusIcon.tintColor = AppTheme.readableAccent
+            statsStatusContainer.backgroundColor = AppTheme.background.withAlphaComponent(0.40)
+            statsStatusContainer.layer.borderColor = AppTheme.hairlineStrong.cgColor
         } else {
             statsStatusLabel.text = "Estadísticas públicas devueltas por el proveedor."
             statsStatusLabel.textColor = AppTheme.secondaryText
+            statsStatusIcon.image = UIImage(systemName: "checkmark.circle.fill")
+            statsStatusIcon.tintColor = AppTheme.success
+            statsStatusContainer.backgroundColor = AppTheme.background.withAlphaComponent(0.40)
+            statsStatusContainer.layer.borderColor = AppTheme.hairlineStrong.cgColor
         }
 
         let clanParts = [summary.clanName, summary.clanLevel.map { "Nv. \($0)" }, summary.clanMembers.map { "\($0) integrantes" }]
@@ -376,10 +391,35 @@ final class PlayerView: UIView {
             makeModeCard(title: "ESCUADRA", symbol: "person.3.fill", label: squadStatsLabel)
         ], axis: isPad ? .horizontal : .vertical)
         contentStack.addArrangedSubview(sectionHeading("ESTADÍSTICAS DE CARRERA", subtitle: "Solo, dúo y escuadra · cuando el proveedor las devuelve"))
-        statsStatusLabel.font = .systemFont(ofSize: 10, weight: .medium)
+        statsStatusContainer.translatesAutoresizingMaskIntoConstraints = false
+        statsStatusContainer.layer.cornerRadius = 12
+        statsStatusContainer.layer.borderWidth = 1
+        statsStatusContainer.layer.borderColor = AppTheme.hairlineStrong.cgColor
+        statsStatusContainer.backgroundColor = AppTheme.background.withAlphaComponent(0.40)
+
+        statsStatusIcon.translatesAutoresizingMaskIntoConstraints = false
+        statsStatusIcon.image = UIImage(systemName: "info.circle.fill")
+        statsStatusIcon.tintColor = AppTheme.readableAccent
+        statsStatusIcon.contentMode = .scaleAspectFit
+
+        statsStatusLabel.font = .systemFont(ofSize: 11, weight: .medium)
         statsStatusLabel.textColor = AppTheme.secondaryText
         statsStatusLabel.numberOfLines = 0
-        contentStack.addArrangedSubview(statsStatusLabel)
+        let statsNoticeStack = UIStackView(arrangedSubviews: [statsStatusIcon, statsStatusLabel])
+        statsNoticeStack.axis = .horizontal
+        statsNoticeStack.alignment = .top
+        statsNoticeStack.spacing = 9
+        statsNoticeStack.translatesAutoresizingMaskIntoConstraints = false
+        statsStatusContainer.addSubview(statsNoticeStack)
+        NSLayoutConstraint.activate([
+            statsStatusIcon.widthAnchor.constraint(equalToConstant: 16),
+            statsStatusIcon.heightAnchor.constraint(equalToConstant: 16),
+            statsNoticeStack.leadingAnchor.constraint(equalTo: statsStatusContainer.leadingAnchor, constant: 12),
+            statsNoticeStack.trailingAnchor.constraint(equalTo: statsStatusContainer.trailingAnchor, constant: -12),
+            statsNoticeStack.topAnchor.constraint(equalTo: statsStatusContainer.topAnchor, constant: 11),
+            statsNoticeStack.bottomAnchor.constraint(equalTo: statsStatusContainer.bottomAnchor, constant: -11)
+        ])
+        contentStack.addArrangedSubview(statsStatusContainer)
         contentStack.addArrangedSubview(modeRow)
 
         contentStack.addArrangedSubview(sectionHeading("ESTADO DE LA CUENTA", subtitle: "Ban Check · consulta manual · información del proveedor"))
@@ -639,8 +679,12 @@ final class PlayerView: UIView {
         }
     }
 
-    private static func modeText(_ mode: FreeFireModeStats?) -> String {
-        guard let mode, !mode.metrics.isEmpty else { return "Sin datos devueltos para este modo." }
+    private static func modeText(_ mode: FreeFireModeStats?, providerUnavailable: Bool) -> String {
+        guard let mode, !mode.metrics.isEmpty else {
+            return providerUnavailable
+                ? "No disponible por un fallo temporal del proveedor. No significa 0 partidas."
+                : "El proveedor no devolvió datos para este modo. No significa 0 partidas."
+        }
         return mode.metrics.map { "\($0.title): \($0.value)" }.joined(separator: "\n")
     }
 
