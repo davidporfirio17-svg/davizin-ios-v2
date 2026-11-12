@@ -101,8 +101,8 @@ enum AppTheme {
 
     static func countdownColor(remainingSeconds: Int) -> UIColor {
         if remainingSeconds <= 3600 { return failure }
-        if remainingSeconds <= 86400 { return warm }
-        return success
+        if remainingSeconds <= 3 * 86400 { return warm }
+        return accent
     }
 }
 

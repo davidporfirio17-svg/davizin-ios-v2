@@ -506,13 +506,7 @@ final class DavizinBridge {
 
     /// Color del contador segun el tiempo restante.
     private func countdownColor() -> UIColor {
-        if remainingSeconds <= 3600 {          // menos de 1 hora -> rojo
-            return AppTheme.failure
-        } else if remainingSeconds <= 86400 {  // menos de 1 dia -> amarillo
-            return AppTheme.accentWarm
-        } else {                                // mas de 1 dia -> verde
-            return AppTheme.success
-        }
+        AppTheme.countdownColor(remainingSeconds: remainingSeconds)
     }
 
     static func kxpDetail(_ code: Int32) -> String {

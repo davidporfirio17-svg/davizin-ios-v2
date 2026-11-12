@@ -128,7 +128,11 @@ final class ViewController: UIViewController {
     func setAccountSession(key: String?, remainingSeconds: Int, countryCode: String? = nil) {
         activeKey = key
         if countryCode != nil { activeCountryCode = countryCode }
-        if key == nil { activeCountryCode = nil }
+        if key == nil {
+            activeCountryCode = nil
+            headerView.countdownText = ""
+            headerView.resetCountdownAppearance()
+        }
         activeRemainingSeconds = max(0, remainingSeconds)
         profileView?.setAccount(key: key, remainingSeconds: activeRemainingSeconds, countryCode: activeCountryCode)
     }

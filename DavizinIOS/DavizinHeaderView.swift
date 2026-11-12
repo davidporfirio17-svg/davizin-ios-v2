@@ -21,10 +21,26 @@ final class DavizinHeaderView: UIView {
         }
     }
 
-	/// Color del contador (verde/amarillo/rojo segun tiempo restante).
-	func setCountdownColor(_ color: UIColor) {
-		countdownLabel.textColor = color
-	}
+	/// Color del contador y brillo de estado (cian/ambar/rojo segun tiempo restante).
+    func setCountdownColor(_ color: UIColor) {
+        countdownLabel.textColor = color
+        statusDot.backgroundColor = color
+        statusDot.layer.shadowColor = color.cgColor
+        layer.borderColor = color.withAlphaComponent(0.48).cgColor
+        layer.shadowColor = color.cgColor
+        layer.shadowOpacity = 0.16
+        layer.shadowRadius = 18.0
+        layer.shadowOffset = .zero
+    }
+
+    func resetCountdownAppearance() {
+        countdownLabel.textColor = AppTheme.accent
+        statusDot.backgroundColor = AppTheme.accent
+        statusDot.layer.shadowColor = AppTheme.accent.cgColor
+        layer.borderColor = AppTheme.hairlineStrong.withAlphaComponent(0.62).cgColor
+        layer.shadowColor = AppTheme.accent.cgColor
+        layer.shadowOpacity = 0.0
+    }
 
 	/// Muestra la versión/build del sistema y el estado de compatibilidad.
 	func setSystemCompatibility(_ text: String, color: UIColor) {
@@ -61,6 +77,11 @@ final class DavizinHeaderView: UIView {
         configure()
     }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: 18.0).cgPath
+    }
+
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
         backgroundColor = AppTheme.card.withAlphaComponent(0.58)
@@ -68,6 +89,10 @@ final class DavizinHeaderView: UIView {
         layer.cornerCurve = .continuous
         layer.borderWidth = 1.0
         layer.borderColor = AppTheme.hairlineStrong.withAlphaComponent(0.62).cgColor
+        layer.shadowColor = AppTheme.accent.cgColor
+        layer.shadowOpacity = 0.0
+        layer.shadowRadius = 18.0
+        layer.shadowOffset = .zero
 
         statusDot.translatesAutoresizingMaskIntoConstraints = false
         statusDot.backgroundColor = AppTheme.accent
