@@ -69,6 +69,13 @@ final class DavizinBridge {
         viewController.onFreeFireLookup = { [weak self] uid, region in
             self?.lookupFreeFireStats(uid: uid, region: region)
         }
+        viewController.onFreeFireAsset = { [weak self] itemID, completion in
+            guard let self else {
+                completion(nil)
+                return
+            }
+            self.loadFreeFireAsset(itemID: itemID, completion: completion)
+        }
 
         viewController.onClose = {
             // Nada - no cerramos
@@ -131,11 +138,19 @@ final class DavizinBridge {
             switch result {
             case .success(let summary):
                 NyxelActivityLog.record("Consulta de estadísticas de Free Fire")
-                self.vc?.setFreeFireLookupState(loading: false, message: summary.text, success: true)
+                self.vc?.setFreeFireLookupSummary(summary)
             case .failure(let error):
                 self.vc?.setFreeFireLookupState(loading: false, message: error.localizedDescription, success: false)
             }
         }
+    }
+
+    private func loadFreeFireAsset(itemID: String, completion: @escaping (UIImage?) -> Void) {
+        guard !sessionKey.isEmpty, !sessionHWID.isEmpty else {
+            completion(nil)
+            return
+        }
+        FreeFireStatsService.shared.loadAsset(itemID: itemID, key: sessionKey, hwid: sessionHWID, completion: completion)
     }
 
     private func continueAfterLogin() {

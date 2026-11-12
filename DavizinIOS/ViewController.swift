@@ -10,6 +10,7 @@ final class ViewController: UIViewController {
     var onModeSelected: ((DavizinMode) -> Void)?
     var onOperation: ((DavizinOperationKind) -> Void)?
     var onFreeFireLookup: ((String, String) -> Void)?
+    var onFreeFireAsset: ((String, @escaping (UIImage?) -> Void) -> Void)?
     var onClose: (() -> Void)?
 
     private let videoBackgroundView = DavizinLoginVideoView()
@@ -31,7 +32,9 @@ final class ViewController: UIViewController {
     private var loginView: LoginView?
     private var gameSelectionView: GameSelectionView?
     private var missionMapView: MissionMapView?
+    private var playerView: PlayerView?
     private var profileView: ProfileView?
+    private var stageBeforePlayer: DavizinScreenStage = .modeSelection
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
     private var stageBeforeHelp: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
@@ -118,7 +121,18 @@ final class ViewController: UIViewController {
     }
 
     func setFreeFireLookupState(loading: Bool, message: String, success: Bool) {
-        profileView?.setFreeFireLookupState(loading: loading, message: message, success: success)
+        guard let playerView else { return }
+        if loading {
+            playerView.setLookupLoading(true, message: message)
+        } else if success {
+            playerView.setLookupLoading(false, message: message)
+        } else {
+            playerView.setLookupError(message)
+        }
+    }
+
+    func setFreeFireLookupSummary(_ summary: FreeFireLookupSummary) {
+        playerView?.showSummary(summary)
     }
 
     /// Actualiza el contador de tiempo restante en el header.
@@ -317,6 +331,9 @@ final class ViewController: UIViewController {
 
         bottomNavView.onModes = { [weak self] in
             self?.showModeSelection(animated: true)
+        }
+        bottomNavView.onPlayer = { [weak self] in
+            self?.showPlayer(animated: true)
         }
         bottomNavView.onProfile = { [weak self] in
             self?.showProfile(animated: true)
@@ -535,13 +552,6 @@ final class ViewController: UIViewController {
         let screen = ProfileView()
         screen.delegate = self
         screen.setAccount(key: activeKey, remainingSeconds: activeRemainingSeconds, countryCode: activeCountryCode)
-        screen.onFreeFireLookupRequested = { [weak self, weak screen] uid, region in
-            guard let self, let onFreeFireLookup = self.onFreeFireLookup else {
-                screen?.setFreeFireLookupState(loading: false, message: "El servicio aún no está configurado.", success: false)
-                return
-            }
-            onFreeFireLookup(uid, region)
-        }
         screen.onAppearanceChanged = { [weak self] in
             self?.overrideUserInterfaceStyle = NyxelAppearanceStore.uiStyle
             self?.showProfile(animated: true)
@@ -562,6 +572,35 @@ final class ViewController: UIViewController {
         }
         screen.refresh()
         profileView = screen
+        display(screen, animated: animated)
+    }
+
+    private func showPlayer(animated: Bool) {
+        if currentStage != .player && !(currentStage == .help && stageBeforeHelp == .player) {
+            stageBeforePlayer = currentStage
+        }
+        currentStage = .player
+        setBottomNavigation(visible: true, selected: .player)
+        headerView.title = "Jugador de Free Fire"
+        headerView.showsBackButton = true
+        headerView.showsAvatarButton = false
+
+        let screen = PlayerView()
+        screen.onLookupRequested = { [weak self, weak screen] uid, region in
+            guard let self, let onFreeFireLookup = self.onFreeFireLookup else {
+                screen?.setLookupError("El servicio aún no está configurado.")
+                return
+            }
+            onFreeFireLookup(uid, region)
+        }
+        screen.onAssetRequested = { [weak self] itemID, completion in
+            guard let self, let onFreeFireAsset = self.onFreeFireAsset else {
+                completion(nil)
+                return
+            }
+            onFreeFireAsset(itemID, completion)
+        }
+        playerView = screen
         display(screen, animated: animated)
     }
 
@@ -736,18 +775,29 @@ final class ViewController: UIViewController {
             showGameSelection(animated: true)
         case .operation:
             showModeSelection(animated: true)
+        case .player:
+            switch stageBeforePlayer {
+            case .operation: showOperation(animated: true)
+            case .modeSelection: showModeSelection(animated: true)
+            case .gameSelection, .home: showGameSelection(animated: true)
+            case .profile: showProfile(animated: true)
+            case .help: showHelp(animated: true)
+            default: showModeSelection(animated: true)
+            }
         case .profile:
             switch stageBeforeProfile {
             case .operation: showOperation(animated: true)
             case .modeSelection: showModeSelection(animated: true)
             case .gameSelection: showGameSelection(animated: true)
             case .home: showGameSelection(animated: true)
+            case .player: showPlayer(animated: true)
             case .help: showHelp(animated: true)
             default: showModeSelection(animated: true)
             }
         case .help:
             switch stageBeforeHelp {
             case .operation: showOperation(animated: true)
+            case .player: showPlayer(animated: true)
             case .profile: showProfile(animated: true)
             case .modeSelection: showModeSelection(animated: true)
             case .gameSelection, .home, .login, .help: showGameSelection(animated: true)

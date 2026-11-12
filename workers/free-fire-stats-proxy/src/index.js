@@ -3,6 +3,7 @@ const FREE_FIRE_USER_AGENT = "NyxelExternal/1.5 (+https://nyxel-freefire-stats.d
 const NYXEL_CHECK_URL = "https://dz.davidporfirio17.workers.dev/check";
 const SUPPORTED_REGIONS = new Set(["sg", "ind", "br"]);
 const CACHE_TTL_SECONDS = 300;
+const ASSET_CACHE_TTL_SECONDS = 86400;
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -19,9 +20,15 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-DZ-Session, X-DZ-Build, X-DZ-Installation",
+    "Access-Control-Allow-Headers": "Content-Type, X-DZ-Session, X-DZ-Build, X-DZ-Installation, Cache-Control",
     "Access-Control-Max-Age": "86400",
   };
+}
+
+function withCors(response) {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(corsHeaders())) headers.set(name, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 async function parseJson(response) {
@@ -134,6 +141,84 @@ async function fetchFreeFire(endpoint, uid, region, apiKey) {
   }
 }
 
+async function fetchFreeFireAsset(itemID, apiKey) {
+  try {
+    const url = new URL(`${FREE_FIRE_API}/image`);
+    url.searchParams.set("itemID", itemID);
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        "User-Agent": FREE_FIRE_USER_AGENT,
+        Accept: "image/png,image/jpeg",
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!response.ok) {
+      const rawMessage = (await response.text()).replaceAll(apiKey, "[redacted]").trim();
+      let message = "No se encontró la imagen del asset.";
+      try {
+        const body = JSON.parse(rawMessage);
+        message = String(body.message || body.error || message).replaceAll(apiKey, "[redacted]");
+      } catch {
+        if (rawMessage) message = rawMessage.slice(0, 160);
+      }
+      return { ok: false, status: response.status, message };
+    }
+    const contentType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (contentType !== "image/png" && contentType !== "image/jpeg") {
+      return { ok: false, status: 502, message: "El proveedor no devolvió una imagen PNG o JPEG." };
+    }
+    const bytes = await response.arrayBuffer();
+    if (!bytes.byteLength) return { ok: false, status: 502, message: "El proveedor devolvió una imagen vacía." };
+    return { ok: true, bytes, contentType };
+  } catch {
+    return { ok: false, status: 502, message: "No se pudo descargar la imagen del proveedor." };
+  }
+}
+
+async function handleAssetRequest(payload, request, env, ctx) {
+  const itemID = String(payload.item_id || payload.itemID || "").trim();
+  if (!/^\d{5,15}$/.test(itemID)) {
+    return json({ success: false, code: "INVALID_ASSET_ID", message: "El identificador de imagen no es válido." }, 400, corsHeaders());
+  }
+
+  const auth = await validateNyxelKey(payload, request, env);
+  if (!auth.ok) return json({ success: false, code: "NYXEL_AUTH", message: auth.message }, auth.status, corsHeaders());
+
+  const cacheKey = new Request(`https://ff-assets-cache.invalid/image?itemID=${encodeURIComponent(itemID)}`);
+  let cache = null;
+  try {
+    cache = caches.default;
+    const cached = await cache.match(cacheKey);
+    if (cached) return withCors(new Response(cached.body, { status: cached.status, headers: cached.headers }));
+  } catch {
+    cache = null;
+  }
+
+  const asset = await fetchFreeFireAsset(itemID, env.FREE_FIRE_API_KEY);
+  if (!asset.ok) {
+    return json({ success: false, code: "ASSET_ERROR", message: asset.message }, asset.status >= 400 && asset.status < 600 ? asset.status : 502, corsHeaders());
+  }
+
+  const cacheResponse = new Response(asset.bytes, {
+    headers: {
+      "Content-Type": asset.contentType,
+      "Cache-Control": `public, max-age=${ASSET_CACHE_TTL_SECONDS}`,
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+  if (cache) ctx.waitUntil(cache.put(cacheKey, cacheResponse.clone()).catch(() => {}));
+  const response = new Response(asset.bytes, {
+    headers: {
+      "Content-Type": asset.contentType,
+      "Cache-Control": `private, max-age=${ASSET_CACHE_TTL_SECONDS}`,
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+  return withCors(response);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -144,7 +229,7 @@ export default {
     if (request.method === "GET" && url.pathname === "/health") {
       return json({ ok: true, apiKeyConfigured: Boolean(env.FREE_FIRE_API_KEY) });
     }
-    if (request.method !== "POST" || url.pathname !== "/lookup") {
+    if (request.method !== "POST" || !["/lookup", "/asset"].includes(url.pathname)) {
       return json({ success: false, message: "Ruta no encontrada." }, 404);
     }
     if (!env.FREE_FIRE_API_KEY) {
@@ -156,6 +241,10 @@ export default {
       payload = await request.json();
     } catch {
       return json({ success: false, message: "Solicitud JSON inválida." }, 400, corsHeaders());
+    }
+
+    if (url.pathname === "/asset") {
+      return handleAssetRequest(payload, request, env, ctx);
     }
 
     const uid = String(payload.uid || "").trim();

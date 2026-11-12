@@ -1,12 +1,13 @@
 # Nyxel Free Fire Stats Proxy
 
-Worker independiente de `dz`, usado por la sección «Free Fire · Estadísticas» del perfil de Nyxel External.
+Worker independiente de `dz`, usado por la pestaña «Jugador» de Nyxel External.
 
 ## Qué hace
 
 - Acepta únicamente `POST /lookup` y valida UID numérico de 5–15 dígitos y región `sg`, `ind` o `br`.
 - Revalida la key/HWID/build de Nyxel con el endpoint existente `/check` mediante el Service Binding `DZ_WORKER`, sin cambiar el Worker `dz`.
 - Consulta `/info` y `/stats` en la API comunitaria de Free Fire.
+- Sirve imágenes PNG/JPEG de `/image` mediante `POST /asset`, después de validar la sesión Nyxel; las imágenes se cachean hasta 24 horas.
 - Lee `FREE_FIRE_API_KEY` como secreto del entorno de Cloudflare; no va en la IPA ni en GitHub.
 - Envía un `User-Agent` propio, requerido por el firewall del proveedor, sin nombres de librerías o bots.
 - Devuelve el perfil y las estadísticas como datos de solo lectura, con caché breve por UID/región.
@@ -18,13 +19,13 @@ Worker independiente de `dz`, usado por la sección «Free Fire · Estadísticas
 2. Configurar el service binding `DZ_WORKER` para apuntar al Worker `dz`; esto evita una llamada pública interna a `workers.dev`.
 3. Añadir el secreto `FREE_FIRE_API_KEY` desde Cloudflare (no guardarlo en el repositorio).
 4. Comprobar `GET /health`; `apiKeyConfigured` debe ser `true`.
-5. Probar `POST /lookup` desde una IPA con una sesión Nyxel válida.
+5. Probar `POST /lookup` y `POST /asset` desde una IPA con una sesión Nyxel válida.
 
 Worker desplegado: `https://nyxel-freefire-stats.davidporfirio17.workers.dev`; health: `https://nyxel-freefire-stats.davidporfirio17.workers.dev/health`.
 
 Las pruebas simuladas se ejecutan con `npm test` desde esta carpeta; no llaman al proveedor real ni requieren secretos.
 
-La OpenAPI enumera `sg`, `ind` y `br`. La indicación enviada por el proveedor amplía `br` a Brasil, Estados Unidos, Norteamérica y LATAM; la app muestra «BR / NA» pero envía el código `br`. No usar credenciales de Free Fire: sólo se envían UID/región a la API de estadísticas.
+La OpenAPI enumera `sg`, `ind` y `br`. La indicación enviada por el proveedor amplía `br` a Brasil, Estados Unidos, Norteamérica y LATAM; la app muestra «BR / NA» pero envía el código `br`. No se envían credenciales del juego: solo van UID/región para la consulta y los IDs numéricos necesarios para pedir imágenes.
 
 El portal de desarrolladores vigente documenta UIDs de 5–15 dígitos, por lo que el UID de 8 dígitos también es válido para la validación local. Algunos materiales anteriores del kit muestran un patrón más estrecho; se sigue la documentación vigente.
 

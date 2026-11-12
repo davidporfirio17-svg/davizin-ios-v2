@@ -1,7 +1,41 @@
 import Foundation
+import UIKit
+
+struct FreeFireMetric {
+    let title: String
+    let value: String
+}
+
+struct FreeFireModeStats {
+    let key: String
+    let title: String
+    let metrics: [FreeFireMetric]
+}
 
 struct FreeFireLookupSummary {
-    let text: String
+    let uid: String
+    let nickname: String?
+    let level: String?
+    let region: String?
+    let season: String?
+    let brRankCode: String?
+    let brPoints: String?
+    let csRankCode: String?
+    let csPoints: String?
+    let likes: String?
+    let signature: String?
+    let clanName: String?
+    let clanLevel: String?
+    let clanMembers: String?
+    let avatarID: String?
+    let headPicID: String?
+    let bannerID: String?
+    let profileBadgeID: String?
+    let clothesIDs: [String]
+    let petID: String?
+    let weaponSkinIDs: [String]
+    let modes: [FreeFireModeStats]
+    let warnings: [String]
 }
 
 private enum FreeFireStatsError: LocalizedError {
@@ -18,9 +52,15 @@ private enum FreeFireStatsError: LocalizedError {
 
 final class FreeFireStatsService {
     static let shared = FreeFireStatsService()
-    private let endpoint = URL(string: "https://nyxel-freefire-stats.davidporfirio17.workers.dev/lookup")!
 
-    private init() {}
+    private let baseURL = URL(string: "https://nyxel-freefire-stats.davidporfirio17.workers.dev")!
+    private let imageCache = NSCache<NSString, UIImage>()
+    private let imageLock = NSLock()
+    private var imageRequestsInFlight: [String: [(UIImage?) -> Void]] = [:]
+
+    private init() {
+        imageCache.countLimit = 96
+    }
 
     func lookup(
         uid: String,
@@ -29,37 +69,23 @@ final class FreeFireStatsService {
         hwid: String,
         completion: @escaping (Result<FreeFireLookupSummary, Error>) -> Void
     ) {
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 25
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-        KeyValidator.applySecurityHeaders(to: &request)
-
-        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
-        let body: [String: Any] = [
+        let body = securityPayload(key: key, hwid: hwid).merging([
             "uid": uid,
-            "region": region,
-            "key": key.uppercased(),
-            "hwid": hwid,
-            "model": KeyValidator.getDeviceModel(),
-            "ios": KeyValidator.getIOSVersion(),
-            "app_version": appVersion,
-            "app_build": KeyValidator.getAppBuild(),
-            "installation_id": KeyValidator.getInstallationID()
-        ]
+            "region": region
+        ]) { _, newValue in newValue }
+
+        let request: URLRequest
         do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            request = try makeRequest(path: "/lookup", body: body)
         } catch {
-            completion(.failure(FreeFireStatsError.service("No se pudo preparar la solicitud.")))
+            DispatchQueue.main.async { completion(.failure(FreeFireStatsError.service("No se pudo preparar la consulta."))) }
             return
         }
 
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error {
-                    completion(.failure(FreeFireStatsError.service("Error de conexión con el Worker: \(error.localizedDescription)")))
+                    completion(.failure(FreeFireStatsError.service("No se pudo conectar con el servicio de jugadores: \(error.localizedDescription)")))
                     return
                 }
                 guard let data else {
@@ -72,7 +98,7 @@ final class FreeFireStatsService {
                     return
                 }
                 guard root["success"] as? Bool == true else {
-                    let message = root["message"] as? String ?? "La consulta no fue autorizada."
+                    let message = root["message"] as? String ?? "No se pudo consultar el perfil."
                     completion(.failure(FreeFireStatsError.service(message)))
                     return
                 }
@@ -80,65 +106,195 @@ final class FreeFireStatsService {
                     completion(.failure(FreeFireStatsError.service("El Worker respondió con HTTP \(status).")))
                     return
                 }
-                completion(.success(FreeFireLookupSummary(text: Self.formatSummary(uid: uid, data: dataObject))))
+                completion(.success(Self.makeSummary(uid: uid, data: dataObject)))
             }
         }.resume()
     }
 
-    private static func formatSummary(uid: String, data: [String: Any]) -> String {
-        let profileRoot = data["profile"] as? [String: Any] ?? [:]
-        let profile = profileRoot["data"] as? [String: Any] ?? profileRoot
-        let statsRoot = data["stats"] as? [String: Any] ?? [:]
-        let stats = statsRoot["data"] as? [String: Any] ?? statsRoot
-        let basicInfo = profile["basicInfo"] as? [String: Any] ?? profile
-        let clanInfo = profile["clanBasicInfo"] as? [String: Any] ?? profile
-        let socialInfo = profile["socialInfo"] as? [String: Any] ?? profile
-        var lines = ["UID: \(text(basicInfo["accountId"]) ?? text(profile["uid"]) ?? uid)"]
-
-        let name = text(basicInfo["nickname"]) ?? text(profile["name"])
-        let level = text(basicInfo["level"]) ?? text(profile["level"])
-        let rank = text(basicInfo["rank"]) ?? text(profile["rank"]) ?? text(profile["tier"])
-        let region = text(basicInfo["region"]) ?? text(profile["region"])
-        var identity: [String] = []
-        if let name { identity.append(name) }
-        if let level { identity.append("Nv. \(level)") }
-        if let rank { identity.append("Rango \(rank)") }
-        if let region { identity.append("Región \(region)") }
-        if !identity.isEmpty { lines.append(identity.joined(separator: " • ")) }
-
-        let clan = text(clanInfo["clanName"]) ?? text(profile["guild"])
-        let clanLevel = text(clanInfo["clanLevel"])
-        let memberCount = text(clanInfo["memberNum"])
-        var clanDetails: [String] = []
-        if let clan { clanDetails.append("Clan: \(clan)") }
-        if let clanLevel { clanDetails.append("Nivel de clan: \(clanLevel)") }
-        if let memberCount { clanDetails.append("Miembros: \(memberCount)") }
-        if !clanDetails.isEmpty { lines.append(clanDetails.joined(separator: " • ")) }
-
-        let signature = text(socialInfo["signature"])
-        let likes = text(socialInfo["likes"]) ?? text(profile["likes"])
-        let social = [signature.map { "Firma: \($0)" }, likes.map { "Me gusta: \($0)" }].compactMap { $0 }
-        if !social.isEmpty { lines.append(social.joined(separator: " • ")) }
-
-        let documentedModes = [("brCareer_solo", "Solo"), ("brCareer_duo", "Dúo"), ("brCareer_squad", "Escuadra")]
-        let legacyModes = [("solo", "Solo"), ("duo", "Dúo"), ("squad", "Escuadra")]
-        let modeNames = documentedModes.contains { stats[$0.0] != nil } ? documentedModes : legacyModes
-        let modeSummaries = modeNames.compactMap { item -> String? in
-            guard let mode = stats[item.0] as? [String: Any] else { return nil }
-            let fields = mode.keys.sorted().compactMap { key -> String? in
-                guard let value = text(mode[key]) else { return nil }
-                return "\(displayName(key)): \(value)"
-            }.prefix(4)
-            guard !fields.isEmpty else { return nil }
-            return "\(item.1): " + fields.joined(separator: " · ")
+    func loadAsset(
+        itemID: String,
+        key: String,
+        hwid: String,
+        completion: @escaping (UIImage?) -> Void
+    ) {
+        let id = itemID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard id.range(of: "^\\d{5,15}$", options: .regularExpression) != nil else {
+            DispatchQueue.main.async { completion(nil) }
+            return
         }
-        if !modeSummaries.isEmpty { lines.append(modeSummaries.joined(separator: "   |   ")) }
 
-        if let warnings = data["warnings"] as? [String], !warnings.isEmpty {
-            lines.append("Aviso: datos parciales (\(warnings.joined(separator: "; ")))")
+        if let cached = imageCache.object(forKey: id as NSString) {
+            DispatchQueue.main.async { completion(cached) }
+            return
         }
-        if lines.count == 1 { lines.append("El proveedor no devolvió detalles de perfil o estadísticas.") }
-        return lines.joined(separator: "\n")
+
+        imageLock.lock()
+        if imageRequestsInFlight[id] != nil {
+            imageRequestsInFlight[id]?.append(completion)
+            imageLock.unlock()
+            return
+        }
+        imageRequestsInFlight[id] = [completion]
+        imageLock.unlock()
+
+        var body = securityPayload(key: key, hwid: hwid)
+        body["item_id"] = id
+        let request: URLRequest
+        do {
+            request = try makeRequest(path: "/asset", body: body)
+        } catch {
+            finishAssetRequest(id: id, image: nil)
+            return
+        }
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self else { return }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let image: UIImage?
+            if error == nil, (200..<300).contains(status), let data {
+                image = UIImage(data: data)
+            } else {
+                image = nil
+            }
+            self.finishAssetRequest(id: id, image: image)
+        }.resume()
+    }
+
+    private func finishAssetRequest(id: String, image: UIImage?) {
+        if let image { imageCache.setObject(image, forKey: id as NSString) }
+        imageLock.lock()
+        let callbacks = imageRequestsInFlight.removeValue(forKey: id) ?? []
+        imageLock.unlock()
+        DispatchQueue.main.async {
+            callbacks.forEach { $0(image) }
+        }
+    }
+
+    private func makeRequest(path: String, body: [String: Any]) throws -> URLRequest {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))))
+        request.httpMethod = "POST"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        KeyValidator.applySecurityHeaders(to: &request)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return request
+    }
+
+    private func securityPayload(key: String, hwid: String) -> [String: Any] {
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+        return [
+            "key": key.uppercased(),
+            "hwid": hwid,
+            "model": KeyValidator.getDeviceModel(),
+            "ios": KeyValidator.getIOSVersion(),
+            "app_version": appVersion,
+            "app_build": KeyValidator.getAppBuild(),
+            "installation_id": KeyValidator.getInstallationID()
+        ]
+    }
+
+    private static func makeSummary(uid: String, data: [String: Any]) -> FreeFireLookupSummary {
+        let profileRoot = dictionary(data["profile"])
+        let profile = dictionary(profileRoot["data"]).isEmpty ? profileRoot : dictionary(profileRoot["data"])
+        let statsRoot = dictionary(data["stats"])
+        let stats = dictionary(statsRoot["data"]).isEmpty ? statsRoot : dictionary(statsRoot["data"])
+        let basic = dictionary(profile["basicInfo"])
+        let profileInfo = dictionary(profile["profileInfo"])
+        let social = dictionary(profile["socialInfo"])
+        let clan = dictionary(profile["clanBasicInfo"])
+        let pet = dictionary(profile["petInfo"])
+
+        let documentedModeDefinitions = [
+            ("brCareer_solo", "Solo"),
+            ("brCareer_duo", "Dúo"),
+            ("brCareer_squad", "Escuadra")
+        ]
+        let legacyModeDefinitions = [("solo", "Solo"), ("duo", "Dúo"), ("squad", "Escuadra")]
+        let modeDefinitions = documentedModeDefinitions.contains { stats[$0.0] != nil } ? documentedModeDefinitions : legacyModeDefinitions
+        let modes = modeDefinitions.compactMap { key, title -> FreeFireModeStats? in
+            guard let raw = stats[key] else { return nil }
+            let values = dictionary(raw)
+            guard !values.isEmpty else { return FreeFireModeStats(key: key, title: title, metrics: []) }
+            return FreeFireModeStats(key: key, title: title, metrics: metrics(from: values))
+        }
+
+        let warnings = data["warnings"] as? [String] ?? []
+        let clothes = stringArray(profileInfo["clothes"] ?? profile["clothes"])
+        let weaponSkins = stringArray(profileInfo["weaponSkinShows"] ?? profile["weaponSkinShows"])
+        let avatarID = scalar(profileInfo, keys: ["avatarId", "avatarID"])
+        let headPicID = scalar(basic, keys: ["headPic", "avatarId", "avatarID"])
+
+        return FreeFireLookupSummary(
+            uid: scalar(basic, keys: ["accountId", "uid"]) ?? scalar(profile, keys: ["uid", "accountId"]) ?? uid,
+            nickname: scalar(basic, keys: ["nickname", "name"]) ?? scalar(profile, keys: ["name", "nickname"]),
+            level: scalar(basic, keys: ["level"]) ?? scalar(profile, keys: ["level"]),
+            region: scalar(basic, keys: ["region"]) ?? scalar(profile, keys: ["region"]),
+            season: scalar(basic, keys: ["seasonId", "season"]),
+            brRankCode: scalar(basic, keys: ["rank"]),
+            brPoints: scalar(basic, keys: ["rankingPoints", "rankPoints"]),
+            csRankCode: scalar(basic, keys: ["csRank"]),
+            csPoints: scalar(basic, keys: ["csRankingPoints", "csRankPoints"]),
+            likes: scalar(social, keys: ["likes"]) ?? scalar(basic, keys: ["liked", "likes"]),
+            signature: scalar(social, keys: ["signature"]),
+            clanName: scalar(clan, keys: ["clanName", "name"]),
+            clanLevel: scalar(clan, keys: ["clanLevel", "level"]),
+            clanMembers: scalar(clan, keys: ["memberNum", "members"]),
+            avatarID: avatarID ?? headPicID,
+            headPicID: headPicID,
+            bannerID: scalar(basic, keys: ["bannerId", "bannerID"]),
+            profileBadgeID: scalar(basic, keys: ["badgeId", "badgeID"]),
+            clothesIDs: clothes,
+            petID: scalar(pet, keys: ["id", "petId"]),
+            weaponSkinIDs: weaponSkins,
+            modes: modes,
+            warnings: warnings
+        )
+    }
+
+    private static func metrics(from mode: [String: Any]) -> [FreeFireMetric] {
+        let prioritized: [(String, [String])] = [
+            ("Partidas", ["matchPlayed", "matchesPlayed", "totalMatches", "matches", "gamesPlayed"]),
+            ("Victorias", ["matchWon", "matchesWon", "totalWins", "wins", "booyahs"]),
+            ("Eliminaciones", ["killCount", "totalKills", "kills", "eliminations"]),
+            ("Máx. eliminaciones", ["maxKill", "maxKills", "highestKills", "maxEliminations"]),
+            ("Headshots", ["headshotKills", "headshots", "headshotCount"]),
+            ("Top 10", ["top10", "topTen", "top10Count"]),
+            ("KD", ["kdRatio", "kd"])
+        ]
+        var result: [FreeFireMetric] = []
+        var used = Set<String>()
+        for (title, aliases) in prioritized {
+            guard let key = aliases.first(where: { mode[$0] != nil }),
+                  let value = text(mode[key]) else { continue }
+            result.append(FreeFireMetric(title: title, value: value))
+            used.insert(key)
+        }
+        if result.isEmpty {
+            for key in mode.keys.sorted() where !used.contains(key) {
+                guard let value = text(mode[key]) else { continue }
+                result.append(FreeFireMetric(title: displayName(key), value: value))
+                if result.count == 4 { break }
+            }
+        }
+        return Array(result.prefix(4))
+    }
+
+    private static func dictionary(_ value: Any?) -> [String: Any] {
+        value as? [String: Any] ?? [:]
+    }
+
+    private static func scalar(_ dictionary: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = text(dictionary[key]) { return value }
+        }
+        return nil
+    }
+
+    private static func stringArray(_ value: Any?) -> [String] {
+        guard let values = value as? [Any] else { return [] }
+        return values.compactMap { text($0) }
     }
 
     private static func displayName(_ key: String) -> String {
@@ -149,7 +305,10 @@ final class FreeFireStatsService {
 
     private static func text(_ value: Any?) -> String? {
         guard let value, !(value is NSNull) else { return nil }
-        if let string = value as? String, !string.isEmpty { return string }
+        if let string = value as? String {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
         if let number = value as? NSNumber { return number.stringValue }
         return nil
     }

@@ -26,7 +26,16 @@ globalThis.fetch = async (input, init = {}) => {
   assert.equal(userAgent, "NyxelExternal/1.5 (+https://nyxel-freefire-stats.davidporfirio17.workers.dev)");
   assert.ok(userAgent.length >= 10);
   assert.ok(!/python|requests|aiohttp|httpx|urllib|node-fetch|axios|got|undici|okhttp|java|curl|wget|bot|crawl|spider|scrapy|puppeteer|playwright|selenium|postman|insomnia|httpie/i.test(userAgent));
-  upstreamCalls.push({ path: url.pathname, apiKey: headers.get("x-api-key") });
+  upstreamCalls.push({ path: url.pathname, apiKey: headers.get("x-api-key"), itemID: url.searchParams.get("itemID") });
+
+  if (url.pathname.endsWith("/image")) {
+    if (providerMode === "asset-missing") return Response.json({ error: "Item not found" }, { status: 404 });
+    if (providerMode === "non-image") return new Response("not-an-image", { status: 200, headers: { "Content-Type": "text/plain" } });
+    return new Response(Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]), {
+      status: 200,
+      headers: { "Content-Type": "image/png" },
+    });
+  }
   if (providerMode === "non-json") return new Response("not-json", { status: 200 });
   if (providerMode === "rate-limit") {
     return new Response(JSON.stringify({ status: "error" }), { status: 429, headers: { "Retry-After": "60" } });
@@ -46,10 +55,8 @@ globalThis.fetch = async (input, init = {}) => {
   throw new Error(`Unexpected fetch: ${url}`);
 };
 
-function makeRequest(overrides = {}) {
-  const payload = {
-    uid: "665951869",
-    region: "ind",
+function securityPayload(overrides = {}) {
+  return {
     key: "test-nyxel-key",
     hwid: "TEST-HWID",
     app_build: "5",
@@ -57,7 +64,30 @@ function makeRequest(overrides = {}) {
     installation_id: "install-test",
     ...overrides,
   };
+}
+
+function makeRequest(overrides = {}) {
+  const payload = {
+    uid: "665951869",
+    region: "ind",
+    ...securityPayload(),
+    ...overrides,
+  };
   return new Request("https://nyxel-freefire-stats.davidporfirio17.workers.dev/lookup", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-DZ-Build": "5",
+      "X-DZ-Installation": "install-test",
+      "X-DZ-Session": "session-test",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+function makeAssetRequest(itemID, overrides = {}) {
+  const payload = { item_id: itemID, ...securityPayload(), ...overrides };
+  return new Request("https://nyxel-freefire-stats.davidporfirio17.workers.dev/asset", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -131,8 +161,11 @@ authSuccess = false;
 const unauthorized = await worker.fetch(makeRequest({ uid: "123456789" }), env, ctx);
 assert.equal(unauthorized.status, 401);
 assert.equal(upstreamCalls.length, callsBeforeUnauthorized);
-
+const unauthorizedAsset = await worker.fetch(makeAssetRequest("102000015"), env, ctx);
+assert.equal(unauthorizedAsset.status, 401);
+assert.equal(upstreamCalls.length, callsBeforeUnauthorized, "unauthorized asset requests must not call the provider");
 authSuccess = true;
+
 const unconfigured = await worker.fetch(makeRequest({ uid: "123456789" }), {}, ctx);
 assert.equal(unconfigured.status, 503);
 
@@ -140,6 +173,33 @@ providerMode = "secret-leak";
 const secretLeak = await worker.fetch(makeRequest({ uid: "66666666" }), env, ctx);
 assert.equal(secretLeak.status, 500);
 assert.ok(!JSON.stringify(await secretLeak.json()).includes("local-test-secret"));
+providerMode = "normal";
+
+const beforeAsset = upstreamCalls.length;
+const assetResponse = await worker.fetch(makeAssetRequest("102000015"), env, ctx);
+assert.equal(assetResponse.status, 200);
+assert.equal(assetResponse.headers.get("content-type"), "image/png");
+assert.equal(assetResponse.headers.get("Access-Control-Allow-Origin"), "*");
+assert.deepEqual(Array.from(new Uint8Array(await assetResponse.arrayBuffer())), [137, 80, 78, 71, 13, 10, 26, 10]);
+assert.equal(upstreamCalls.length, beforeAsset + 1);
+assert.equal(upstreamCalls.at(-1).path, "/api/v1/image");
+assert.equal(upstreamCalls.at(-1).itemID, "102000015");
+const cachedAsset = await worker.fetch(makeAssetRequest("102000015"), env, ctx);
+assert.equal(cachedAsset.status, 200);
+assert.equal(upstreamCalls.length, beforeAsset + 1, "cached assets must not call the provider again");
+const invalidAsset = await worker.fetch(makeAssetRequest("not-an-id"), env, ctx);
+assert.equal(invalidAsset.status, 400);
+assert.equal(upstreamCalls.length, beforeAsset + 1, "invalid asset IDs must not call the provider");
+
+providerMode = "asset-missing";
+const missingAsset = await worker.fetch(makeAssetRequest("102000016"), env, ctx);
+assert.equal(missingAsset.status, 404);
+assert.equal((await missingAsset.json()).code, "ASSET_ERROR");
+providerMode = "non-image";
+const invalidImage = await worker.fetch(makeAssetRequest("102000017"), env, ctx);
+assert.equal(invalidImage.status, 502);
+assert.match((await invalidImage.json()).message, /PNG o JPEG/i);
+providerMode = "normal";
 
 providerMode = "stats-fails";
 const partial = await worker.fetch(makeRequest({ uid: "77777777" }), env, ctx);
