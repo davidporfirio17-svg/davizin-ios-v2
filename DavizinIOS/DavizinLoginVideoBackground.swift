@@ -30,7 +30,7 @@ final class DavizinLoginVideoView: UIView {
     }
 
     private func start() {
-        guard !UIAccessibility.isReduceMotionEnabled,
+        guard !UIAccessibility.isReduceMotionEnabled, NyxelAppearanceStore.animationsEnabled,
               let url = Bundle.main.url(forResource: "login_background", withExtension: "mp4") else { return }
         let item = AVPlayerItem(url: url)
         let queue = AVQueuePlayer()
@@ -46,12 +46,12 @@ final class DavizinLoginVideoView: UIView {
     @objc private func pauseVideo() { player?.pause() }
 
     @objc private func resumeVideo() {
-        guard !UIAccessibility.isReduceMotionEnabled, window != nil else { return }
+        guard !UIAccessibility.isReduceMotionEnabled, NyxelAppearanceStore.animationsEnabled, window != nil else { return }
         player?.play()
     }
 
     @objc private func motionPreferenceChanged() {
-        if UIAccessibility.isReduceMotionEnabled {
+        if UIAccessibility.isReduceMotionEnabled || !NyxelAppearanceStore.animationsEnabled {
             player?.pause()
             playerLayer.player = nil
             player = nil

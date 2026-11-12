@@ -107,7 +107,7 @@ final class LoginView: UIView {
         cardView.alpha = 0.0
         cardView.transform = CGAffineTransform(translationX: 0.0, y: 16.0)
 
-        guard !UIAccessibility.isReduceMotionEnabled else {
+        guard !UIAccessibility.isReduceMotionEnabled, NyxelAppearanceStore.animationsEnabled else {
             logoMark.alpha = 1.0
             logoMark.transform = .identity
             cardView.alpha = 1.0

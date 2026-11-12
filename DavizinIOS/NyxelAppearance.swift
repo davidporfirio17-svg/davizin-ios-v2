@@ -23,6 +23,12 @@ enum NyxelAppearanceStore {
     }
     static var accentHot: UIColor { accent.withAlphaComponent(0.82) }
     static var accentDim: UIColor { accent.withAlphaComponent(0.14) }
+    private static let animationsKey = "nyxel.animations.enabled"
+    static var animationsEnabled: Bool {
+        if UserDefaults.standard.object(forKey: animationsKey) == nil { return true }
+        return UserDefaults.standard.bool(forKey: animationsKey)
+    }
+    static func setAnimationsEnabled(_ enabled: Bool) { UserDefaults.standard.set(enabled, forKey: animationsKey) }
     static func setTheme(_ theme: Theme) { UserDefaults.standard.set(theme.rawValue, forKey: key) }
     static func setColorMode(_ mode: ColorMode) { UserDefaults.standard.set(mode.rawValue, forKey: colorModeKey) }
 }

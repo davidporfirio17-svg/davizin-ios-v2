@@ -292,6 +292,13 @@ final class ViewController: UIViewController {
 
     @objc private func appWillEnterForeground() {
         NyxelCleanupFlow.markReturnedToNyxel()
+        overrideUserInterfaceStyle = NyxelAppearanceStore.uiStyle
+        setNeedsStatusBarAppearanceUpdate()
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        if currentStage != .login && !animatedBackgroundView.isHidden {
+            animatedBackgroundView.startAnimating()
+        }
         if let backgroundedAt, Date().timeIntervalSince(backgroundedAt) >= inactivityLockInterval {
             activeKey = nil
             activeRemainingSeconds = 0

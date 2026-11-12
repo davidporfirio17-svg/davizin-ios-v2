@@ -117,6 +117,7 @@ final class ProfileView: UIView {
     private let themeControl = UISegmentedControl(items: ["Auto", "Claro", "Oscuro"])
     private let appearanceControl = UISegmentedControl(items: ["Cian", "Fuego", "Violeta"])
     private let biometricSwitch = UISwitch()
+    private let animationsSwitch = UISwitch()
     private let activationVoiceSwitch = UISwitch()
     private let refreshButton = UIButton(type: .system)
     private let diagnosticsLabel = UILabel()
@@ -166,6 +167,7 @@ final class ProfileView: UIView {
         themeControl.selectedSegmentIndex = NyxelAppearanceStore.colorMode.rawValue
         appearanceControl.selectedSegmentIndex = NyxelAppearanceStore.theme.rawValue
         biometricSwitch.isOn = UserDefaults.standard.bool(forKey: "nyxel.biometric.enabled")
+        animationsSwitch.isOn = NyxelAppearanceStore.animationsEnabled
         activationVoiceSwitch.isOn = SoundService.shared.activationVoiceEnabled
         updateProgressRing()
         refreshDiagnosticsTapped()
@@ -236,6 +238,8 @@ final class ProfileView: UIView {
         appearanceControl.addTarget(self, action: #selector(appearanceChanged), for: .valueChanged)
         biometricSwitch.onTintColor = AppTheme.accent
         biometricSwitch.addTarget(self, action: #selector(biometricChanged), for: .valueChanged)
+        animationsSwitch.onTintColor = AppTheme.accent
+        animationsSwitch.addTarget(self, action: #selector(animationsChanged), for: .valueChanged)
         activationVoiceSwitch.onTintColor = AppTheme.accent
         activationVoiceSwitch.addTarget(self, action: #selector(activationVoiceChanged), for: .valueChanged)
 
@@ -264,6 +268,10 @@ final class ProfileView: UIView {
         let accentRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Color de acento"), appearanceControl])
         accentRow.axis = .vertical
         accentRow.spacing = 8
+        let animationsRow = UIStackView(arrangedSubviews: [makeCaptionLabel("Animaciones y videos de fondo"), animationsSwitch])
+        animationsRow.axis = .horizontal
+        animationsRow.alignment = .center
+        animationsRow.distribution = .equalSpacing
 
         diagnosticsLabel.font = AppTheme.monoFont(10)
         diagnosticsLabel.textColor = AppTheme.primaryText
@@ -301,7 +309,7 @@ final class ProfileView: UIView {
         clearPlayerHistoryButton.accessibilityHint = "Elimina el UID y la región guardados en este dispositivo."
         clearPlayerHistoryButton.addTarget(self, action: #selector(clearPlayerHistoryTapped), for: .touchUpInside)
         let privacySection = ProfileDisclosureSection(title: "PRIVACIDAD", views: [privacySummaryLabel, clearPlayerHistoryButton], expanded: false)
-        let appearanceSection = ProfileDisclosureSection(title: "APARIENCIA", views: [themeRow, accentRow])
+        let appearanceSection = ProfileDisclosureSection(title: "APARIENCIA", views: [themeRow, accentRow, animationsRow])
         let securitySection = ProfileDisclosureSection(title: "SEGURIDAD", views: [biometricRow])
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
         let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, privacySection, appearanceSection, securitySection, audioSection, diagnosticsSection, refreshButton, logoutButton])
@@ -420,6 +428,11 @@ final class ProfileView: UIView {
     @objc private func biometricChanged() {
         UserDefaults.standard.set(biometricSwitch.isOn, forKey: "nyxel.biometric.enabled")
         NyxelActivityLog.record(biometricSwitch.isOn ? "Biometría activada" : "Biometría desactivada")
+    }
+
+    @objc private func animationsChanged() {
+        NyxelAppearanceStore.setAnimationsEnabled(animationsSwitch.isOn)
+        NyxelActivityLog.record(animationsSwitch.isOn ? "Animaciones activadas" : "Animaciones desactivadas")
     }
 
     @objc private func activationVoiceChanged() {

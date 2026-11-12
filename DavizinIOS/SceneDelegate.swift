@@ -48,5 +48,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneWillResignActive(_ scene: UIScene) {}
-    func sceneDidBecomeActive(_ scene: UIScene) {}
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        window?.overrideUserInterfaceStyle = NyxelAppearanceStore.uiStyle
+    }
 }

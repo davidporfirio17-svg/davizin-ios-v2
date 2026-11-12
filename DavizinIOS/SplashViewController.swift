@@ -36,7 +36,7 @@ final class SplashViewController: UIViewController {
         super.viewDidAppear(animated)
         if videoIsActive {
             player?.play()
-        } else {
+        } else if !didFinish {
             animateFallbackSplash()
         }
     }
@@ -120,7 +120,11 @@ final class SplashViewController: UIViewController {
     }
 
     private func installWelcomeVideo() {
-        guard let url = Bundle.main.url(forResource: "nyxel_welcome", withExtension: "mp4") else { return }
+        guard NyxelAppearanceStore.animationsEnabled,
+              let url = Bundle.main.url(forResource: "nyxel_welcome", withExtension: "mp4") else {
+            showStaticSplash()
+            return
+        }
         activateWelcomeAudio()
         let item = AVPlayerItem(url: url)
         let welcomePlayer = AVPlayer(playerItem: item)
@@ -153,6 +157,20 @@ final class SplashViewController: UIViewController {
             queue: .main
         ) { [weak self] _ in
             self?.showFallbackSplash()
+        }
+    }
+
+    private func showStaticSplash() {
+        portraitView.isHidden = false
+        wordLabel.isHidden = false
+        captionLabel.isHidden = false
+        portraitView.alpha = 1
+        portraitView.transform = .identity
+        wordLabel.alpha = 1
+        captionLabel.alpha = 1
+        progressLayer.strokeEnd = 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.finishSplash()
         }
     }
 
