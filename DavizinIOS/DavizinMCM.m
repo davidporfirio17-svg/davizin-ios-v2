@@ -9,6 +9,8 @@
 #import <fcntl.h>
 #import <os/lock.h>
 #import <dirent.h>
+#import <sys/stat.h>
+#import <errno.h>
 
 #pragma mark - C API types (container_query_* from libsystem_containermanager)
 
@@ -123,6 +125,13 @@ static inline void DavizinMCMLog(NSString *msg) {
 
 static void _storeLease(MCMAPI *api, void *q, void *act, const char *bid, const char *path);
 static BOOL _mcmProbeCanWrite(const char *dirPath);
+
+static const char *kAppGroups[] = {
+    "group.a8b3cf4e91d07562.1",
+    "group.a8b3cf4e91d07562.2",
+    "group.a8b3cf4e91d07562.3",
+};
+static const int kAppGroupCount = 3;
 
 #pragma mark - worse_query symlink: sandbox escape via App Group symlink (forcequitOS technique)
 
@@ -339,13 +348,6 @@ static inline BOOL shouldUseBadQuery(void) {
     NSOperatingSystemVersion osVersion = [[NSProcessInfo processInfo] operatingSystemVersion];
     return osVersion.majorVersion >= 26;
 }
-
-static const char *kAppGroups[] = {
-    "group.a8b3cf4e91d07562.1",
-    "group.a8b3cf4e91d07562.2",
-    "group.a8b3cf4e91d07562.3",
-};
-static const int kAppGroupCount = 3;
 
 int64_t DavizinGrantContainerAccess(const char *containerPath) {
     if (!shouldUseBadQuery()) {
