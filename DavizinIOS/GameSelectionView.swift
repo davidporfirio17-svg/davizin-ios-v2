@@ -6,6 +6,9 @@ protocol GameSelectionViewDelegate: AnyObject {
 
 final class GameSelectionView: UIView {
     weak var delegate: GameSelectionViewDelegate?
+    var onOpenPlayer: (() -> Void)?
+    var onOpenProfile: (() -> Void)?
+    var onOpenHelp: (() -> Void)?
 
     private let cardView = DavizinCardView()
     private let categoryLabel = UILabel()
@@ -18,6 +21,11 @@ final class GameSelectionView: UIView {
     private let freeFireCompatibility = UILabel()
     private let freeFireMaxCompatibility = UILabel()
     private let stackView = UIStackView()
+    private let sessionIcon = UIImageView()
+    private let sessionStatusLabel = UILabel()
+    private let connectivityIcon = UIImageView()
+    private let connectivityStatusLabel = UILabel()
+    private var connectivityObserver: NSObjectProtocol?
 
     private(set) var selectedGame: DavizinGame?
 
@@ -29,6 +37,52 @@ final class GameSelectionView: UIView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         configure()
+    }
+
+    deinit {
+        if let connectivityObserver { NotificationCenter.default.removeObserver(connectivityObserver) }
+    }
+
+    func setSessionStatus(keyAuthorized: Bool, remainingSeconds: Int) {
+        let active = keyAuthorized && remainingSeconds > 0
+        sessionIcon.image = UIImage(systemName: active ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+        sessionIcon.tintColor = active ? AppTheme.success : AppTheme.accentWarm
+        if active {
+            let days = remainingSeconds / 86400
+            let hours = (remainingSeconds % 86400) / 3600
+            let minutes = (remainingSeconds % 3600) / 60
+            let remaining: String
+            if days > 0 {
+                remaining = days == 1 ? "1 día \(hours) h" : "\(days) días \(hours) h"
+            } else {
+                remaining = "\(hours) h \(minutes) min"
+            }
+            sessionStatusLabel.text = "Acceso Nyxel activo · \(remaining) restantes"
+            sessionStatusLabel.textColor = AppTheme.primaryText
+        } else {
+            sessionStatusLabel.text = keyAuthorized ? "Tu acceso Nyxel expiró" : "Sesión Nyxel no disponible"
+            sessionStatusLabel.textColor = AppTheme.accentWarm
+        }
+    }
+
+    private func setConnectivityStatus(_ connected: Bool?) {
+        switch connected {
+        case .some(true):
+            connectivityIcon.image = UIImage(systemName: "wifi")
+            connectivityIcon.tintColor = AppTheme.success
+            connectivityStatusLabel.text = "Internet disponible"
+            connectivityStatusLabel.textColor = AppTheme.primaryText
+        case .some(false):
+            connectivityIcon.image = UIImage(systemName: "wifi.slash")
+            connectivityIcon.tintColor = AppTheme.failure
+            connectivityStatusLabel.text = "Sin internet · revisa Wi-Fi o datos móviles"
+            connectivityStatusLabel.textColor = AppTheme.accentWarm
+        case .none:
+            connectivityIcon.image = UIImage(systemName: "network")
+            connectivityIcon.tintColor = AppTheme.secondaryText
+            connectivityStatusLabel.text = "Comprobando conexión…"
+            connectivityStatusLabel.textColor = AppTheme.secondaryText
+        }
     }
 
     func setSelectedGame(_ game: DavizinGame?) {
@@ -56,7 +110,7 @@ final class GameSelectionView: UIView {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
-        categoryLabel.text = "01 / ENTORNO"
+        categoryLabel.text = "INICIO · ESTADO GENERAL"
         categoryLabel.textColor = AppTheme.tertiaryText
         categoryLabel.font = AppTheme.captionFont()
         categoryLabel.textAlignment = .center
@@ -112,6 +166,50 @@ final class GameSelectionView: UIView {
         stackView.addArrangedSubview(categoryLabel)
         stackView.addArrangedSubview(titleLabel)
         stackView.addArrangedSubview(subtitleLabel)
+
+        sessionIcon.image = UIImage(systemName: "checkmark.shield.fill")
+        sessionIcon.contentMode = .scaleAspectFit
+        sessionIcon.widthAnchor.constraint(equalToConstant: 18).isActive = true
+        sessionIcon.heightAnchor.constraint(equalToConstant: 18).isActive = true
+        connectivityIcon.image = UIImage(systemName: "network")
+        connectivityIcon.contentMode = .scaleAspectFit
+        connectivityIcon.widthAnchor.constraint(equalToConstant: 18).isActive = true
+        connectivityIcon.heightAnchor.constraint(equalToConstant: 18).isActive = true
+        [sessionStatusLabel, connectivityStatusLabel].forEach {
+            $0.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 13, weight: .semibold))
+            $0.adjustsFontForContentSizeCategory = true
+            $0.numberOfLines = 0
+        }
+        let sessionRow = UIStackView(arrangedSubviews: [sessionIcon, sessionStatusLabel])
+        let connectivityRow = UIStackView(arrangedSubviews: [connectivityIcon, connectivityStatusLabel])
+        [sessionRow, connectivityRow].forEach { $0.axis = .horizontal; $0.alignment = .center; $0.spacing = 9 }
+        let statusStack = UIStackView(arrangedSubviews: [sessionRow, connectivityRow])
+        statusStack.axis = .vertical
+        statusStack.spacing = 10
+        statusStack.translatesAutoresizingMaskIntoConstraints = false
+        let statusPanel = UIView()
+        statusPanel.backgroundColor = AppTheme.background.withAlphaComponent(0.55)
+        statusPanel.layer.cornerRadius = 13
+        statusPanel.layer.borderWidth = 1
+        statusPanel.layer.borderColor = AppTheme.hairlineStrong.cgColor
+        statusPanel.addSubview(statusStack)
+        NSLayoutConstraint.activate([
+            statusStack.leadingAnchor.constraint(equalTo: statusPanel.leadingAnchor, constant: 12),
+            statusStack.trailingAnchor.constraint(equalTo: statusPanel.trailingAnchor, constant: -12),
+            statusStack.topAnchor.constraint(equalTo: statusPanel.topAnchor, constant: 12),
+            statusStack.bottomAnchor.constraint(equalTo: statusPanel.bottomAnchor, constant: -12)
+        ])
+        stackView.addArrangedSubview(statusPanel)
+        setSessionStatus(keyAuthorized: false, remainingSeconds: 0)
+        setConnectivityStatus(NyxelConnectivity.isConnected)
+        connectivityObserver = NotificationCenter.default.addObserver(
+            forName: .nyxelConnectivityDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            self?.setConnectivityStatus(note.object as? Bool)
+        }
+
         let freeFireChoice = UIStackView(arrangedSubviews: [freeFireButton, freeFireSubtitle, freeFireCompatibility])
         let freeFireMaxChoice = UIStackView(arrangedSubviews: [freeFireMaxButton, freeFireMaxSubtitle, freeFireMaxCompatibility])
         [freeFireChoice, freeFireMaxChoice].forEach {
@@ -121,6 +219,17 @@ final class GameSelectionView: UIView {
         }
         stackView.addArrangedSubview(freeFireChoice)
         stackView.addArrangedSubview(freeFireMaxChoice)
+
+        let shortcuts = UIStackView(arrangedSubviews: [
+            makeShortcut(title: "JUGADOR", symbol: "person.crop.square.fill", action: #selector(playerShortcutTapped)),
+            makeShortcut(title: "CUENTA", symbol: "person.crop.circle.fill", action: #selector(profileShortcutTapped)),
+            makeShortcut(title: "AYUDA", symbol: "questionmark.circle.fill", action: #selector(helpShortcutTapped))
+        ])
+        shortcuts.axis = .horizontal
+        shortcuts.distribution = .fillEqually
+        shortcuts.spacing = 8
+        stackView.addArrangedSubview(shortcuts)
+        setConnectivityStatus(NyxelConnectivity.isConnected)
 
         cardView.translatesAutoresizingMaskIntoConstraints = false
         cardView.useTransparentAppearance()
@@ -152,4 +261,27 @@ final class GameSelectionView: UIView {
         setSelectedGame(.freeFireMax)
         delegate?.gameSelectionView(self, didSelect: .freeFireMax)
     }
+
+    private func makeShortcut(title: String, symbol: String, action: Selector) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setTitle(title, for: .normal)
+        button.setImage(UIImage(systemName: symbol), for: .normal)
+        button.tintColor = AppTheme.readableAccent
+        button.setTitleColor(AppTheme.primaryText, for: .normal)
+        button.titleLabel?.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: .systemFont(ofSize: 10, weight: .bold))
+        button.titleLabel?.adjustsFontForContentSizeCategory = true
+        button.backgroundColor = AppTheme.background.withAlphaComponent(0.48)
+        button.layer.cornerRadius = 10
+        button.layer.borderWidth = 1
+        button.layer.borderColor = AppTheme.hairline.cgColor
+        button.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        button.accessibilityLabel = title.capitalized
+        button.accessibilityHint = "Abre la sección \(title.lowercased())."
+        button.addTarget(self, action: action, for: .touchUpInside)
+        return button
+    }
+
+    @objc private func playerShortcutTapped() { onOpenPlayer?() }
+    @objc private func profileShortcutTapped() { onOpenProfile?() }
+    @objc private func helpShortcutTapped() { onOpenHelp?() }
 }

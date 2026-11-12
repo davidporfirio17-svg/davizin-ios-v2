@@ -42,6 +42,16 @@ final class HelpCenterView: UIView {
             body: "En Perfil puedes revisar el estado y vencimiento de tu acceso. La clave aparece enmascarada; usa Actualizar perfil para volver a sincronizar los datos de la sesión."
         ))
         contentStack.addArrangedSubview(makeTopicCard(
+            icon: "person.crop.square",
+            title: "Jugador y privacidad",
+            body: "Las últimas consultas de UID y región se guardan localmente para repetirlas rápido. El UID se envía al proveedor por el Worker solo al consultar. Puedes borrar el UID recordado y el historial desde Cuenta → Privacidad."
+        ))
+        contentStack.addArrangedSubview(makeTopicCard(
+            icon: "wifi.exclamationmark",
+            title: "Conexión, reintentos y datos parciales",
+            body: "El inicio y Jugador muestran si hay internet. Si una consulta falla, revisa Wi-Fi o datos y pulsa Reintentar; no se repite automáticamente. Si el proveedor entrega el perfil pero falla en estadísticas, se conservan los datos disponibles y se explica qué parte faltó."
+        ))
+        contentStack.addArrangedSubview(makeTopicCard(
             icon: "bell.badge",
             title: "Permisos y notificaciones",
             body: "Permite las notificaciones si quieres recibir el recordatorio de limpieza. Red local solo se necesita al usar el emparejamiento cercano. Puedes revisar los permisos desde Ajustes de Nyxel."

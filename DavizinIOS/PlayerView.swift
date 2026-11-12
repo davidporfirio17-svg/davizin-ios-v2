@@ -23,6 +23,10 @@ final class PlayerView: UIView {
     private let regionControl = UISegmentedControl(items: ["BR · NA", "SG", "IND"])
     private let searchButton = UIButton(type: .system)
     private let statusLabel = UILabel()
+    private let connectivityLabel = UILabel()
+    private let retryButton = UIButton(type: .system)
+    private let recentHistoryStack = UIStackView()
+    private var connectivityObserver: NSObjectProtocol?
 
     private let levelValueLabel = UILabel()
     private let likesValueLabel = UILabel()
@@ -44,6 +48,7 @@ final class PlayerView: UIView {
     private let clanLabel = UILabel()
     private let signatureLabel = UILabel()
     private let outfitGridStack = UIStackView()
+    private let otherProfileAssetsStack = UIStackView()
 
     private var renderGeneration = 0
     private let isPad = UIDevice.current.userInterfaceIdiom == .pad
@@ -58,6 +63,10 @@ final class PlayerView: UIView {
         configure()
     }
 
+    deinit {
+        if let connectivityObserver { NotificationCenter.default.removeObserver(connectivityObserver) }
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
         heroGradient.frame = heroCard.bounds
@@ -69,11 +78,13 @@ final class PlayerView: UIView {
         searchButton.setTitle(loading ? "CONSULTANDO PERFIL…" : "BUSCAR PERFIL", for: .normal)
         statusLabel.text = message
         statusLabel.textColor = loading ? AppTheme.readableAccent : AppTheme.secondaryText
+        if loading { retryButton.isHidden = true }
     }
 
     func setLookupError(_ message: String) {
         setLookupLoading(false, message: message)
         statusLabel.textColor = AppTheme.accentWarm
+        retryButton.isHidden = false
     }
 
     func showSummary(_ summary: FreeFireLookupSummary) {
@@ -148,10 +159,13 @@ final class PlayerView: UIView {
             setLookupLoading(false, message: "Perfil cargado parcialmente. Algunas estadísticas no llegaron del proveedor.")
             statusLabel.textColor = AppTheme.accentWarm
         }
+        retryButton.isHidden = statsWarning == nil
+        retryButton.setTitle(statsWarning == nil ? "REINTENTAR CONSULTA" : "REINTENTAR PERFIL Y ESTADÍSTICAS", for: .normal)
 
         requestAsset(summary.bannerID, into: bannerImageView, generation: generation)
         requestAsset(summary.avatarID ?? summary.headPicID, into: avatarImageView, generation: generation)
         updateOutfitItems(summary.clothesIDs, generation: generation)
+        updateOtherProfileAssets(badgeID: summary.profileBadgeID, petID: summary.petID, weaponIDs: summary.weaponSkinIDs, generation: generation)
     }
 
     private func configure() {
@@ -220,6 +234,7 @@ final class PlayerView: UIView {
         uidField.leftViewMode = .always
         uidField.heightAnchor.constraint(equalToConstant: 46).isActive = true
         uidField.accessibilityLabel = "UID de Free Fire"
+        uidField.accessibilityHint = "Solo números. El UID reciente se guarda en este dispositivo y se puede borrar en Cuenta, Privacidad."
 
         regionControl.selectedSegmentIndex = UserDefaults.standard.integer(forKey: "nyxel.last_player_region")
         regionControl.selectedSegmentTintColor = AppTheme.accent
@@ -227,6 +242,7 @@ final class PlayerView: UIView {
         regionControl.setTitleTextAttributes([.foregroundColor: AppTheme.accentForeground], for: .selected)
         regionControl.heightAnchor.constraint(equalToConstant: 34).isActive = true
         regionControl.accessibilityLabel = "Región de la cuenta"
+        regionControl.accessibilityHint = "Selecciona la región asociada al UID antes de consultar."
 
         searchButton.setTitle("BUSCAR PERFIL", for: .normal)
         searchButton.setTitleColor(AppTheme.accentForeground, for: .normal)
@@ -244,10 +260,92 @@ final class PlayerView: UIView {
         statusLabel.numberOfLines = 0
         statusLabel.minimumScaleFactor = 0.85
 
-        let stack = UIStackView(arrangedSubviews: [title, note, uidField, regionControl, searchButton, statusLabel])
+        connectivityLabel.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: .systemFont(ofSize: 10, weight: .semibold))
+        connectivityLabel.adjustsFontForContentSizeCategory = true
+        updateConnectivityStatus(NyxelConnectivity.isConnected)
+        connectivityObserver = NotificationCenter.default.addObserver(
+            forName: .nyxelConnectivityDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            self?.updateConnectivityStatus(note.object as? Bool)
+        }
+
+        retryButton.setTitle("REINTENTAR CONSULTA", for: .normal)
+        retryButton.setTitleColor(AppTheme.readableAccent, for: .normal)
+        retryButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .bold)
+        retryButton.backgroundColor = AppTheme.readableAccent.withAlphaComponent(0.10)
+        retryButton.layer.cornerRadius = 10
+        retryButton.layer.borderWidth = 1
+        retryButton.layer.borderColor = AppTheme.readableAccent.withAlphaComponent(0.28).cgColor
+        retryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 42).isActive = true
+        retryButton.isHidden = true
+        retryButton.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
+        retryButton.accessibilityLabel = "Reintentar consulta de jugador"
+
+        recentHistoryStack.axis = .vertical
+        recentHistoryStack.spacing = 6
+        recentHistoryStack.alignment = .fill
+        refreshRecentHistory()
+
+        let stack = UIStackView(arrangedSubviews: [title, note, connectivityLabel, uidField, regionControl, searchButton, statusLabel, retryButton, recentHistoryStack])
         stack.axis = .vertical
         stack.spacing = 9
         queryCard.addContent(stack)
+    }
+
+    private func updateConnectivityStatus(_ connected: Bool?) {
+        switch connected {
+        case .some(true):
+            connectivityLabel.text = "Conexión a internet disponible"
+            connectivityLabel.textColor = AppTheme.success
+        case .some(false):
+            connectivityLabel.text = "Sin internet · revisa Wi-Fi o datos móviles antes de consultar"
+            connectivityLabel.textColor = AppTheme.accentWarm
+        case .none:
+            connectivityLabel.text = "Comprobando conexión a internet…"
+            connectivityLabel.textColor = AppTheme.secondaryText
+        }
+        connectivityLabel.numberOfLines = 0
+        connectivityLabel.accessibilityLabel = connectivityLabel.text
+    }
+
+    private func refreshRecentHistory() {
+        for view in recentHistoryStack.arrangedSubviews {
+            recentHistoryStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        let entries = Array(FreeFirePlayerHistory.entries.prefix(5))
+        guard !entries.isEmpty else { return }
+
+        let heading = label("CONSULTAS RECIENTES", size: 10, weight: .bold, color: AppTheme.readableAccent)
+        heading.adjustsFontForContentSizeCategory = true
+        let note = label("Guardadas localmente en este dispositivo", size: 10, weight: .medium, color: AppTheme.secondaryText)
+        note.adjustsFontForContentSizeCategory = true
+        recentHistoryStack.addArrangedSubview(heading)
+        recentHistoryStack.addArrangedSubview(note)
+
+        for entry in entries {
+            let button = UIButton(type: .system)
+            button.setTitle("UID  \(entry.uid)     ·     \(entry.region.uppercased())", for: .normal)
+            button.setTitleColor(AppTheme.primaryText, for: .normal)
+            button.titleLabel?.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 12, weight: .semibold))
+            button.titleLabel?.adjustsFontForContentSizeCategory = true
+            button.contentHorizontalAlignment = .leading
+            button.contentEdgeInsets = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
+            button.backgroundColor = AppTheme.background.withAlphaComponent(0.48)
+            button.layer.cornerRadius = 9
+            button.layer.borderWidth = 1
+            button.layer.borderColor = AppTheme.hairline.cgColor
+            button.accessibilityLabel = "Volver a consultar UID \(entry.uid), región \(entry.region.uppercased())"
+            button.addAction(UIAction { [weak self] _ in
+                guard let self else { return }
+                self.uidField.text = entry.uid
+                self.regionControl.selectedSegmentIndex = ["br", "sg", "ind"].firstIndex(of: entry.region) ?? 0
+                self.searchTapped()
+            }, for: .touchUpInside)
+            recentHistoryStack.addArrangedSubview(button)
+        }
     }
 
     private func configureHeroCard() {
@@ -426,6 +524,9 @@ final class PlayerView: UIView {
 
         contentStack.addArrangedSubview(sectionHeading("ROPA Y ASSETS", subtitle: "Imágenes del servicio Free Fire Community y nombres de un catálogo comunitario"))
         contentStack.addArrangedSubview(makeOutfitCard())
+
+        contentStack.addArrangedSubview(sectionHeading("OTROS OBJETOS DEL PERFIL", subtitle: "Solo se muestran cuando el proveedor entrega sus IDs"))
+        contentStack.addArrangedSubview(makeOtherProfileAssetsCard())
     }
 
     private func makeMetricCard(title: String, value: UILabel, symbol: String) -> UIView {
@@ -555,6 +656,95 @@ final class PlayerView: UIView {
         return card
     }
 
+    private func makeOtherProfileAssetsCard() -> UIView {
+        let card = DavizinCardView()
+        card.useTransparentAppearance()
+        card.contentInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        otherProfileAssetsStack.axis = .vertical
+        otherProfileAssetsStack.alignment = .fill
+        otherProfileAssetsStack.spacing = 7
+        let note = label("Los nombres de estos elementos son descriptivos; el servicio no siempre informa el nombre oficial.", size: 10, weight: .regular, color: AppTheme.secondaryText)
+        note.numberOfLines = 0
+        let stack = UIStackView(arrangedSubviews: [otherProfileAssetsStack, note])
+        stack.axis = .vertical
+        stack.spacing = 9
+        card.addContent(stack)
+        return card
+    }
+
+    private func updateOtherProfileAssets(badgeID: String?, petID: String?, weaponIDs: [String], generation: Int) {
+        for view in otherProfileAssetsStack.arrangedSubviews {
+            otherProfileAssetsStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        var assets: [(String, String)] = []
+        if let badgeID, !badgeID.isEmpty { assets.append(("Distintivo de perfil", badgeID)) }
+        if let petID, !petID.isEmpty { assets.append(("Mascota", petID)) }
+        for (index, id) in weaponIDs.prefix(4).enumerated() where !id.isEmpty {
+            assets.append(("Aspecto de arma \(index + 1)", id))
+        }
+        guard !assets.isEmpty else {
+            let empty = label("El proveedor no entregó IDs de distintivo, mascota o aspectos de arma.", size: 11, weight: .medium, color: AppTheme.secondaryText)
+            empty.numberOfLines = 0
+            otherProfileAssetsStack.addArrangedSubview(empty)
+            return
+        }
+        assets.forEach { otherProfileAssetsStack.addArrangedSubview(makeOtherAssetRow(title: $0.0, id: $0.1, generation: generation)) }
+    }
+
+    private func makeOtherAssetRow(title: String, id: String, generation: Int) -> UIView {
+        let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.backgroundColor = AppTheme.background.withAlphaComponent(0.42)
+        row.layer.cornerRadius = 10
+        row.layer.borderWidth = 1
+        row.layer.borderColor = AppTheme.hairline.cgColor
+        let image = UIImageView(image: UIImage(systemName: "sparkles"))
+        image.translatesAutoresizingMaskIntoConstraints = false
+        image.contentMode = .scaleAspectFit
+        image.tintColor = AppTheme.readableAccent
+        row.addSubview(image)
+        let titleLabel = label(title, size: 12, weight: .semibold, color: AppTheme.primaryText)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.adjustsFontForContentSizeCategory = true
+        let idLabel = label("ID \(id)", size: 10, weight: .medium, color: AppTheme.secondaryText)
+        idLabel.translatesAutoresizingMaskIntoConstraints = false
+        let spinner = UIActivityIndicatorView(style: .small)
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        spinner.color = AppTheme.readableAccent
+        spinner.startAnimating()
+        row.addSubview(titleLabel)
+        row.addSubview(idLabel)
+        row.addSubview(spinner)
+        NSLayoutConstraint.activate([
+            row.heightAnchor.constraint(greaterThanOrEqualToConstant: 68),
+            image.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 8),
+            image.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            image.widthAnchor.constraint(equalToConstant: 48),
+            image.heightAnchor.constraint(equalToConstant: 48),
+            titleLabel.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 11),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: spinner.leadingAnchor, constant: -8),
+            titleLabel.topAnchor.constraint(equalTo: row.topAnchor, constant: 13),
+            idLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            idLabel.trailingAnchor.constraint(lessThanOrEqualTo: spinner.leadingAnchor, constant: -8),
+            idLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
+            idLabel.bottomAnchor.constraint(lessThanOrEqualTo: row.bottomAnchor, constant: -10),
+            spinner.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -10),
+            spinner.centerYAnchor.constraint(equalTo: row.centerYAnchor)
+        ])
+        row.accessibilityLabel = "\(title), ID \(id)"
+        row.isAccessibilityElement = true
+        row.accessibilityTraits = .staticText
+        requestAsset(id, into: image, generation: generation) { loaded in
+            spinner.stopAnimating()
+            if !loaded {
+                image.image = UIImage(systemName: "photo.badge.exclamationmark")
+                image.tintColor = AppTheme.accentWarm
+            }
+        }
+        return row
+    }
+
     private func updateOutfitItems(_ itemIDs: [String], generation: Int) {
         for row in outfitGridStack.arrangedSubviews {
             outfitGridStack.removeArrangedSubview(row)
@@ -662,6 +852,8 @@ final class PlayerView: UIView {
         ])
 
         cell.accessibilityLabel = "\(metadata?.name ?? "Prenda sin nombre"), \(metadata?.category ?? "tipo no identificado"), ID \(itemID)"
+        cell.isAccessibilityElement = true
+        cell.accessibilityTraits = .staticText
         requestAsset(itemID, into: image, generation: generation) { imageLoaded in
             spinner.stopAnimating()
             imageStatusLabel.isHidden = imageLoaded
@@ -792,12 +984,22 @@ final class PlayerView: UIView {
         let region = regions[regionControl.selectedSegmentIndex]
         UserDefaults.standard.set(uid, forKey: "nyxel.last_player_uid")
         UserDefaults.standard.set(regionControl.selectedSegmentIndex, forKey: "nyxel.last_player_region")
+        FreeFirePlayerHistory.record(uid: uid, region: region)
+        refreshRecentHistory()
+        guard NyxelConnectivity.isConnected != false else {
+            setLookupError("No hay conexión a internet. La consulta no se envió; revisa Wi-Fi o datos móviles y vuelve a intentarlo.")
+            return
+        }
         guard let onLookupRequested else {
             setLookupError("La consulta no está conectada al servicio.")
             return
         }
         setLookupLoading(true, message: "Validando sesión y consultando perfil…")
         onLookupRequested(uid, region)
+    }
+
+    @objc private func retryTapped() {
+        searchTapped()
     }
 
     @objc private func copyUIDTapped() {
@@ -818,6 +1020,11 @@ final class PlayerView: UIView {
         }
         guard let onBanCheckRequested else {
             banCheckStatusLabel.text = "La consulta Ban Check aún no está conectada."
+            banCheckStatusLabel.textColor = AppTheme.accentWarm
+            return
+        }
+        guard NyxelConnectivity.isConnected != false else {
+            banCheckStatusLabel.text = "Sin conexión a internet. La consulta no se envió; vuelve a intentarlo cuando estés en línea."
             banCheckStatusLabel.textColor = AppTheme.accentWarm
             return
         }

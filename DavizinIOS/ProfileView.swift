@@ -46,8 +46,9 @@ private final class ProfileDisclosureSection: UIView {
         backgroundColor = UIColor.white.withAlphaComponent(0.035)
 
         titleLabel.text = title
-        titleLabel.font = .systemFont(ofSize: 10, weight: .semibold)
-        titleLabel.textColor = AppTheme.accent
+        titleLabel.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: .systemFont(ofSize: 11, weight: .bold))
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.textColor = AppTheme.primaryText
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         chevron.tintColor = AppTheme.tertiaryText
         chevron.translatesAutoresizingMaskIntoConstraints = false
@@ -99,6 +100,7 @@ final class ProfileView: UIView {
     weak var delegate: ProfileViewDelegate?
     var onRefreshRequested: (() -> Void)?
     var onAppearanceChanged: (() -> Void)?
+    var onClearPlayerHistoryRequested: (() -> Void)?
 
     private let avatarCircle = UIView()
     private let avatarImageView = UIImageView()
@@ -120,6 +122,8 @@ final class ProfileView: UIView {
     private let diagnosticsLabel = UILabel()
     private let refreshDiagnosticsButton = UIButton(type: .system)
     private let shareDiagnosticsButton = UIButton(type: .system)
+    private let privacySummaryLabel = UILabel()
+    private let clearPlayerHistoryButton = UIButton(type: .system)
     private let logoutButton = DavizinButton(title: "CERRAR SESIÓN", style: .destructive)
     private let scrollView = UIScrollView()
     private let progressTrack = CAShapeLayer()
@@ -165,6 +169,7 @@ final class ProfileView: UIView {
         activationVoiceSwitch.isOn = SoundService.shared.activationVoiceEnabled
         updateProgressRing()
         refreshDiagnosticsTapped()
+        updatePrivacySummary()
     }
 
     private func configure() {
@@ -212,16 +217,18 @@ final class ProfileView: UIView {
         heroStack.axis = .horizontal; heroStack.alignment = .center; heroStack.spacing = 16
         heroStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let keyRow = makeRow(label: "Key", valueLabel: keyValueLabel)
+        let keyRow = makeRow(label: "Clave", valueLabel: keyValueLabel)
         let countryRow = makeRow(label: "País", valueLabel: countryValueLabel)
         let statusRow = makeRow(label: "Estado", valueLabel: accountStatusLabel)
         let expirationRow = makeRow(label: "Expira en", valueLabel: expirationValueLabel)
         let countRow = makeRow(label: "Inyecciones totales", valueLabel: countValueLabel)
 
-        deviceLabel.font = AppTheme.monoFont(10)
-        deviceLabel.textColor = AppTheme.secondaryText
+        deviceLabel.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(for: AppTheme.monoFont(11))
+        deviceLabel.adjustsFontForContentSizeCategory = true
+        deviceLabel.textColor = AppTheme.primaryText
         deviceLabel.numberOfLines = 0
-        rankProgressLabel.font = AppTheme.monoFont(10)
+        rankProgressLabel.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(for: AppTheme.monoFont(11))
+        rankProgressLabel.adjustsFontForContentSizeCategory = true
         rankProgressLabel.textColor = AppTheme.accentHot
         configureSegmentedControl(themeControl)
         configureSegmentedControl(appearanceControl)
@@ -281,10 +288,23 @@ final class ProfileView: UIView {
         )
 
         let accountSection = ProfileDisclosureSection(title: "CUENTA", views: [keyRow, countryRow, statusRow, expirationRow, countRow, rankProgressLabel, deviceLabel])
+        privacySummaryLabel.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 12, weight: .medium))
+        privacySummaryLabel.adjustsFontForContentSizeCategory = true
+        privacySummaryLabel.textColor = AppTheme.primaryText
+        privacySummaryLabel.numberOfLines = 0
+        clearPlayerHistoryButton.setTitle("BORRAR UID E HISTORIAL", for: .normal)
+        clearPlayerHistoryButton.setTitleColor(AppTheme.readableAccent, for: .normal)
+        clearPlayerHistoryButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .bold)
+        clearPlayerHistoryButton.contentHorizontalAlignment = .leading
+        clearPlayerHistoryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+        clearPlayerHistoryButton.accessibilityLabel = "Borrar UID recordado e historial local de jugadores"
+        clearPlayerHistoryButton.accessibilityHint = "Elimina el UID y la región guardados en este dispositivo."
+        clearPlayerHistoryButton.addTarget(self, action: #selector(clearPlayerHistoryTapped), for: .touchUpInside)
+        let privacySection = ProfileDisclosureSection(title: "PRIVACIDAD", views: [privacySummaryLabel, clearPlayerHistoryButton], expanded: false)
         let appearanceSection = ProfileDisclosureSection(title: "APARIENCIA", views: [themeRow, accentRow])
         let securitySection = ProfileDisclosureSection(title: "SEGURIDAD", views: [biometricRow])
         let audioSection = ProfileDisclosureSection(title: "AUDIO", views: [activationVoiceRow])
-        let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, appearanceSection, securitySection, audioSection, diagnosticsSection, refreshButton, logoutButton])
+        let stack = UIStackView(arrangedSubviews: [heroStack, accountSection, privacySection, appearanceSection, securitySection, audioSection, diagnosticsSection, refreshButton, logoutButton])
         stack.axis = .vertical; stack.spacing = 15
         stack.setCustomSpacing(22, after: heroStack)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -320,11 +340,20 @@ final class ProfileView: UIView {
     }
 
     private func makeRow(label: String, valueLabel: UILabel) -> UIView {
-        let left = UILabel(); left.text = label; left.font = .systemFont(ofSize: 13, weight: .medium); left.textColor = AppTheme.secondaryText
-        valueLabel.font = AppTheme.monoFont(13); valueLabel.textColor = AppTheme.accentHot; valueLabel.textAlignment = .right
+        let left = UILabel(); left.text = label; left.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 14, weight: .semibold)); left.textColor = AppTheme.primaryText; left.adjustsFontForContentSizeCategory = true
+        valueLabel.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .monospacedSystemFont(ofSize: 13, weight: .semibold)); valueLabel.textColor = AppTheme.primaryText; valueLabel.textAlignment = .right; valueLabel.adjustsFontForContentSizeCategory = true; valueLabel.adjustsFontSizeToFitWidth = true; valueLabel.minimumScaleFactor = 0.8
         let row = UIStackView(arrangedSubviews: [left, valueLabel]); row.axis = .horizontal; row.distribution = .equalSpacing
         return row
     }
+
+    private func updatePrivacySummary() {
+        let count = FreeFirePlayerHistory.entries.count
+        privacySummaryLabel.text = "Se guardan localmente hasta 8 UID y regiones para reconsultarlos. Al buscar, el UID y la región se envían al proveedor por el Worker. Nyxel no sincroniza la lista de historial con un servidor; el proveedor aplica sus propias políticas de procesamiento. Actualmente hay \(count) consultas guardadas."
+        clearPlayerHistoryButton.isEnabled = count > 0 || UserDefaults.standard.string(forKey: "nyxel.last_player_uid") != nil
+        clearPlayerHistoryButton.alpha = clearPlayerHistoryButton.isEnabled ? 1 : 0.55
+    }
+
+    @objc private func clearPlayerHistoryTapped() { onClearPlayerHistoryRequested?() }
 
     @objc private func refreshTapped() {
         refreshButton.isEnabled = false

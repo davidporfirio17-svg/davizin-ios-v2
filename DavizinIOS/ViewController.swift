@@ -155,6 +155,7 @@ final class ViewController: UIViewController {
         }
         activeRemainingSeconds = max(0, remainingSeconds)
         profileView?.setAccount(key: key, remainingSeconds: activeRemainingSeconds, countryCode: activeCountryCode)
+        gameSelectionView?.setSessionStatus(keyAuthorized: key != nil, remainingSeconds: activeRemainingSeconds)
     }
 
     /// Muestra un mensaje personalizado del panel al cliente (popup con estilo Davizin).
@@ -277,6 +278,7 @@ final class ViewController: UIViewController {
         modalPresentationStyle = .fullScreen
         modalPresentationCapturesStatusBarAppearance = true
         overrideUserInterfaceStyle = NyxelAppearanceStore.uiStyle
+        NyxelConnectivity.startMonitoring()
         configureBaseUI()
         NotificationCenter.default.addObserver(self, selector: #selector(appDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
@@ -487,6 +489,10 @@ final class ViewController: UIViewController {
         let screen = GameSelectionView()
         screen.delegate = self
         screen.setSelectedGame(selectedGame)
+        screen.setSessionStatus(keyAuthorized: activeKey != nil, remainingSeconds: activeRemainingSeconds)
+        screen.onOpenPlayer = { [weak self] in self?.showPlayer(animated: true) }
+        screen.onOpenProfile = { [weak self] in self?.showProfile(animated: true) }
+        screen.onOpenHelp = { [weak self] in self?.showHelp(animated: true) }
         gameSelectionView = screen
         display(screen, animated: animated)
     }
@@ -556,6 +562,21 @@ final class ViewController: UIViewController {
         screen.onAppearanceChanged = { [weak self] in
             self?.overrideUserInterfaceStyle = NyxelAppearanceStore.uiStyle
             self?.showProfile(animated: true)
+        }
+        screen.onClearPlayerHistoryRequested = { [weak self, weak screen] in
+            guard let self else { return }
+            let alert = UIAlertController(
+                title: "¿Borrar el historial local?",
+                message: "Se eliminarán el UID recordado y las consultas recientes de este dispositivo.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
+            alert.addAction(UIAlertAction(title: "Borrar", style: .destructive) { _ in
+                FreeFirePlayerHistory.clear()
+                screen?.refresh()
+                DavizinToastCenter.shared.show(title: "Historial eliminado", subtitle: "El UID y la región ya no están guardados en este dispositivo.", kind: .success)
+            })
+            self.present(alert, animated: true)
         }
         screen.onRefreshRequested = { [weak self, weak screen] in
             guard let self, let key = self.activeKey, !key.isEmpty else { return }

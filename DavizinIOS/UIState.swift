@@ -1,7 +1,33 @@
 import Foundation
 import UserNotifications
+import Network
 
 enum DavizinScreenStage: Equatable { case login, home, gameSelection, modeSelection, operation, player, profile, help }
+
+extension Notification.Name {
+    static let nyxelConnectivityDidChange = Notification.Name("nyxel.connectivity.didChange")
+}
+
+enum NyxelConnectivity {
+    private static let monitor = NWPathMonitor()
+    private static let queue = DispatchQueue(label: "nyxel.connectivity.monitor")
+    private static var started = false
+    private(set) static var isConnected: Bool? = nil
+
+    static func startMonitoring() {
+        guard !started else { return }
+        started = true
+        monitor.pathUpdateHandler = { path in
+            let connected = path.status == .satisfied
+            DispatchQueue.main.async {
+                guard isConnected != connected else { return }
+                isConnected = connected
+                NotificationCenter.default.post(name: .nyxelConnectivityDidChange, object: connected)
+            }
+        }
+        monitor.start(queue: queue)
+    }
+}
 
 enum DavizinGame: String, CaseIterable { case freeFire = "Free Fire", freeFireMax = "Free Fire MAX" }
 

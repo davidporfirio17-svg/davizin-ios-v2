@@ -49,6 +49,39 @@ struct FreeFireClothingItem: Decodable {
     let category: String
 }
 
+struct RecentFreeFirePlayer: Codable, Equatable {
+    let uid: String
+    let region: String
+}
+
+enum FreeFirePlayerHistory {
+    private static let storageKey = "nyxel.freefire.playerHistory.v1"
+    private static let maximumEntries = 8
+
+    static var entries: [RecentFreeFirePlayer] {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let saved = try? JSONDecoder().decode([RecentFreeFirePlayer].self, from: data) else { return [] }
+        return saved
+    }
+
+    static func record(uid: String, region: String) {
+        guard uid.range(of: "^\\d{5,15}$", options: .regularExpression) != nil,
+              ["br", "sg", "ind"].contains(region.lowercased()) else { return }
+        let entry = RecentFreeFirePlayer(uid: uid, region: region.lowercased())
+        var updated = entries.filter { $0 != entry }
+        updated.insert(entry, at: 0)
+        updated = Array(updated.prefix(maximumEntries))
+        guard let data = try? JSONEncoder().encode(updated) else { return }
+        UserDefaults.standard.set(data, forKey: storageKey)
+    }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        UserDefaults.standard.removeObject(forKey: "nyxel.last_player_uid")
+        UserDefaults.standard.removeObject(forKey: "nyxel.last_player_region")
+    }
+}
+
 enum FreeFireClothingCatalog {
     // Metadata: https://github.com/0xMe/ItemID2 (MIT); game content remains Garena property.
     private static let itemsByID: [String: FreeFireClothingItem] = {
