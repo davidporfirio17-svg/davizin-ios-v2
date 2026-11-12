@@ -163,8 +163,8 @@ enum NyxelSupportPolicy {
     }
 
     static let verifiedIOS17Range = "17.0–17.7.x"
-    static let verifiedIOS18Range = "18.0–18.7.4"
-    static let verifiedIOS26Range = "26.0–26.6.2"
+    static let verifiedIOS18Range = "18.0–18.7.10"
+    static let verifiedIOS26Range = "26.0–26.7.2"
 
     static let verifiedIOS27Builds: [(beta: Int, publicBeta: Int?, build: String)] = [
         (1, nil, "24A5355q"),
@@ -200,31 +200,10 @@ enum NyxelSupportPolicy {
         verifiedIOS27Builds.first { $0.build == build }?.publicBeta
     }
 
-    /// iOS 17–26 conserva la política amplia que ya utilizaba la aplicación.
-    /// iOS 27+ acepta builds oficiales (release) automáticamente y exige
-    /// whitelist solo para betas. Los builds beta de Apple tienen '5' como
-    /// 4.º carácter (ej. 24A5355q), los release no (ej. 24A435, 24B119).
+    /// iOS 17–27.x: worse_query confirmado funcionando hasta 27.3 Beta 1.
+    /// Acepta todos los builds (release y beta) dentro del rango.
     static func supportsVerifiedSystem(major: Int, minor: Int, patch: Int, build: String) -> Bool {
-        guard major >= 17 else { return false }
-        if major <= 26 { return true }
-        if build.count < 4 { return true }
-
-        // iOS 27+: accept all official release builds automatically
-        if build.count >= 4 {
-            let fourthChar = build[build.index(build.startIndex, offsetBy: 3)]
-            if fourthChar != "5" {
-                return true
-            }
-        }
-
-        // Beta builds: require exact whitelist match
-        if major == 27 && minor == 2 {
-            return ["24B5084k", "24B5089g", "24B5110a"].contains(build)
-        }
-        if major == 27 && minor == 0 {
-            return verifiedIOS27Builds.contains { $0.build == build }
-        }
-        return false
+        major >= 17 && major <= 27
     }
 
     /// Desde iOS 26+, las operaciones sobre otro contenedor deben pasar por
@@ -261,7 +240,7 @@ enum NyxelSupportPolicy {
     }
 
     static var supportedRangesDescription: String {
-        "iOS 17–27.x (kexploit directo sin VPN)"
+        "iOS 17.0–18.7.10 · 26.0–26.7.2 · 27.0–27.3.x"
     }
     
     // MARK: - Device Information
