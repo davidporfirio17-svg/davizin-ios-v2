@@ -32,7 +32,7 @@ async function parseJson(response) {
   }
 }
 
-async function validateNyxelKey(payload, request) {
+async function validateNyxelKey(payload, request, env) {
   const key = String(payload.key || "").trim().toUpperCase();
   const hwid = String(payload.hwid || "").trim();
   const appBuild = String(payload.app_build || request.headers.get("X-DZ-Build") || "").trim();
@@ -59,18 +59,29 @@ async function validateNyxelKey(payload, request) {
       const value = request.headers.get(name);
       if (value) headers[name] = value;
     }
-    const response = await fetch(NYXEL_CHECK_URL, {
+    const checkRequest = new Request(NYXEL_CHECK_URL, {
       method: "POST",
       headers,
       body: JSON.stringify(checkBody),
       signal: AbortSignal.timeout(10000),
     });
+    const response = env.DZ_WORKER
+      ? await env.DZ_WORKER.fetch(checkRequest)
+      : await fetch(checkRequest);
     const result = await parseJson(response);
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+      const contentType = response.headers.get("content-type") || "sin Content-Type";
+      return {
+        ok: false,
+        status: 502,
+        message: `No se pudo leer la respuesta de dz/check (HTTP ${response.status}; ${contentType}).`,
+      };
+    }
     if (!response.ok || result?.success !== true) {
       return {
         ok: false,
         status: 401,
-        message: String(result?.message || "La sesión de Nyxel no está autorizada."),
+        message: String(result.message || `dz/check rechazó la validación (HTTP ${response.status}).`),
       };
     }
     return { ok: true };
@@ -156,7 +167,7 @@ export default {
       return json({ success: false, message: "La documentación de esta API solo declara sg, ind y br." }, 400, corsHeaders());
     }
 
-    const auth = await validateNyxelKey(payload, request);
+    const auth = await validateNyxelKey(payload, request, env);
     if (!auth.ok) {
       return json({ success: false, code: "NYXEL_AUTH", message: auth.message }, auth.status, corsHeaders());
     }

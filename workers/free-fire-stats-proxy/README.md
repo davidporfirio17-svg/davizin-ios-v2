@@ -5,7 +5,7 @@ Worker independiente de `dz`, usado por la sección «Free Fire · Estadísticas
 ## Qué hace
 
 - Acepta únicamente `POST /lookup` y valida UID numérico de 5–15 dígitos y región `sg`, `ind` o `br`.
-- Revalida la key/HWID/build de Nyxel con el endpoint existente `/check`, sin cambiar el Worker `dz`.
+- Revalida la key/HWID/build de Nyxel con el endpoint existente `/check` mediante el Service Binding `DZ_WORKER`, sin cambiar el Worker `dz`.
 - Consulta `/info` y `/stats` en la API comunitaria de Free Fire.
 - Lee `FREE_FIRE_API_KEY` como secreto del entorno de Cloudflare; no va en la IPA ni en GitHub.
 - Envía un `User-Agent` propio, requerido por el firewall del proveedor, sin nombres de librerías o bots.
@@ -15,9 +15,10 @@ Worker independiente de `dz`, usado por la sección «Free Fire · Estadísticas
 ## Configuración
 
 1. Crear el Worker `nyxel-freefire-stats` y habilitar su subdominio `workers.dev`.
-2. Añadir el secreto `FREE_FIRE_API_KEY` desde Cloudflare (no guardarlo en el repositorio).
-3. Comprobar `GET /health`; `apiKeyConfigured` debe ser `true`.
-4. Probar `POST /lookup` desde una IPA con una sesión Nyxel válida.
+2. Configurar el service binding `DZ_WORKER` para apuntar al Worker `dz`; esto evita una llamada pública interna a `workers.dev`.
+3. Añadir el secreto `FREE_FIRE_API_KEY` desde Cloudflare (no guardarlo en el repositorio).
+4. Comprobar `GET /health`; `apiKeyConfigured` debe ser `true`.
+5. Probar `POST /lookup` desde una IPA con una sesión Nyxel válida.
 
 Worker desplegado: `https://nyxel-freefire-stats.davidporfirio17.workers.dev`; health: `https://nyxel-freefire-stats.davidporfirio17.workers.dev/health`.
 

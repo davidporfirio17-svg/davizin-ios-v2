@@ -4,6 +4,7 @@ import worker from "./src/index.js";
 const cacheEntries = new Map();
 let upstreamCalls = [];
 let authSuccess = true;
+let authMode = "json";
 let providerMode = "normal";
 
 globalThis.caches = {
@@ -20,16 +21,6 @@ globalThis.caches = {
 globalThis.fetch = async (input, init = {}) => {
   const target = input instanceof URL ? input.toString() : (typeof input === "string" ? input : input.url);
   const url = new URL(target);
-  if (url.hostname === "dz.davidporfirio17.workers.dev") {
-    assert.equal(init.method, "POST");
-    const body = JSON.parse(init.body);
-    assert.equal(body.key, "TEST-NYXEL-KEY");
-    assert.equal(body.hwid, "TEST-HWID");
-    assert.equal(body.app_build, "5");
-    assert.equal(init.headers["X-DZ-Installation"], "install-test");
-    return Response.json({ success: authSuccess, message: authSuccess ? "ok" : "invalid" });
-  }
-
   const headers = new Headers(init.headers);
   const userAgent = headers.get("user-agent");
   assert.equal(userAgent, "NyxelExternal/1.5 (+https://nyxel-freefire-stats.davidporfirio17.workers.dev)");
@@ -78,7 +69,24 @@ function makeRequest(overrides = {}) {
   });
 }
 
-const env = { FREE_FIRE_API_KEY: "local-test-secret" };
+const env = {
+  FREE_FIRE_API_KEY: "local-test-secret",
+  DZ_WORKER: {
+    async fetch(request) {
+      assert.equal(request.method, "POST");
+      assert.equal(new URL(request.url).pathname, "/check");
+      const body = await request.json();
+      assert.equal(body.key, "TEST-NYXEL-KEY");
+      assert.equal(body.hwid, "TEST-HWID");
+      assert.equal(body.app_build, "5");
+      assert.equal(request.headers.get("X-DZ-Installation"), "install-test");
+      if (authMode === "non-json") {
+        return new Response("<html>edge error</html>", { status: 200, headers: { "Content-Type": "text/html" } });
+      }
+      return Response.json({ success: authSuccess, message: authSuccess ? "ok" : "invalid" });
+    },
+  },
+};
 const ctx = { waitUntil(promise) { promise.catch(() => {}); } };
 
 const first = await worker.fetch(makeRequest(), env, ctx);
@@ -111,6 +119,12 @@ assert.equal(upstreamCalls.length, 8, "invalid-length UIDs must not call the pro
 
 const badRegion = await worker.fetch(makeRequest({ region: "mx" }), env, ctx);
 assert.equal(badRegion.status, 400);
+
+authMode = "non-json";
+const invalidAuthBody = await worker.fetch(makeRequest({ uid: "33333333" }), env, ctx);
+assert.equal(invalidAuthBody.status, 502);
+assert.match((await invalidAuthBody.json()).message, /dz\/check.*HTTP 200.*text\/html/i);
+authMode = "json";
 
 const callsBeforeUnauthorized = upstreamCalls.length;
 authSuccess = false;
