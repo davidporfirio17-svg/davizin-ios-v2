@@ -63,11 +63,11 @@ final class DavizinHeaderView: UIView {
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
-        backgroundColor = AppTheme.card
+        backgroundColor = AppTheme.card.withAlphaComponent(0.58)
         layer.cornerRadius = 18.0
         layer.cornerCurve = .continuous
         layer.borderWidth = 1.0
-        layer.borderColor = AppTheme.hairlineStrong.cgColor
+        layer.borderColor = AppTheme.hairlineStrong.withAlphaComponent(0.62).cgColor
 
         statusDot.translatesAutoresizingMaskIntoConstraints = false
         statusDot.backgroundColor = AppTheme.accent
@@ -91,7 +91,7 @@ final class DavizinHeaderView: UIView {
         addSubview(closeButton)
 
         avatarButton.translatesAutoresizingMaskIntoConstraints = false
-        avatarButton.backgroundColor = AppTheme.background
+        avatarButton.backgroundColor = AppTheme.background.withAlphaComponent(0.52)
 		avatarButton.layer.cornerRadius = 15.0
 		avatarButton.clipsToBounds = true
         avatarButton.layer.borderWidth = 1.5
@@ -169,7 +169,7 @@ final class DavizinHeaderView: UIView {
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setImage(UIImage(systemName: imageName), for: .normal)
         button.tintColor = AppTheme.secondaryText
-        button.backgroundColor = AppTheme.background
+        button.backgroundColor = AppTheme.background.withAlphaComponent(0.52)
         button.layer.cornerRadius = 12.0
         button.accessibilityTraits = .button
         button.addTarget(self, action: #selector(iconButtonTapped(_:)), for: .touchUpInside)

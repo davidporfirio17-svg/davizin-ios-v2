@@ -45,7 +45,7 @@ final class DavizinBottomNavView: UIView {
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
-        backgroundColor = AppTheme.backgroundRaise.withAlphaComponent(0.96)
+        backgroundColor = AppTheme.backgroundRaise.withAlphaComponent(0.78)
         layer.cornerRadius = 18
         layer.cornerCurve = .continuous
         layer.borderWidth = 1

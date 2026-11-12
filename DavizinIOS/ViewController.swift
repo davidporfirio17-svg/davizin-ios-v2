@@ -11,6 +11,7 @@ final class ViewController: UIViewController {
     var onOperation: ((DavizinOperationKind) -> Void)?
     var onClose: (() -> Void)?
 
+    private let videoBackgroundView = DavizinLoginVideoView()
     private let animatedBackgroundView = DavizinAnimatedBackgroundView()
     private let headerView = DavizinHeaderView()
     private let contentContainerView = UIView()
@@ -288,9 +289,14 @@ final class ViewController: UIViewController {
     }
 
     private func configureBaseUI() {
-        view.backgroundColor = AppTheme.background
+        view.backgroundColor = .black
+
+        videoBackgroundView.translatesAutoresizingMaskIntoConstraints = false
+        videoBackgroundView.isUserInteractionEnabled = false
+        view.addSubview(videoBackgroundView)
 
         animatedBackgroundView.translatesAutoresizingMaskIntoConstraints = false
+        animatedBackgroundView.backgroundColor = .clear
         view.addSubview(animatedBackgroundView)
 
         headerView.delegate = self
@@ -314,6 +320,11 @@ final class ViewController: UIViewController {
         bottomNavHeightConstraint = bottomNavHeight
 
         NSLayoutConstraint.activate([
+            videoBackgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            videoBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            videoBackgroundView.topAnchor.constraint(equalTo: view.topAnchor),
+            videoBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
             animatedBackgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             animatedBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             animatedBackgroundView.topAnchor.constraint(equalTo: view.topAnchor),

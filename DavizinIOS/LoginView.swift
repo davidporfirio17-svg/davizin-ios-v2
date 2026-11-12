@@ -42,7 +42,6 @@ protocol LoginViewDelegate: AnyObject {
 final class LoginView: UIView {
     weak var delegate: LoginViewDelegate?
 
-    private let videoBackground = DavizinLoginVideoView()
     private let loginIceBlue = UIColor(red: 0.37, green: 0.80, blue: 1.0, alpha: 1.0)
     private let videoOverlay = UIView()
     private let videoGradient = CAGradientLayer()
@@ -105,13 +104,8 @@ final class LoginView: UIView {
         guard window != nil, !hasPlayedEntrance else { return }
         hasPlayedEntrance = true
 
-        videoBackground.alpha = 0.0
         cardView.alpha = 0.0
         cardView.transform = CGAffineTransform(translationX: 0.0, y: 16.0)
-
-        UIView.animate(withDuration: 0.70, delay: 0.04, options: [.curveEaseOut, .beginFromCurrentState]) {
-            self.videoBackground.alpha = 1.0
-        }
 
         guard !UIAccessibility.isReduceMotionEnabled else {
             logoMark.alpha = 1.0
@@ -241,9 +235,9 @@ final class LoginView: UIView {
         guard showingValidationError else { return }
         showingValidationError = false
         cardView.layer.removeAnimation(forKey: "nyxel.validation.shake")
-        keyField.layer.shadowColor = AppTheme.accent.cgColor
-        keyField.layer.shadowOpacity = 0.0
-        keyField.layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
+        keyField.layer.shadowColor = loginIceBlue.cgColor
+        keyField.layer.shadowOpacity = 0.12
+        keyField.layer.borderColor = loginIceBlue.withAlphaComponent(0.82).cgColor
     }
 
     /// Muestra el estado de compatibilidad del dispositivo (verde/rojo/amarillo).
@@ -262,8 +256,6 @@ final class LoginView: UIView {
         ) {
             self.cardView.alpha = 0.0
             self.cardView.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
-            self.videoBackground.alpha = 0.0
-            self.videoBackground.transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
         } completion: { _ in
             completion()
         }
@@ -273,8 +265,6 @@ final class LoginView: UIView {
         backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
 
-        videoBackground.translatesAutoresizingMaskIntoConstraints = false
-        videoBackground.isUserInteractionEnabled = false
         videoOverlay.translatesAutoresizingMaskIntoConstraints = false
         videoOverlay.isUserInteractionEnabled = false
         videoOverlay.backgroundColor = .clear
@@ -297,9 +287,7 @@ final class LoginView: UIView {
         vignetteGradient.startPoint = CGPoint(x: 0.5, y: 0.0)
         vignetteGradient.endPoint = CGPoint(x: 0.5, y: 1.0)
         videoOverlay.layer.addSublayer(vignetteGradient)
-        addSubview(videoBackground)
         addSubview(videoOverlay)
-        sendSubviewToBack(videoBackground)
 
 			logoMark.image = UIImage(named: "NyxelAvatar")
 			logoMark.tintColor = nil
@@ -421,10 +409,6 @@ final class LoginView: UIView {
         observeKeyboard()
 
         let commonConstraints = [
-            videoBackground.leadingAnchor.constraint(equalTo: leadingAnchor),
-            videoBackground.trailingAnchor.constraint(equalTo: trailingAnchor),
-            videoBackground.topAnchor.constraint(equalTo: topAnchor),
-            videoBackground.bottomAnchor.constraint(equalTo: bottomAnchor),
             videoOverlay.leadingAnchor.constraint(equalTo: leadingAnchor),
             videoOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
             videoOverlay.topAnchor.constraint(equalTo: topAnchor),

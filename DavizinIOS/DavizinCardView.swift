@@ -45,15 +45,15 @@ final class DavizinCardView: UIView {
 
     func useTransparentAppearance() {
         backgroundColor = .clear
-        blurView.alpha = 0.30
-        layer.borderColor = UIColor.white.withAlphaComponent(0.30).cgColor
+        blurView.alpha = 0.16
+        layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
         layer.shadowColor = AppTheme.accent.cgColor
-        layer.shadowOpacity = 0.18
+        layer.shadowOpacity = 0.12
         layer.shadowRadius = 32.0
         layer.shadowOffset = CGSize(width: 0.0, height: 14.0)
         glassHighlight.colors = [
-            UIColor.white.withAlphaComponent(0.18).cgColor,
-            UIColor.white.withAlphaComponent(0.035).cgColor,
+            UIColor.white.withAlphaComponent(0.11).cgColor,
+            UIColor.white.withAlphaComponent(0.022).cgColor,
             UIColor.clear.cgColor
         ]
         glassHighlight.locations = [0.0, 0.14, 0.46]
