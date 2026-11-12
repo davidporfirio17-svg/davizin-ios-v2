@@ -13,6 +13,7 @@ final class SplashViewController: UIViewController {
     private var playerLayer: AVPlayerLayer?
     private var endObserver: NSObjectProtocol?
     private var failureObserver: NSObjectProtocol?
+    private var previousAudioSession: (category: AVAudioSession.Category, mode: AVAudioSession.Mode, options: AVAudioSession.CategoryOptions)?
     private var videoIsActive = false
     private var fallbackHasStarted = false
     private var didFinish = false
@@ -120,9 +121,10 @@ final class SplashViewController: UIViewController {
 
     private func installWelcomeVideo() {
         guard let url = Bundle.main.url(forResource: "nyxel_welcome", withExtension: "mp4") else { return }
+        activateWelcomeAudio()
         let item = AVPlayerItem(url: url)
         let welcomePlayer = AVPlayer(playerItem: item)
-        welcomePlayer.volume = 0.85
+        welcomePlayer.volume = 0.70
         welcomePlayer.isMuted = false
         player = welcomePlayer
 
@@ -158,6 +160,7 @@ final class SplashViewController: UIViewController {
         guard !didFinish else { return }
         videoIsActive = false
         player?.pause()
+        restoreAudioSession()
         playerLayer?.isHidden = true
         portraitView.isHidden = false
         wordLabel.isHidden = false
@@ -195,6 +198,7 @@ final class SplashViewController: UIViewController {
         guard !didFinish else { return }
         didFinish = true
         player?.pause()
+        restoreAudioSession()
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
         endObserver = nil
@@ -204,6 +208,21 @@ final class SplashViewController: UIViewController {
         }, completion: { _ in
             self.onFinished?()
         })
+    }
+
+    private func activateWelcomeAudio() {
+        let session = AVAudioSession.sharedInstance()
+        previousAudioSession = (session.category, session.mode, session.categoryOptions)
+        try? session.setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
+        try? session.setActive(true)
+    }
+
+    private func restoreAudioSession() {
+        guard let previousAudioSession else { return }
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(previousAudioSession.category, mode: previousAudioSession.mode, options: previousAudioSession.options)
+        try? session.setActive(true)
+        self.previousAudioSession = nil
     }
 
     private func applyKerning(to label: UILabel, value: CGFloat) {
