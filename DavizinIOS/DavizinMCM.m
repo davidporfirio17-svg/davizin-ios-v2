@@ -242,12 +242,16 @@ static int64_t _worseQuerySymlink(const char *targetPath) {
         };
         static const int kFlagCount = 4;
         static int sKnownGoodFlag = -1;
+        static int sKnownGoodGroup = -1;
 
         NSFileManager *fm = [NSFileManager defaultManager];
 
         const char **rtGroups; int rtGroupCount;
         _getRuntimeAppGroups(&rtGroups, &rtGroupCount);
-        for (int g = 0; g < rtGroupCount; g++) {
+        for (int rawG = 0; rawG < rtGroupCount; rawG++) {
+            int g = (sKnownGoodGroup >= 0 && rawG == 0) ? sKnownGoodGroup
+                  : (sKnownGoodGroup >= 0 && rawG <= sKnownGoodGroup) ? rawG - 1
+                  : rawG;
             NSString *groupID = [NSString stringWithUTF8String:rtGroups[g]];
             NSURL *containerURL = [fm containerURLForSecurityApplicationGroupIdentifier:groupID];
             if (!containerURL) {
@@ -335,6 +339,7 @@ static int64_t _worseQuerySymlink(const char *targetPath) {
                     if (fd >= 0) {
                         close(fd);
                         sKnownGoodFlag = fi;
+                        sKnownGoodGroup = g;
                         DavizinMCMLog([NSString stringWithFormat:
                             @"[WQ-SYM] *** SUCCESS g[%d] f=%d → %s ***", g, fi, targetPath]);
                         close(libraryFd);
@@ -457,6 +462,39 @@ static inline BOOL shouldUseBadQuery(void) {
     return osVersion.majorVersion >= 26;
 }
 
+#define kGrantCacheSentinel ((int64_t)8000)
+
+static NSMutableSet<NSString *> *sGrantCache;
+static os_unfair_lock sGrantCacheLock = OS_UNFAIR_LOCK_INIT;
+
+static BOOL _grantCacheCovers(NSString *path) {
+    os_unfair_lock_lock(&sGrantCacheLock);
+    BOOL hit = NO;
+    if (sGrantCache) {
+        if ([sGrantCache containsObject:path]) {
+            hit = YES;
+        } else {
+            for (NSString *cached in sGrantCache) {
+                if ([path hasPrefix:cached] &&
+                    path.length > cached.length &&
+                    [path characterAtIndex:cached.length] == '/') {
+                    hit = YES;
+                    break;
+                }
+            }
+        }
+    }
+    os_unfair_lock_unlock(&sGrantCacheLock);
+    return hit;
+}
+
+static void _grantCacheAdd(NSString *path) {
+    os_unfair_lock_lock(&sGrantCacheLock);
+    if (!sGrantCache) sGrantCache = [NSMutableSet set];
+    [sGrantCache addObject:path];
+    os_unfair_lock_unlock(&sGrantCacheLock);
+}
+
 int64_t DavizinGrantContainerAccess(const char *containerPath) {
     if (!shouldUseBadQuery()) {
         return -1;
@@ -467,12 +505,18 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
         cleanPath = [cleanPath substringToIndex:cleanPath.length - 1];
     }
 
+    if (_grantCacheCovers(cleanPath)) {
+        DavizinMCMLog([NSString stringWithFormat:@"Grant CACHED para %@", cleanPath]);
+        return kGrantCacheSentinel;
+    }
+
     const char *pathC = [cleanPath UTF8String];
 
     // Strategy WQ-SYM: symlink-based sandbox escape (forcequitOS worse_query — primary for iOS 27.0+)
     {
         int64_t symHandle = _worseQuerySymlink(pathC);
         if (symHandle >= 0) {
+            _grantCacheAdd(cleanPath);
             DavizinMCMLog([NSString stringWithFormat:@"Grant WQ-SYM para %@: handle=%lld", cleanPath, symHandle]);
             return symHandle;
         }
@@ -558,8 +602,7 @@ int64_t DavizinGrantContainerAccess(const char *containerPath) {
 }
 
 void DavizinReleaseContainerGrant(int64_t handle) {
-    if (handle >= 9000) {
-        // MCM lease handle — kept alive in sLeases, don't release via bad_query
+    if (handle == kGrantCacheSentinel || handle >= 9000) {
         return;
     }
     if (handle >= 0) {

@@ -399,26 +399,27 @@ class InjectorService {
 
         NyxelActivityLog.record("DIAG readFromContainer relPath=\(relPath) pairingRequired=\(pairingRequired)")
 
-        // --- iOS 27+: bad_query + lectura directa PRIMERO, AirLift como fallback ---
+        // --- iOS 27+: worse_query grant + lectura directa, AirLift solo si permisos fallan ---
         if pairingRequired {
             if !container.isEmpty {
-                NyxelActivityLog.record("DIAG iOS 27+ bad_query read directo para \(relPath)")
+                NyxelActivityLog.record("DIAG iOS 27+ grant+read para \(relPath)")
                 let handleRoot = DavizinGrantContainerAccess(container)
-                let handleDir = DavizinGrantContainerAccess(parentDir)
-                let handleFile = DavizinGrantContainerAccess(fullPath)
                 let url = URL(fileURLWithPath: fullPath)
                 do {
                     let data = try Data(contentsOf: url)
-                    DavizinReleaseContainerGrant(handleFile)
-                    DavizinReleaseContainerGrant(handleDir)
                     DavizinReleaseContainerGrant(handleRoot)
-                    NyxelActivityLog.record("DIAG iOS 27+ bad_query read OK bytes=\(data.count)")
+                    NyxelActivityLog.record("DIAG iOS 27+ read OK bytes=\(data.count)")
                     return data
                 } catch {
-                    DavizinReleaseContainerGrant(handleFile)
-                    DavizinReleaseContainerGrant(handleDir)
                     DavizinReleaseContainerGrant(handleRoot)
-                    NyxelActivityLog.record("DIAG iOS 27+ bad_query read failed: \(error.localizedDescription), trying AirLift fallback")
+                    let nsErr = error as NSError
+                    let isNotFound = nsErr.domain == NSCocoaErrorDomain && nsErr.code == 260
+                    if handleRoot >= 0 && isNotFound {
+                        NyxelActivityLog.record("DIAG iOS 27+ read: archivo no existe (grant OK)")
+                        onFailure?("archivo no encontrado (grant OK)")
+                        return nil
+                    }
+                    NyxelActivityLog.record("DIAG iOS 27+ read failed: \(error.localizedDescription), trying AirLift")
                 }
             }
 
@@ -435,7 +436,7 @@ class InjectorService {
                 NyxelActivityLog.record("DIAG AirLift read skipped (failed previously in this session)")
             }
 
-            let detail = container.isEmpty ? "container vacio, sin bad_query ni AirLift" : "bad_query y AirLift fallaron"
+            let detail = container.isEmpty ? "container vacio" : "grant y AirLift fallaron"
             onFailure?(detail)
             return nil
         }
@@ -782,16 +783,11 @@ class InjectorService {
     private static func removeLegacyRemoteBackupIfAccessible(container: String, relativePath: String) -> Bool {
         let fileManager = FileManager.default
         let fullPath = container + "/" + relativePath
-        let parentPath = (fullPath as NSString).deletingLastPathComponent
         let rootGrant = DavizinGrantContainerAccess(container)
-        let parentGrant = DavizinGrantContainerAccess(parentPath)
-        let fileGrant = DavizinGrantContainerAccess(fullPath)
         defer {
-            DavizinReleaseContainerGrant(fileGrant)
-            DavizinReleaseContainerGrant(parentGrant)
             DavizinReleaseContainerGrant(rootGrant)
         }
-        if NyxelDeviceInfo.versionTuple.major >= 26 && [rootGrant, parentGrant, fileGrant].contains(where: { $0 < 0 }) {
+        if NyxelDeviceInfo.versionTuple.major >= 26 && rootGrant < 0 {
             return false
         }
         guard fileManager.fileExists(atPath: fullPath) else { return false }
