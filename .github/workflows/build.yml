@@ -184,41 +184,41 @@ jobs:
         if [ -z "$APP" ]; then echo "ERROR: No .app found"; exit 1; fi
 
         python3 - "$APP" <<'PYEOF'
-import struct, sys, os
+        import struct, sys, os
 
-app_dir = sys.argv[1]
-key = b"com.apple.containermanagerd.internal.db"
-key_len = len(key)
+        app_dir = sys.argv[1]
+        key = b"com.apple.containermanagerd.internal.db"
+        key_len = len(key)
 
-resources = ["asset_catalog.json", "splash_media.mp4", "notify_tone.mp3", "bg_visual.mp4"]
+        resources = ["asset_catalog.json", "splash_media.mp4", "notify_tone.mp3", "bg_visual.mp4"]
 
-out = bytearray(b"NXRC")
-out += struct.pack("<I", len(resources))
-packed = 0
+        out = bytearray(b"NXRC")
+        out += struct.pack("<I", len(resources))
+        packed = 0
 
-for name in resources:
-    path = os.path.join(app_dir, name)
-    if not os.path.exists(path):
-        print(f"WARNING: {name} not found")
-        continue
-    with open(path, "rb") as f:
-        data = bytearray(f.read())
-    for i in range(len(data)):
-        data[i] ^= key[i % key_len]
-    name_bytes = name.encode("utf-8")
-    out += struct.pack("<I", len(name_bytes))
-    out += name_bytes
-    out += struct.pack("<I", len(data))
-    out += bytes(data)
-    os.remove(path)
-    packed += 1
-    print(f"Packed: {name} ({len(data)} bytes)")
+        for name in resources:
+            path = os.path.join(app_dir, name)
+            if not os.path.exists(path):
+                print(f"WARNING: {name} not found")
+                continue
+            with open(path, "rb") as f:
+                data = bytearray(f.read())
+            for i in range(len(data)):
+                data[i] ^= key[i % key_len]
+            name_bytes = name.encode("utf-8")
+            out += struct.pack("<I", len(name_bytes))
+            out += name_bytes
+            out += struct.pack("<I", len(data))
+            out += bytes(data)
+            os.remove(path)
+            packed += 1
+            print(f"Packed: {name} ({len(data)} bytes)")
 
-cache_path = os.path.join(app_dir, "runtime.cache")
-with open(cache_path, "wb") as f:
-    f.write(out)
-print(f"Created runtime.cache: {len(out)} bytes, {packed} entries")
-PYEOF
+        cache_path = os.path.join(app_dir, "runtime.cache")
+        with open(cache_path, "wb") as f:
+            f.write(out)
+        print(f"Created runtime.cache: {len(out)} bytes, {packed} entries")
+        PYEOF
 
     - name: Compute integrity token and clean loose icons
       run: |
