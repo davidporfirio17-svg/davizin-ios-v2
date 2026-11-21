@@ -494,7 +494,13 @@ class InjectorService {
             }
         }
 
-        return false
+        // URL scheme fallback
+        if Thread.isMainThread {
+            return NyxelInstalledGames.isInstalled(for: game)
+        }
+        var detected = false
+        DispatchQueue.main.sync { detected = NyxelInstalledGames.isInstalled(for: game) }
+        return detected
     }
 
     /// Ruta del Worker para cada modo y juego (descarga desde KV).
@@ -983,6 +989,21 @@ class InjectorService {
             if isBundleInstalledViaEnumeration(bid) {
                 return .compatible
             }
+        }
+
+        // URL scheme fallback: canOpenURL does not depend on sandbox/MCM access
+        let detect = {
+            NyxelInstalledGames.isInstalled(for: .freeFireMax) ||
+            NyxelInstalledGames.isInstalled(for: .freeFire)
+        }
+        var gameDetected = false
+        if Thread.isMainThread {
+            gameDetected = detect()
+        } else {
+            DispatchQueue.main.sync { gameDetected = detect() }
+        }
+        if gameDetected {
+            return .compatible
         }
 
         return .noGameInstalled
