@@ -125,7 +125,7 @@ final class SplashViewController: UIViewController {
 
     private func installWelcomeVideo() {
         guard NyxelAppearanceStore.animationsEnabled,
-              let url = Bundle.main.url(forResource: "nyxel_welcome", withExtension: "mp4") else {
+              let url = Bundle.main.url(forResource: "splash_media", withExtension: "mp4") else {
             showStaticSplash()
             return
         }

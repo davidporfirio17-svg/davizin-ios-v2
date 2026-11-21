@@ -104,10 +104,10 @@
 				F33 = {isa=PBXFileReference;lastKnownFileType=sourcecode.swift;path=NyxelCompatibilityExtensions.swift;sourceTree="<group>";};
 			FR1 = {isa=PBXFileReference;lastKnownFileType=folder.assetcatalog;path=Assets.xcassets;sourceTree="<group>";};
 					FR3 = {isa=PBXFileReference;lastKnownFileType=file.storyboard;path=LaunchScreen.storyboard;sourceTree="<group>";};
-					FR4 = {isa=PBXFileReference;lastKnownFileType=video.mp4;path=Resources/login_background.mp4;sourceTree="<group>";};
-					FR5 = {isa=PBXFileReference;lastKnownFileType=audio.mp3;path=Resources/opcion_activada.mp3;sourceTree="<group>";};
-					FR6 = {isa=PBXFileReference;lastKnownFileType=text.json;path=DavizinIOS/Resources/FreeFireClothingCatalog.json;sourceTree="<group>";};
-					FR7 = {isa=PBXFileReference;lastKnownFileType=video.mp4;path=Resources/nyxel_welcome.mp4;sourceTree="<group>";};
+					FR4 = {isa=PBXFileReference;lastKnownFileType=video.mp4;path=Resources/bg_visual.mp4;sourceTree="<group>";};
+					FR5 = {isa=PBXFileReference;lastKnownFileType=audio.mp3;path=Resources/notify_tone.mp3;sourceTree="<group>";};
+					FR6 = {isa=PBXFileReference;lastKnownFileType=text.json;path=DavizinIOS/Resources/asset_catalog.json;sourceTree="<group>";};
+					FR7 = {isa=PBXFileReference;lastKnownFileType=video.mp4;path=Resources/splash_media.mp4;sourceTree="<group>";};
 			PROD = {isa=PBXFileReference;explicitFileType=wrapper.application;includeInIndex=0;path=DavizinIOS.app;sourceTree=BUILT_PRODUCTS_DIR;};
 	/* PBXFrameworksBuildPhase */
 		PH_F = {isa=PBXFrameworksBuildPhase;buildActionMask=2147483647;files=();runOnlyForDeploymentPostprocessing=0;};

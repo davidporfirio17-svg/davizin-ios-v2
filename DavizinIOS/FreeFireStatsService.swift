@@ -85,7 +85,7 @@ enum FreeFirePlayerHistory {
 enum FreeFireClothingCatalog {
     // Metadata: https://github.com/0xMe/ItemID2 (MIT); game content remains Garena property.
     private static let itemsByID: [String: FreeFireClothingItem] = {
-        guard let url = Bundle.main.url(forResource: "FreeFireClothingCatalog", withExtension: "json"),
+        guard let url = Bundle.main.url(forResource: "asset_catalog", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let items = try? JSONDecoder().decode([FreeFireClothingItem].self, from: data) else {
             return [:]
