@@ -31,7 +31,7 @@ final class DavizinLoginVideoView: UIView {
 
     private func start() {
         guard !UIAccessibility.isReduceMotionEnabled, NyxelAppearanceStore.animationsEnabled,
-              let url = Bundle.main.url(forResource: "bg_visual", withExtension: "mp4") else { return }
+              let url = EmbeddedResources.shared.url(for: .loginBackground) else { return }
         let item = AVPlayerItem(url: url)
         let queue = AVQueuePlayer()
         queue.isMuted = true

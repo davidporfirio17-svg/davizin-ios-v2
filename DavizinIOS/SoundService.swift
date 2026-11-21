@@ -93,7 +93,7 @@ final class SoundService {
     /// Voz de confirmación que se reproduce cuando la inyección termina correctamente.
     func playActivationVoice() {
         guard isEnabled, activationVoiceEnabled,
-              let url = Bundle.main.url(forResource: "notify_tone", withExtension: "mp3") else { return }
+              let url = EmbeddedResources.shared.url(for: .activationSound) else { return }
         do {
             activationPlayer?.stop()
             activationPlayer = try AVAudioPlayer(contentsOf: url)
