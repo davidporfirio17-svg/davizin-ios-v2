@@ -288,7 +288,7 @@ final class NixelPairingProbe {
 /// con la UI.
 final class NixelPairingRecordStore {
     static let shared = NixelPairingRecordStore()
-    private let service = "cz.kolbi.wqfiles.nyxel.pairing"
+    private let service = "com.apple.mobile.installd.nyxel.pairing"
 
     private init() {}
 
@@ -741,7 +741,7 @@ enum NixelHybridCoordinator {
 // PairableHost socket consumed by the Rust FFI.
 private final class NixelAirLiftNWPublisher {
     static let shared = NixelAirLiftNWPublisher()
-    private let queue = DispatchQueue(label: "cz.kolbi.wqfiles.airlift.listener")
+    private let queue = DispatchQueue(label: "com.apple.mobile.installd.airlift.listener")
     private var listener: NWListener?
     private var probeListener: NWListener?
     private var rawPort: UInt16 = 0
