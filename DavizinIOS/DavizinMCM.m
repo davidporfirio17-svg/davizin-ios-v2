@@ -1603,6 +1603,272 @@ static NSString *_scanContainerDir(const char *basePath, NSString *targetBundleI
     return nil;
 }
 
+#pragma mark - LaunchServices csstore parsing (iOS 27+ fallback)
+
+static BOOL _csIsValidUUIDAt(const uint8_t *bytes, NSUInteger pos, NSUInteger len) {
+    if (pos + 36 > len) return NO;
+    static const int dashPos[] = { 8, 13, 18, 23 };
+    for (int d = 0; d < 4; d++) {
+        if (bytes[pos + dashPos[d]] != '-') return NO;
+    }
+    for (int c = 0; c < 36; c++) {
+        if (c == 8 || c == 13 || c == 18 || c == 23) continue;
+        uint8_t ch = bytes[pos + c];
+        if (!((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f')))
+            return NO;
+    }
+    return YES;
+}
+
+static NSDictionary *_csExtractFromBinary(NSData *data) {
+    const uint8_t *bytes = (const uint8_t *)data.bytes;
+    NSUInteger len = data.length;
+    NSMutableSet *bundleCandidates = [NSMutableSet set];
+    NSMutableSet *containerPaths = [NSMutableSet set];
+    NSMutableArray *bundleEntries = [NSMutableArray array];
+    NSMutableDictionary *pathPositions = [NSMutableDictionary dictionary];
+
+    static const char *kBIDPrefixes[] = {
+        "com.", "org.", "net.", "io.", "app.", "me.", "dev.",
+        "co.", "in.", "uk.", "de.", "fr.", "jp.", "kr.",
+        "ru.", "cn.", "br.", "au.", "ca.", "eu.", "tv.", "us."
+    };
+    static const int kBIDPrefixCount = sizeof(kBIDPrefixes) / sizeof(kBIDPrefixes[0]);
+
+    NSUInteger i = 0;
+    while (i < len) {
+        BOOL isPrefix = NO;
+        for (int p = 0; p < kBIDPrefixCount; p++) {
+            size_t plen = strlen(kBIDPrefixes[p]);
+            if (i + plen < len && memcmp(bytes + i, kBIDPrefixes[p], plen) == 0) {
+                isPrefix = YES;
+                break;
+            }
+        }
+        if (!isPrefix) { i++; continue; }
+
+        NSUInteger start = i;
+        NSUInteger dots = 0;
+        while (i < len && (
+            (bytes[i] >= 'a' && bytes[i] <= 'z') ||
+            (bytes[i] >= 'A' && bytes[i] <= 'Z') ||
+            (bytes[i] >= '0' && bytes[i] <= '9') ||
+            bytes[i] == '.' || bytes[i] == '-' || bytes[i] == '_'
+        )) {
+            if (bytes[i] == '.') dots++;
+            i++;
+        }
+        NSUInteger slen = i - start;
+        if (dots >= 2 && slen >= 5 && slen <= 256) {
+            NSString *s = [[NSString alloc] initWithBytes:bytes + start
+                                                   length:slen
+                                                 encoding:NSUTF8StringEncoding];
+            if (s && ![s hasSuffix:@"."] && [s rangeOfString:@".."].location == NSNotFound) {
+                [bundleCandidates addObject:s];
+                [bundleEntries addObject:@{@"b": s, @"p": @(start)}];
+            }
+        }
+    }
+
+    static const char *kPathPrefixes[] = {
+        "/var/mobile/Containers/Data/Application/",
+        "/private/var/mobile/Containers/Data/Application/",
+        "/var/containers/Bundle/Application/",
+        "/private/var/containers/Bundle/Application/",
+    };
+    static const int kPathPrefixCount = sizeof(kPathPrefixes) / sizeof(kPathPrefixes[0]);
+
+    for (int pp = 0; pp < kPathPrefixCount; pp++) {
+        size_t ppLen = strlen(kPathPrefixes[pp]);
+        const uint8_t *search = (const uint8_t *)kPathPrefixes[pp];
+        for (NSUInteger j = 0; j + ppLen + 36 <= len; j++) {
+            if (memcmp(bytes + j, search, ppLen) != 0) continue;
+            NSUInteger uuidStart = j + ppLen;
+            if (!_csIsValidUUIDAt(bytes, uuidStart, len)) { j += ppLen - 1; continue; }
+
+            char pathBuf[512];
+            if (pp == 0 || pp == 2) {
+                snprintf(pathBuf, sizeof(pathBuf), "/private%.*s",
+                         (int)(ppLen + 36), (const char *)(bytes + j));
+            } else {
+                snprintf(pathBuf, sizeof(pathBuf), "%.*s",
+                         (int)(ppLen + 36), (const char *)(bytes + j));
+            }
+            NSString *path = [NSString stringWithUTF8String:pathBuf];
+            if (path) {
+                [containerPaths addObject:path];
+                if (!pathPositions[path]) pathPositions[path] = @(j);
+            }
+            j += ppLen + 35;
+        }
+    }
+
+    NSMutableDictionary *pathToBundle = [NSMutableDictionary dictionary];
+    for (NSString *path in containerPaths) {
+        NSNumber *posNum = pathPositions[path];
+        if (!posNum) continue;
+        NSUInteger pathPos = posNum.unsignedIntegerValue;
+        NSString *nearestBid = nil;
+        NSUInteger nearestDist = NSUIntegerMax;
+        for (NSDictionary *entry in bundleEntries) {
+            NSUInteger bidPos = [entry[@"p"] unsignedIntegerValue];
+            NSUInteger dist = (pathPos > bidPos) ? (pathPos - bidPos) : (bidPos - pathPos);
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearestBid = entry[@"b"];
+            }
+        }
+        if (nearestBid && nearestDist < 4096) {
+            pathToBundle[path] = nearestBid;
+        }
+    }
+
+    return @{
+        @"bundleIDs": bundleCandidates,
+        @"containerPaths": containerPaths,
+        @"pathToBundle": pathToBundle,
+    };
+}
+
+static NSMutableDictionary *sCSPathToBundle = nil;
+static BOOL sCSParsed = NO;
+
+static void _findAndParseCSStores(void) {
+    if (!sCSPathToBundle)
+        sCSPathToBundle = [[NSMutableDictionary alloc] init];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSMutableArray *searchDirs = [NSMutableArray array];
+
+    NSString *lsdIdents[] = {
+        @"com.apple.lsd", @"com.apple.lsd", @"com.apple.lsd",
+        @"com.apple.mobileslideshow", @"systemgroup.com.apple.lsd.mapdb"
+    };
+    uint64_t lsdClasses[] = { 10, 12, 2, 10, 13 };
+    BOOL lsdIsGroup[] = { NO, NO, NO, NO, YES };
+    static const uint64_t kCSFlags[] = { 0x900000000ULL, 0x8100000000ULL, 0x100000000ULL };
+
+    for (int qi = 0; qi < 5; qi++) {
+        for (int f = 0; f < 3; f++) {
+            NSString *path = _mcmQueryContainerPath(lsdClasses[qi], lsdIdents[qi],
+                                                     lsdIsGroup[qi], kCSFlags[f]);
+            if (path.length > 0 && path.isAbsolutePath) {
+                int64_t h = _worseQuerySymlink(path.fileSystemRepresentation);
+                if (h < 0) h = _worseQueryGrant(path.fileSystemRepresentation, "cs-lsd");
+                DavizinMCMLog([NSString stringWithFormat:
+                    @"[csstore] lsd cls=%llu %@ → %@ grant=%lld",
+                    lsdClasses[qi], lsdIdents[qi], path, (long long)h]);
+                [searchDirs addObject:[[path stringByAppendingPathComponent:@"Library"]
+                                       stringByAppendingPathComponent:@"Caches"]];
+                [searchDirs addObject:path];
+                break;
+            }
+        }
+    }
+
+    MCMAPI *api = MCMGetAPI();
+    if (api->queryCreate && api->queryIterate && api->objectGetPath) {
+        static const uint64_t kEnumCls[] = { 10, 12 };
+        for (int ci = 0; ci < 2; ci++) {
+            void *q = api->queryCreate();
+            if (!q) continue;
+            api->querySetClass(q, kEnumCls[ci]);
+            api->querySetFlags(q, 0x100000000ULL);
+            if (api->querySetPart) api->querySetPart(q, 0);
+            __block int enumN = 0;
+            api->queryIterate(q, ^bool(void *obj) {
+                if (!obj) return enumN < 50;
+                const char *rawPath = api->objectGetPath(obj);
+                if (rawPath) {
+                    NSString *p = [NSString stringWithUTF8String:rawPath];
+                    if ([p isEqualToString:@"/var"] || [p hasPrefix:@"/var/"])
+                        p = [@"/private" stringByAppendingString:p];
+                    int64_t h = _worseQuerySymlink(p.fileSystemRepresentation);
+                    if (h < 0) h = _worseQueryGrant(p.fileSystemRepresentation, "cs-enum");
+                    [searchDirs addObject:[[p stringByAppendingPathComponent:@"Library"]
+                                           stringByAppendingPathComponent:@"Caches"]];
+                }
+                enumN++;
+                return enumN < 50;
+            });
+            api->queryFree(q);
+        }
+    }
+
+    [searchDirs addObject:@"/private/var/mobile/Library/Caches"];
+
+    NSArray *daemonBases = @[
+        @"/private/var/mobile/Containers/Data/InternalDaemon",
+        @"/private/var/containers/Data/InternalDaemon",
+    ];
+    for (NSString *base in daemonBases) {
+        NSArray *uuids = [fm contentsOfDirectoryAtPath:base error:nil];
+        for (NSString *uuid in uuids) {
+            if (uuid.length < 32 || [uuid hasPrefix:@"."]) continue;
+            NSString *cPath = [base stringByAppendingPathComponent:uuid];
+            int64_t h = _worseQuerySymlink(cPath.fileSystemRepresentation);
+            if (h < 0) h = _worseQueryGrant(cPath.fileSystemRepresentation, "cs-daemon");
+            [searchDirs addObject:[[cPath stringByAppendingPathComponent:@"Library"]
+                                   stringByAppendingPathComponent:@"Caches"]];
+        }
+    }
+
+    NSArray *sysEntries = [fm contentsOfDirectoryAtPath:
+        @"/private/var/mobile/Containers/Data/System" error:nil];
+    for (NSString *uuid in sysEntries) {
+        if (uuid.length < 32 || [uuid hasPrefix:@"."]) continue;
+        [searchDirs addObject:
+            [[[@"/private/var/mobile/Containers/Data/System"
+               stringByAppendingPathComponent:uuid]
+              stringByAppendingPathComponent:@"Library"]
+             stringByAppendingPathComponent:@"Caches"]];
+    }
+
+    NSOrderedSet *uniqueDirs = [NSOrderedSet orderedSetWithArray:searchDirs];
+    DavizinMCMLog([NSString stringWithFormat:@"[csstore] scanning %lu dirs",
+                   (unsigned long)uniqueDirs.count]);
+
+    int storesFound = 0;
+    for (NSString *dir in uniqueDirs) {
+        NSArray *contents = [fm contentsOfDirectoryAtPath:dir error:nil];
+        if (!contents) continue;
+        for (NSString *name in contents) {
+            if (![name hasPrefix:@"com.apple.LaunchServices-"]) continue;
+            NSString *storePath = [dir stringByAppendingPathComponent:name];
+            NSData *data = [NSData dataWithContentsOfFile:storePath];
+            if (!data || data.length < 100) continue;
+            storesFound++;
+            NSDictionary *extracted = _csExtractFromBinary(data);
+            NSDictionary *ptb = extracted[@"pathToBundle"];
+            if (ptb) [sCSPathToBundle addEntriesFromDictionary:ptb];
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[csstore] parsed %@ (%lu bytes): %lu bundles, %lu paths, %lu mapped",
+                name, (unsigned long)data.length,
+                (unsigned long)[extracted[@"bundleIDs"] count],
+                (unsigned long)[extracted[@"containerPaths"] count],
+                (unsigned long)ptb.count]);
+        }
+    }
+
+    DavizinMCMLog([NSString stringWithFormat:@"[csstore] done: %d stores, %lu total mappings",
+                   storesFound, (unsigned long)sCSPathToBundle.count]);
+}
+
+static NSString *_lookupContainerViaCSStore(NSString *bundleID) {
+    @autoreleasepool {
+        if (!sCSParsed) {
+            _findAndParseCSStores();
+            sCSParsed = YES;
+        }
+        for (NSString *path in sCSPathToBundle) {
+            if ([sCSPathToBundle[path] isEqualToString:bundleID] &&
+                [path rangeOfString:@"/Data/Application/"].location != NSNotFound) {
+                return path;
+            }
+        }
+        return nil;
+    }
+}
+
 NSString *DavizinDiscoverContainerPath(NSString *bundleID) {
     if (!bundleID || bundleID.length == 0) return nil;
 
@@ -1675,6 +1941,21 @@ NSString *DavizinDiscoverContainerPath(NSString *bundleID) {
                 @"[Discovery] Sandbox grant handle=%lld para %s", handle, kDirs[i]]);
             NSString *found = _scanContainerDir(kDirs[i], bundleID);
             if (found) return found;
+        }
+    }
+
+    // Pass 3: csstore-based lookup (iOS 27+ fallback when MCM returns 0 apps)
+    {
+        NSString *csPath = _lookupContainerViaCSStore(bundleID);
+        if (csPath) {
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] csstore lookup: %@ → %@", bundleID, csPath]);
+            int64_t grantH = _worseQuerySymlink(csPath.fileSystemRepresentation);
+            if (grantH < 0) grantH = _worseQueryGrant(csPath.fileSystemRepresentation, "cs-grant");
+            if (grantH < 0) grantH = _tryGetSandboxAccess(csPath.fileSystemRepresentation);
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] csstore container grant=%lld para %@", grantH, csPath]);
+            return csPath;
         }
     }
 
