@@ -111,6 +111,14 @@ final class DavizinBridge {
                 self?.sessionKey = upperKey
                 self?.sessionHWID = KeyValidator.getDeviceHWID()
 
+                let dev = NyxelDeviceInfo.versionTuple
+                if NyxelSupportPolicy.requiresPairingTunnel(
+                    major: dev.major, minor: dev.minor,
+                    patch: dev.patch, build: NyxelSupportPolicy.currentBuild
+                ) {
+                    DavizinPrewarmContainerCache()
+                }
+
                 self?.startCountdown()
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

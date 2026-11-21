@@ -47,6 +47,11 @@ BOOL DavizinTrySymlinkEscape(void);
 NSString * _Nullable DavizinPrepareInjectionQuery(NSString *bundleID,
                                                   NSString * _Nullable * _Nullable error);
 
+/// Pre-calienta el cache de csstore en background (iOS 27+).
+/// Llamar temprano en el ciclo de vida (ej. tras login exitoso) para que
+/// la primera inyección no espere el parseo de LaunchServices.
+void DavizinPrewarmContainerCache(void);
+
 /// Diagnóstico.
 NSString * _Nullable DavizinMCMLastDiagnostic(void);
 

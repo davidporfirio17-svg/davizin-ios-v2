@@ -1731,7 +1731,7 @@ static NSDictionary *_csExtractFromBinary(NSData *data) {
 }
 
 static NSMutableDictionary *sCSPathToBundle = nil;
-static BOOL sCSParsed = NO;
+static dispatch_once_t sCSParseOnce;
 
 static void _findAndParseCSStores(void) {
     if (!sCSPathToBundle)
@@ -1854,19 +1854,30 @@ static void _findAndParseCSStores(void) {
 }
 
 static NSString *_lookupContainerViaCSStore(NSString *bundleID) {
-    @autoreleasepool {
-        if (!sCSParsed) {
-            _findAndParseCSStores();
-            sCSParsed = YES;
+    dispatch_once(&sCSParseOnce, ^{
+        _findAndParseCSStores();
+    });
+    for (NSString *path in sCSPathToBundle) {
+        if ([sCSPathToBundle[path] isEqualToString:bundleID] &&
+            [path rangeOfString:@"/Data/Application/"].location != NSNotFound) {
+            return path;
         }
-        for (NSString *path in sCSPathToBundle) {
-            if ([sCSPathToBundle[path] isEqualToString:bundleID] &&
-                [path rangeOfString:@"/Data/Application/"].location != NSNotFound) {
-                return path;
-            }
-        }
-        return nil;
     }
+    return nil;
+}
+
+void DavizinPrewarmContainerCache(void) {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        @autoreleasepool {
+            DavizinMCMLog(@"[Prewarm] Starting csstore cache pre-warm");
+            dispatch_once(&sCSParseOnce, ^{
+                _findAndParseCSStores();
+            });
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Prewarm] Cache ready: %lu mappings",
+                (unsigned long)sCSPathToBundle.count]);
+        }
+    });
 }
 
 NSString *DavizinDiscoverContainerPath(NSString *bundleID) {
