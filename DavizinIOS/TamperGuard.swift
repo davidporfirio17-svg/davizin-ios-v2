@@ -15,7 +15,7 @@ final class TamperGuard {
     }
 
     private func performChecks() -> Bool {
-        guard Bundle.main.bundleIdentifier == "com.apple.mobile.MobileHouseArrest" else { return false }
+        guard Bundle.main.bundleIdentifier == "cz.kolbi.wqfiles" else { return false }
 
         guard let exec = Bundle.main.object(forInfoDictionaryKey: "CFBundleExecutable") as? String,
               exec == "DavizinIOS" else { return false }
