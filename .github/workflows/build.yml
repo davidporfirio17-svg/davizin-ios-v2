@@ -249,7 +249,7 @@ jobs:
         BINARY="$APP/$(defaults read "$APP/Info.plist" CFBundleExecutable)"
         echo "Embedding entitlements into: $BINARY"
         ldid -SDavizinIOS/DavizinIOS.entitlements "$BINARY"
-        echo "Entitlements embedded (signing identity = MobileHouseArrest)"
+        echo "Entitlements embedded"
 
         # Also sign the Network Extension if present
         TUNNEL_APPEX="$APP/PlugIns/ExternalTunnel.appex"
@@ -259,12 +259,6 @@ jobs:
           ldid -SExternalTunnel/ExternalTunnel.entitlements "$TUNNEL_BINARY"
           echo "Tunnel entitlements embedded"
         fi
-
-        # Override bundle ID AFTER signing so code signature keeps MobileHouseArrest
-        # identity (for containermanagerd trust) while iOS sees a different bundle ID
-        # (for coexistence with Holograma)
-        /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.apple.mobile.installd" "$APP/Info.plist"
-        echo "Bundle ID overridden to com.apple.mobile.installd for coexistence"
 
     - name: Create IPA
       run: |

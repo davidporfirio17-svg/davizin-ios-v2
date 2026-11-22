@@ -11,6 +11,7 @@
 #import <dirent.h>
 #import <sys/stat.h>
 #import <errno.h>
+#import <objc/message.h>
 
 #pragma mark - C API types (container_query_* from libsystem_containermanager)
 
@@ -572,6 +573,9 @@ void DavizinReleaseContainerGrant(int64_t handle) {
     }
 }
 
+static NSString *_lookupContainerViaLSProxy(NSString *bundleID);
+static NSString *_lookupContainerViaMobileInstallation(NSString *bundleID);
+
 #pragma mark - Container path lookup (direct C API with persistent lease)
 
 NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
@@ -626,10 +630,18 @@ NSString *DavizinGetContainerPath(NSString *bundleID, NSString **outError) {
         void *qErr = api->queryGetLastError ? api->queryGetLastError(query) : NULL;
         int posix = qErr && api->errorGetPOSIX ? api->errorGetPOSIX(qErr) : 0;
         const char *msg = qErr && api->errorGetMessage ? api->errorGetMessage(qErr) : NULL;
+        DavizinMCMLog([NSString stringWithFormat:@"MCM class-2 rechazado para %@: posix=%d", bundleID, posix]);
+        api->queryFree(query);
+
+        // MCM class-2 rejected: try LSApplicationProxy (uses lsd, not containermanagerd)
+        NSString *lsPath = _lookupContainerViaLSProxy(bundleID);
+        if (lsPath.length > 0 && lsPath.isAbsolutePath) {
+            DavizinMCMLog([NSString stringWithFormat:@"LSProxy fallback OK para %@: %@", bundleID, lsPath]);
+            return lsPath;
+        }
+
         if (outError) *outError = [NSString stringWithFormat:
             @"No encontrado '%@' posix=%d %s", bundleID, posix, msg ?: ""];
-        DavizinMCMLog([NSString stringWithFormat:@"Container no encontrado para %@: posix=%d", bundleID, posix]);
-        api->queryFree(query);
         return nil;
     }
 
@@ -1880,13 +1892,137 @@ void DavizinPrewarmContainerCache(void) {
     });
 }
 
+#pragma mark - LSApplicationProxy container lookup (bypasses containermanagerd)
+
+static NSString *_lookupContainerViaLSProxy(NSString *bundleID) {
+    Class proxyClass = NSClassFromString(@"LSApplicationProxy");
+    if (!proxyClass) {
+        dlopen("/System/Library/Frameworks/CoreServices.framework/CoreServices", RTLD_LAZY);
+        proxyClass = NSClassFromString(@"LSApplicationProxy");
+    }
+    if (!proxyClass) {
+        DavizinMCMLog(@"[LSProxy] class not available");
+        return nil;
+    }
+
+    SEL proxySel = NSSelectorFromString(@"applicationProxyForIdentifier:");
+    if (![proxyClass respondsToSelector:proxySel]) {
+        DavizinMCMLog(@"[LSProxy] applicationProxyForIdentifier: not available");
+        return nil;
+    }
+
+    id proxy = ((id(*)(id, SEL, id))objc_msgSend)(proxyClass, proxySel, bundleID);
+    if (!proxy) {
+        DavizinMCMLog([NSString stringWithFormat:
+            @"[LSProxy] no proxy for %@", bundleID]);
+        return nil;
+    }
+
+    SEL installedSel = NSSelectorFromString(@"isInstalled");
+    if ([proxy respondsToSelector:installedSel]) {
+        BOOL installed = ((BOOL(*)(id, SEL))objc_msgSend)(proxy, installedSel);
+        if (!installed) {
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[LSProxy] %@ not installed", bundleID]);
+            return nil;
+        }
+    }
+
+    SEL dataContainerSel = NSSelectorFromString(@"dataContainerURL");
+    if (![proxy respondsToSelector:dataContainerSel]) {
+        DavizinMCMLog(@"[LSProxy] dataContainerURL not available");
+        return nil;
+    }
+
+    NSURL *containerURL = ((NSURL *(*)(id, SEL))objc_msgSend)(proxy, dataContainerSel);
+    if (!containerURL || !containerURL.path.length) {
+        DavizinMCMLog([NSString stringWithFormat:
+            @"[LSProxy] dataContainerURL nil for %@", bundleID]);
+        return nil;
+    }
+
+    NSString *path = containerURL.path;
+    if ([path isEqualToString:@"/var"] || [path hasPrefix:@"/var/"])
+        path = [@"/private" stringByAppendingString:path];
+
+    DavizinMCMLog([NSString stringWithFormat:
+        @"[LSProxy] %@ → %@", bundleID, path]);
+    return path;
+}
+
+static NSString *_lookupContainerViaMobileInstallation(NSString *bundleID) {
+    void *miHandle = dlopen("/System/Library/PrivateFrameworks/MobileInstallation.framework/MobileInstallation", RTLD_LAZY);
+    if (!miHandle) {
+        DavizinMCMLog(@"[MILookup] framework not available");
+        return nil;
+    }
+
+    typedef NSDictionary *(*MILookup_t)(NSDictionary *);
+    MILookup_t lookup = (MILookup_t)dlsym(miHandle, "MobileInstallationLookup");
+    if (!lookup) {
+        DavizinMCMLog(@"[MILookup] MobileInstallationLookup symbol not found");
+        return nil;
+    }
+
+    NSDictionary *result = lookup(@{
+        @"ReturnAttributes": @[@"Container", @"Path", @"BundleContainer"],
+    });
+
+    NSDictionary *appInfo = result[bundleID];
+    if (!appInfo) {
+        DavizinMCMLog([NSString stringWithFormat:
+            @"[MILookup] no entry for %@", bundleID]);
+        return nil;
+    }
+
+    NSString *container = appInfo[@"Container"];
+    if (!container.length) {
+        DavizinMCMLog([NSString stringWithFormat:
+            @"[MILookup] no Container key for %@", bundleID]);
+        return nil;
+    }
+
+    if ([container hasPrefix:@"/var/"])
+        container = [@"/private" stringByAppendingString:container];
+
+    DavizinMCMLog([NSString stringWithFormat:
+        @"[MILookup] %@ → %@", bundleID, container]);
+    return container;
+}
+
 NSString *DavizinDiscoverContainerPath(NSString *bundleID) {
     if (!bundleID || bundleID.length == 0) return nil;
 
     DavizinMCMLog([NSString stringWithFormat:
         @"[Discovery] Buscando container para %@", bundleID]);
 
-    // Pass 0: MCM class-2 direct query (may fail on iOS 27.2 but try both flag sets)
+    // Pass 0a: LSApplicationProxy (goes through lsd, not containermanagerd)
+    {
+        NSString *lsPath = _lookupContainerViaLSProxy(bundleID);
+        if (lsPath.length > 0 && lsPath.isAbsolutePath) {
+            int64_t grantH = _worseQuerySymlink(lsPath.fileSystemRepresentation);
+            if (grantH < 0) grantH = _worseQueryGrant(lsPath.fileSystemRepresentation, "ls-grant");
+            if (grantH < 0) grantH = _tryGetSandboxAccess(lsPath.fileSystemRepresentation);
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] LSProxy OK: %@ grant=%lld", lsPath, grantH]);
+            return lsPath;
+        }
+    }
+
+    // Pass 0b: MobileInstallation framework lookup
+    {
+        NSString *miPath = _lookupContainerViaMobileInstallation(bundleID);
+        if (miPath.length > 0 && miPath.isAbsolutePath) {
+            int64_t grantH = _worseQuerySymlink(miPath.fileSystemRepresentation);
+            if (grantH < 0) grantH = _worseQueryGrant(miPath.fileSystemRepresentation, "mi-grant");
+            if (grantH < 0) grantH = _tryGetSandboxAccess(miPath.fileSystemRepresentation);
+            DavizinMCMLog([NSString stringWithFormat:
+                @"[Discovery] MILookup OK: %@ grant=%lld", miPath, grantH]);
+            return miPath;
+        }
+    }
+
+    // Pass 0c: MCM class-2 direct query (may fail on iOS 27.2 but try both flag sets)
     {
         static const uint64_t kFlagSets[] = { 0x900000000ULL, 0x8100000000ULL };
         for (int f = 0; f < 2; f++) {
@@ -1899,7 +2035,7 @@ NSString *DavizinDiscoverContainerPath(NSString *bundleID) {
         }
     }
 
-    // Pass 0b: MCM enumeration — enumerate class-2 identifiers to find our target
+    // Pass 0d: MCM enumeration — enumerate class-2 identifiers to find our target
     {
         NSArray<NSString *> *identifiers = _mcmEnumerateIdentifiers(2, 500);
         if ([identifiers containsObject:bundleID]) {
