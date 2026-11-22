@@ -415,11 +415,10 @@ final class DavizinBridge {
                 }
 
                 if pairingRequired {
-                    NyxelActivityLog.record("iOS 27+: per-container grants via worse_query (exploit innecesario)")
+                    NyxelActivityLog.record("iOS 27+: preparación omitida (per-container grants se obtienen en inyección)")
                     DispatchQueue.main.async {
                         self.operationInFlight = false
-                        self.hapticFeedback(success: true)
-                        self.vc?.setOperationState(.succeeded("Sistema preparado (per-container) ✓"))
+                        self.vc?.setOperationState(.idle)
                     }
                     return
                 }

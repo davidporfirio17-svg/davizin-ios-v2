@@ -642,7 +642,8 @@ class InjectorService {
                 NyxelActivityLog.record("DIAG MCM+Discovery+AirLift container lookup fallaron en iOS 27; continuando sin container local")
             } else {
                 let detail = mcmErr ?? "container_query devolvió nil"
-                NyxelActivityLog.record("DIAG MCM+Discovery fallo en iOS 27+: \(detail). El juego puede no estar instalado o MCM rechazó la consulta.")
+                let mcmDiag = DavizinMCMLastDiagnostic() ?? "sin dato"
+                NyxelActivityLog.record("DIAG MCM+Discovery fallo en iOS 27+: \(detail). Cadena MCM: \(mcmDiag)")
                 return InjectorResult(success: false, message: "MCM-27: \(detail)")
             }
         } else if container == nil {
