@@ -614,6 +614,7 @@ class InjectorService {
         let bid = bundleID(for: game)
         let pairingRequired = requiresPairingTransportOnCurrentDevice()
 
+        DavizinMCMResetDiagnostic()
         NyxelActivityLog.record("========== INJECTION TRACE BEGIN ==========")
         NyxelActivityLog.record("DIAG system=\(NyxelSupportPolicy.currentSystemDescription) game=\(game.rawValue) mode=\(mode.displayName) pairingRequired=\(pairingRequired) airLiftAvailable=\(NixelAirLiftFileChannel.isAvailable)")
 
@@ -644,12 +645,12 @@ class InjectorService {
                 let detail = mcmErr ?? "container_query devolvió nil"
                 let mcmDiag = DavizinMCMLastDiagnostic() ?? "sin dato"
                 NyxelActivityLog.record("DIAG MCM+Discovery fallo en iOS 27+: \(detail). Cadena MCM: \(mcmDiag)")
-                return InjectorResult(success: false, message: "MCM-27: \(detail)")
+                return InjectorResult(success: false, message: "No se encontró el contenedor del juego. Verifica que esté instalado.")
             }
         } else if container == nil {
             let msg = mcmErr ?? "MCM fallo - container nil"
             NyxelActivityLog.record("DIAG MCM fallo fatal: \(msg)")
-            return InjectorResult(success: false, message: msg)
+            return InjectorResult(success: false, message: "No se encontró el contenedor del juego. Verifica que esté instalado.")
         }
 
         NyxelActivityLog.record("DIAG PASO 3 container=\(container ?? "(nil-AirLift-mode)")")

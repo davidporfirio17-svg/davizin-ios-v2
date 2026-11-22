@@ -54,5 +54,6 @@ void DavizinPrewarmContainerCache(void);
 
 /// Diagnóstico.
 NSString * _Nullable DavizinMCMLastDiagnostic(void);
+void DavizinMCMResetDiagnostic(void);
 
 NS_ASSUME_NONNULL_END

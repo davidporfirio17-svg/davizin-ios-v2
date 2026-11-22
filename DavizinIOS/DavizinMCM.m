@@ -2036,3 +2036,9 @@ NSString *DavizinMCMLastDiagnostic(void) {
     os_unfair_lock_unlock(&sMCMLogRingLock);
     return result;
 }
+
+void DavizinMCMResetDiagnostic(void) {
+    os_unfair_lock_lock(&sMCMLogRingLock);
+    [sMCMLogRing removeAllObjects];
+    os_unfair_lock_unlock(&sMCMLogRingLock);
+}
