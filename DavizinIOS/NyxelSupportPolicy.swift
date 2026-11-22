@@ -177,20 +177,7 @@ enum NyxelSupportPolicy {
         ProcessInfo.processInfo.operatingSystemVersion
     }
 
-    /// Obtiene el build Darwin exacto, por ejemplo 24A5355q.
-    static var currentBuild: String {
-        var size = 0
-        guard sysctlbyname("kern.osversion", nil, &size, nil, 0) == 0, size > 0 else {
-            return ""
-        }
-
-        var buffer = [CChar](repeating: 0, count: size)
-        let result = buffer.withUnsafeMutableBufferPointer { pointer in
-            sysctlbyname("kern.osversion", pointer.baseAddress, &size, nil, 0)
-        }
-        guard result == 0 else { return "" }
-        return String(cString: buffer)
-    }
+    static var currentBuild: String { NyxelDeviceInfo.osBuild }
 
     static func iOS27BetaNumber(for build: String) -> Int? {
         verifiedIOS27Builds.first { $0.build == build }?.beta
@@ -323,11 +310,19 @@ class NyxelLogger {
     func logError(_ message: String) { log(message, level: "ERROR") }
     func logSuccess(_ message: String) { log(message, level: "SUCCESS") }
     
+    private static let maxLogSize: UInt64 = 512_000
+
     private func writeToFile(_ message: String) {
         guard let logFile = logFile else { return }
         let data = (message + "\n").data(using: .utf8) ?? Data()
-        
+
         if FileManager.default.fileExists(atPath: logFile.path) {
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: logFile.path),
+               let size = attrs[.size] as? UInt64, size > Self.maxLogSize {
+                try? FileManager.default.removeItem(at: logFile)
+                try? data.write(to: logFile, options: .atomic)
+                return
+            }
             if let fileHandle = FileHandle(forWritingAtPath: logFile.path) {
                 fileHandle.seekToEndOfFile()
                 fileHandle.write(data)

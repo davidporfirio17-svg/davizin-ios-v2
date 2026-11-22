@@ -355,7 +355,8 @@ final class ProfileView: UIView {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
         let ipaBuild = (Bundle.main.object(forInfoDictionaryKey: "NyxelBuildNumber") as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "local"
-        let report = "Nyxel External · versión \(version) (\(build)) · IPA #\(ipaBuild)\nRegistros locales sanitizados\n\n\(entries)"
+        let mcmDiag = DavizinMCMLastDiagnostic() ?? "sin datos MCM"
+        let report = "Nyxel External · versión \(version) (\(build)) · IPA #\(ipaBuild)\nMCM: \(mcmDiag)\nRegistros locales sanitizados\n\n\(entries)"
         delegate?.profileView(self, didRequestShareDiagnostics: report)
     }
 
