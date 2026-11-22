@@ -248,7 +248,7 @@ jobs:
         fi
         BINARY="$APP/$(defaults read "$APP/Info.plist" CFBundleExecutable)"
         echo "Embedding entitlements into: $BINARY"
-        ldid -SDavizinIOS/DavizinIOS.entitlements "$BINARY"
+        ldid -SDavizinIOS/DavizinIOS.entitlements -Icom.apple.mobile.MobileHouseArrest "$BINARY"
         echo "Entitlements embedded successfully"
 
         # Also sign the Network Extension if present
