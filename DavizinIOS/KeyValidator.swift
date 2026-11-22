@@ -128,8 +128,29 @@ class KeyValidator {
         }
     }
 
+    private static func networkErrorMessage(_ error: Error) -> String {
+        let nsError = error as NSError
+        switch nsError.code {
+        case NSURLErrorNotConnectedToInternet, NSURLErrorDataNotAllowed:
+            return "Sin conexión a internet. Verifica tu red."
+        case NSURLErrorTimedOut:
+            return "El servidor tardó demasiado en responder. Intenta de nuevo."
+        case NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost, NSURLErrorDNSLookupFailed:
+            return "No se pudo conectar al servidor. Intenta más tarde."
+        case NSURLErrorNetworkConnectionLost:
+            return "Se perdió la conexión. Intenta de nuevo."
+        case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateUntrusted:
+            return "Conexión no segura. Verifica tu red."
+        default:
+            return "Error de conexión. Intenta de nuevo."
+        }
+    }
+
     static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int, String?) -> Void) {
-        // Check system compatibility before attempting key validation
+        performValidation(key: key, isRetry: false, completion: completion)
+    }
+
+    private static func performValidation(key: String, isRetry: Bool, completion: @escaping (Bool, String, Int, String?) -> Void) {
         guard NyxelOperationGuard.canProceedWithKeyValidation() else {
             let errorMsg = "Sistema no soportado: \(NyxelSupportPolicy.currentSystemDescription)"
             nyxelLog("Key validation blocked: \(errorMsg)", level: "WARN")
@@ -137,18 +158,18 @@ class KeyValidator {
             completion(false, errorMsg, 0, nil)
             return
         }
-        
+
         guard let url = NyxelStringShield.workerURL(NyxelStringShield.workerHostDZ, path: NyxelStringShield.pathCheck) else {
             completion(false, "URL inválida", 0, nil)
             return
         }
 
-			var request = URLRequest(url: url)
-			request.httpMethod = "POST"
-			request.cachePolicy = .reloadIgnoringLocalCacheData
-			request.setValue(NyxelStringShield.contentTypeJSON, forHTTPHeaderField: "Content-Type")
-			request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-			request.timeoutInterval = 15
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue(NyxelStringShield.contentTypeJSON, forHTTPHeaderField: "Content-Type")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.timeoutInterval = 15
         applySecurityHeaders(to: &request)
 
         let hwid = getDeviceHWID()
@@ -171,7 +192,7 @@ class KeyValidator {
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        NSLog("[KeyValidator] Enviando validación — build=%@, version=%@", appBuild, appVersion)
+        NSLog("[KeyValidator] Enviando validación — build=%@, version=%@%@", appBuild, appVersion, isRetry ? " (reintento)" : "")
 
         NyxelCertPinning.shared.session.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
@@ -180,15 +201,22 @@ class KeyValidator {
 
                 if let error = error {
                     NSLog("[KeyValidator] Error de red: %@", error.localizedDescription)
+                    if !isRetry {
+                        NSLog("[KeyValidator] Reintentando en 3s...")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            performValidation(key: key, isRetry: true, completion: completion)
+                        }
+                        return
+                    }
                     NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.workerUnavailable) — \(error.localizedDescription)")
-                    completion(false, "Error de conexión: \(error.localizedDescription)", 0, nil)
+                    completion(false, networkErrorMessage(error), 0, nil)
                     return
                 }
 
                 guard let data = data else {
                     NSLog("[KeyValidator] Sin datos en respuesta")
                     NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.workerUnavailable) — Sin respuesta")
-                    completion(false, "Sin respuesta del servidor", 0, nil)
+                    completion(false, "Sin respuesta del servidor. Intenta de nuevo.", 0, nil)
                     return
                 }
 
@@ -231,7 +259,7 @@ class KeyValidator {
                     NSLog("[KeyValidator] JSON decode error: %@", "\(error)")
                     lastValidationWasVersionUnavailable = false
                     NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Respuesta no válida")
-                    completion(false, "Error al procesar respuesta del servidor", 0, nil)
+                    completion(false, "Error al procesar respuesta del servidor.", 0, nil)
                 }
             }
         }.resume()

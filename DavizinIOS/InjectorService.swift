@@ -435,13 +435,12 @@ class InjectorService {
     }
 
 	static func inject(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) -> InjectorResult {
-		defer { print("❌ inject() COMPLETÓ (defer)") }
+		defer { NyxelActivityLog.record("inject() completó (defer)") }
 
 		DavizinMCMResetDiagnostic()
-		print("🔵 inject() INICIANDO")
+		NyxelActivityLog.record("inject() iniciando")
 
 		do {
-			print("🔵 inject() verificando sistema")
 			sendErrorNotification("Verificando", "Sistema")
 
 			guard NyxelSupportPolicy.isCurrentSystemSupported else {
@@ -587,17 +586,14 @@ class InjectorService {
         return InjectorResult(success: true,
             message: "¡\(mode.displayName) aplicado! Abre Free Fire, espera 8–10 segundos, vuelve a Nyxel y limpia la sesión.")
 		} catch let error as NSError {
-			print("💥 CRASH NSError: \(error.localizedDescription)")
-			NyxelActivityLog.record("Error interno: \(error.localizedDescription)")
+			NyxelActivityLog.record("Error interno (NSError): \(error.localizedDescription)")
 			return InjectorResult(success: false, message: "Ocurrió un error inesperado. Intenta de nuevo.")
 		} catch {
-			print("💥 CRASH Exception: \(error)")
-			NyxelActivityLog.record("Error interno: \(error)")
+			NyxelActivityLog.record("Error interno (exception): \(error)")
 			return InjectorResult(success: false, message: "Ocurrió un error inesperado. Intenta de nuevo.")
 		}
 
-		print("⚠️ FATAL: inject() reached end without return")
-		NyxelActivityLog.record("Error interno: flujo incompleto")
+		NyxelActivityLog.record("Error interno: flujo incompleto (unreachable)")
 		return InjectorResult(success: false, message: "Ocurrió un error inesperado. Intenta de nuevo.")
     }
 
