@@ -24,6 +24,13 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Cache Rust target directory
+      uses: actions/cache@v4
+      with:
+        path: airlift-rust-core/target
+        key: rust-ios-${{ hashFiles('airlift-rust-core/Cargo.lock', 'airlift-rust-core/Cargo.toml', 'airlift-rust-core/src/**') }}
+        restore-keys: rust-ios-
+
     - name: Build AirLiftFFI transport backend
       run: |
         set -euo pipefail

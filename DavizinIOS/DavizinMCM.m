@@ -99,10 +99,18 @@ static MCMLease *allocLease(void) {
     return &sLeases[0];
 }
 
-#pragma mark - Logging
+#pragma mark - Logging (ring buffer)
+
+static NSMutableArray<NSString *> *sMCMLogRing = nil;
+static os_unfair_lock sMCMLogRingLock = OS_UNFAIR_LOCK_INIT;
 
 static inline void DavizinMCMLog(NSString *msg) {
     NSLog(@"[DavizinMCM] %@", msg);
+    os_unfair_lock_lock(&sMCMLogRingLock);
+    if (!sMCMLogRing) sMCMLogRing = [NSMutableArray new];
+    [sMCMLogRing addObject:[msg copy]];
+    if (sMCMLogRing.count > 20) [sMCMLogRing removeObjectAtIndex:0];
+    os_unfair_lock_unlock(&sMCMLogRingLock);
 }
 
 #pragma mark - bad_query grant helpers
@@ -258,5 +266,16 @@ NSString *DavizinPrepareInjectionQuery(NSString *bundleID, NSString **outErr) {
 }
 
 NSString *DavizinMCMLastDiagnostic(void) {
-    return @"Using direct container_query C API with persistent lease";
+    os_unfair_lock_lock(&sMCMLogRingLock);
+    NSString *result = sMCMLogRing.count > 0
+        ? [sMCMLogRing componentsJoinedByString:@" | "]
+        : @"sin mensajes MCM";
+    os_unfair_lock_unlock(&sMCMLogRingLock);
+    return result;
+}
+
+void DavizinMCMResetDiagnostic(void) {
+    os_unfair_lock_lock(&sMCMLogRingLock);
+    [sMCMLogRing removeAllObjects];
+    os_unfair_lock_unlock(&sMCMLogRingLock);
 }

@@ -24,4 +24,7 @@ NSString * _Nullable DavizinPrepareInjectionQuery(NSString *bundleID,
 /// Diagnóstico de la última llamada a DavizinGetContainerPath.
 NSString * _Nullable DavizinMCMLastDiagnostic(void);
 
+/// Limpia el buffer de diagnóstico MCM.
+void DavizinMCMResetDiagnostic(void);
+
 NS_ASSUME_NONNULL_END

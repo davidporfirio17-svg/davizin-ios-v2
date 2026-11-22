@@ -437,6 +437,7 @@ class InjectorService {
 	static func inject(game: DavizinGame, mode: DavizinMode, key: String, hwid: String) -> InjectorResult {
 		defer { print("❌ inject() COMPLETÓ (defer)") }
 
+		DavizinMCMResetDiagnostic()
 		print("🔵 inject() INICIANDO")
 
 		do {
@@ -469,8 +470,10 @@ class InjectorService {
             NyxelActivityLog.record("Usando canal alternativo de acceso")
             sendErrorNotification("OK", "Canal alternativo activo")
         } else {
+            let diag = DavizinMCMLastDiagnostic() ?? "sin diagnóstico"
+            NyxelActivityLog.record("MCM falló: \(mcmErr ?? "nil") | diag: \(diag)")
             sendErrorNotification("Error", "No se pudo acceder al juego")
-            return InjectorResult(success: false, message: "No se pudo acceder al juego. Verifica que esté instalado.")
+            return InjectorResult(success: false, message: "No se encontró el contenedor del juego. Verifica que esté instalado.")
         }
 
         sendErrorNotification("Sincronizando", "Configuración remota")

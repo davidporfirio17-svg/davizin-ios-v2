@@ -248,8 +248,8 @@ final class DavizinBridge {
             guard let self else { return }
             guard success && remaining > 0 else {
                 self.operationInFlight = false
-                NyxelActivityLog.record("Operación bloqueada: key no autorizada")
-                self.vc?.setOperationState(.failed("La key ya no está autorizada. Verifica tu sesión."))
+                NyxelActivityLog.record("Operación bloqueada: key no autorizada — \(message ?? "sin detalle")")
+                self.vc?.setOperationState(.failed(message ?? "La key ya no está autorizada."))
                 return
             }
             self.remainingSeconds = remaining
