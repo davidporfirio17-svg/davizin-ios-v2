@@ -592,9 +592,6 @@ class InjectorService {
 			NyxelActivityLog.record("Error interno (exception): \(error)")
 			return InjectorResult(success: false, message: "Ocurrió un error inesperado. Intenta de nuevo.")
 		}
-
-		NyxelActivityLog.record("Error interno: flujo incompleto (unreachable)")
-		return InjectorResult(success: false, message: "Ocurrió un error inesperado. Intenta de nuevo.")
     }
 
     private static func removeLegacyRemoteBackupIfAccessible(container: String, relativePath: String) -> Bool {

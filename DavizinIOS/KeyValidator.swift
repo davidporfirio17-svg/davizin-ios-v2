@@ -84,10 +84,7 @@ class KeyValidator {
     }
 
     static func getDeviceModel() -> String {
-        var systemInfo = utsname()
-        uname(&systemInfo)
-        let model = String(bytes: Data(bytes: &systemInfo.machine, count: Int(_SYS_NAMELEN)), encoding: .ascii)?.trimmingCharacters(in: .controlCharacters) ?? "Unknown"
-        return model
+        NyxelDeviceInfo.machineName
     }
 
     static func getIOSVersion() -> String {

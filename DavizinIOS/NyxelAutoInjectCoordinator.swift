@@ -13,6 +13,7 @@ final class NyxelAutoInjectCoordinator {
 
     private(set) var pendingAction: NyxelAutoAction?
     private var isRunning = false
+    private var runningStartedAt: Date?
 
     func setPending(_ action: NyxelAutoAction) {
         pendingAction = action
@@ -30,8 +31,15 @@ final class NyxelAutoInjectCoordinator {
 
     func executeAfterLogin(bridge: DavizinBridge, viewController: ViewController) {
         guard let action = consumePending() else { return }
+
+        if isRunning, let started = runningStartedAt, Date().timeIntervalSince(started) > 60 {
+            NyxelActivityLog.record("Auto: isRunning trabado por \(Int(Date().timeIntervalSince(started)))s, reseteando")
+            isRunning = false
+        }
+
         guard !isRunning else { return }
         isRunning = true
+        runningStartedAt = Date()
 
         switch action {
         case .inject:
