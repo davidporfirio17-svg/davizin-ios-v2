@@ -17,10 +17,7 @@ final class NyxelGameVersionChecker {
     }
 
     private static func bundleID(for game: DavizinGame) -> String {
-        switch game {
-        case .freeFireMax: return "com.dts.freefiremax"
-        case .freeFire:    return "com.dts.freefireth"
-        }
+        game.bundleID
     }
 
     func checkForUpdates(completion: @escaping ([VersionResult]) -> Void) {
@@ -60,7 +57,7 @@ final class NyxelGameVersionChecker {
             return
         }
 
-        let task = URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+        let task = NyxelCertPinning.shared.session.dataTask(with: url) { [weak self] data, _, error in
             guard let self, error == nil, let data else {
                 completion(nil)
                 return

@@ -3,7 +3,16 @@ import UserNotifications
 
 enum DavizinScreenStage: Equatable { case login, home, gameSelection, modeSelection, operation, profile, help }
 
-enum DavizinGame: String, CaseIterable { case freeFire = "Free Fire", freeFireMax = "Free Fire MAX" }
+enum DavizinGame: String, CaseIterable {
+    case freeFire = "Free Fire", freeFireMax = "Free Fire MAX"
+
+    var bundleID: String {
+        switch self {
+        case .freeFireMax: return "com.dts.freefiremax"
+        case .freeFire:    return "com.dts.freefireth"
+        }
+    }
+}
 
 struct DavizinMode: Hashable, Codable, Identifiable {
     let id: String

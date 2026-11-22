@@ -25,7 +25,7 @@ class AppState: ObservableObject {
         return raw.isEmpty ? "local" : raw
     }
     var ipaBuildNumber: String { AppState.ipaBuildNumber }
-    let freeFireBundleID = "com.dts.freefiremax"
+    let freeFireBundleID = DavizinGame.freeFireMax.bundleID
     let freeFireName = "Free Fire MAX"
     
     private var countdownTimer: Timer?

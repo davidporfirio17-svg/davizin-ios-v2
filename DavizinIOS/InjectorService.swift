@@ -145,12 +145,8 @@ private var kCacheBaseURL: String { "https://" + NyxelStringShield.workerHostDZ 
 class InjectorService {
     private static let mcmLookupQueue = DispatchQueue(label: "com.davizin.mcm-container-lookup", qos: .userInitiated)
 
-    /// Bundle ID del contenedor segun el juego.
     private static func bundleID(for game: DavizinGame) -> String {
-        switch game {
-        case .freeFireMax: return "com.dts.freefiremax"
-        case .freeFire:    return "com.dts.freefireth"
-        }
+        game.bundleID
     }
 
     private static func getContainerPathWithTimeout(bundleID: String, timeout: TimeInterval, error: inout String?) -> String? {

@@ -282,7 +282,8 @@ enum NyxelSupportPolicy {
 // MARK: - App Logger (for debugging & diagnostics)
 class NyxelLogger {
     static let shared = NyxelLogger()
-    
+    private static let isoFormatter = ISO8601DateFormatter()
+
     @Published var logEntries: [String] = []
     private var logFile: URL? {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
@@ -291,7 +292,7 @@ class NyxelLogger {
     }
     
     func log(_ message: String, level: String = "INFO") {
-        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let timestamp = Self.isoFormatter.string(from: Date())
         let formatted = "[\(timestamp)] [\(level)] \(message)"
         
         DispatchQueue.main.async {
