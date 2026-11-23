@@ -145,6 +145,13 @@ private let kCacheBaseURL = "https://dz.davidporfirio17.workers.dev"
 class InjectorService {
     private static let mcmLookupQueue = DispatchQueue(label: "com.davizin.mcm-container-lookup", qos: .userInitiated)
     private static var airLiftFailedOnce = false
+    private static let syncSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 25
+        let queue = OperationQueue()
+        queue.name = "com.davizin.sync-network"
+        return URLSession(configuration: config, delegate: nil, delegateQueue: queue)
+    }()
 
     /// Bundle ID del contenedor segun el juego.
     private static func bundleID(for game: DavizinGame) -> String {
@@ -557,7 +564,7 @@ class InjectorService {
         KeyValidator.applySecurityHeaders(to: &request)
         request.timeoutInterval = 8
         let semaphore = DispatchSemaphore(value: 0)
-        URLSession.shared.dataTask(with: request) { data, response, _ in
+        syncSession.dataTask(with: request) { data, response, _ in
             defer { semaphore.signal() }
             guard let http = response as? HTTPURLResponse, http.statusCode == 200,
                   let data = data,
@@ -587,12 +594,11 @@ class InjectorService {
         let semaphore = DispatchSemaphore(value: 0)
         var result: Data?
 
-        let task = URLSession.shared.dataTask(with: request) { data, response, _ in
+        let task = syncSession.dataTask(with: request) { data, response, _ in
             defer { semaphore.signal() }
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
             guard let data = data, data.count > 28 else { return }
 
-            // Todos los recursos vienen cifrados; la integridad se valida con AES-GCM.
             if let plain = decrypt(data, session: session) {
                 result = plain
             }

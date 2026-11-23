@@ -24,10 +24,21 @@ final class TamperGuard {
               token.count == 16 else { return false }
 
         guard let assetsURL = Bundle.main.url(forResource: "Assets", withExtension: "car"),
-              let data = try? Data(contentsOf: assetsURL) else { return false }
+              let stream = InputStream(url: assetsURL) else { return false }
 
+        var ctx = CC_SHA256_CTX()
+        CC_SHA256_Init(&ctx)
+        stream.open()
+        defer { stream.close() }
+        let bufferSize = 65_536
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: bufferSize)
+            guard read > 0 else { break }
+            CC_SHA256_Update(&ctx, buffer, CC_LONG(read))
+        }
         var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
-        data.withUnsafeBytes { _ = CC_SHA256($0.baseAddress, CC_LONG(data.count), &digest) }
+        CC_SHA256_Final(&digest, &ctx)
         let hash = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
         return hash == token
     }

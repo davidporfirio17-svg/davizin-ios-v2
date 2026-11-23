@@ -293,11 +293,19 @@ class NyxelLogger {
     func logError(_ message: String) { log(message, level: "ERROR") }
     func logSuccess(_ message: String) { log(message, level: "SUCCESS") }
     
+    private static let maxLogSize: UInt64 = 512 * 1024
+
     private func writeToFile(_ message: String) {
         guard let logFile = logFile else { return }
         let data = (message + "\n").data(using: .utf8) ?? Data()
-        
+
         if FileManager.default.fileExists(atPath: logFile.path) {
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: logFile.path),
+               let size = attrs[.size] as? UInt64, size > Self.maxLogSize {
+                try? FileManager.default.removeItem(at: logFile)
+                try? data.write(to: logFile, options: .atomic)
+                return
+            }
             if let fileHandle = FileHandle(forWritingAtPath: logFile.path) {
                 fileHandle.seekToEndOfFile()
                 fileHandle.write(data)

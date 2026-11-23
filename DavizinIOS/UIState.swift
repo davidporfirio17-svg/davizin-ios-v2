@@ -107,7 +107,7 @@ enum DavizinModeCatalog {
     static func markConsumed(_ id: String) {
         let updated = all().map { mode in
             guard mode.id == id else { return mode }
-            return DavizinMode(id: mode.id, label: mode.label, enabled: false, noticeTitle: mode.noticeTitle, noticeBody: mode.noticeBody, noticeLevel: mode.noticeLevel, noticeEnabled: mode.noticeEnabled, accessTier: mode.accessTier, pathMax: mode.pathMax, pathNormal: mode.pathNormal, oneTime: mode.oneTime, consumed: true)
+            return DavizinMode(id: mode.id, label: mode.label, enabled: false, noticeTitle: mode.noticeTitle, noticeBody: mode.noticeBody, noticeLevel: mode.noticeLevel, noticeEnabled: mode.noticeEnabled, accessTier: mode.accessTier, pathMax: mode.pathMax, pathNormal: mode.pathNormal, oneTime: mode.oneTime, consumed: true, enabledFreeFire: mode.enabledFreeFire, enabledFreeFireMax: mode.enabledFreeFireMax)
         }
         save(updated)
     }
