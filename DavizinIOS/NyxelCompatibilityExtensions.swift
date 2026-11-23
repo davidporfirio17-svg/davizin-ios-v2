@@ -3,33 +3,27 @@ import UIKit
 
 // MARK: - Operation Guards
 enum NyxelOperationGuard {
-    /// Check before downloading/validating keys
     static func canProceedWithKeyValidation() -> Bool {
         guard NyxelSupportPolicy.isCurrentSystemSupported else {
-            nyxelLog("🚫 Key validation blocked: \(NyxelSupportPolicy.currentSystemDescription) not supported", level: "WARN")
+            NyxelActivityLog.record("Guard: key validation bloqueada — \(NyxelSupportPolicy.currentSystemDescription)")
             return false
         }
-        nyxelLog("✓ Key validation allowed for \(NyxelSupportPolicy.currentSystemDescription)", level: "INFO")
         return true
     }
-    
-    /// Check before injecting into Free Fire
+
     static func canProceedWithInjection() -> Bool {
         guard NyxelSupportPolicy.isCurrentSystemSupported else {
-            nyxelLog("🚫 Injection blocked: \(NyxelSupportPolicy.currentSystemDescription) not supported", level: "WARN")
+            NyxelActivityLog.record("Guard: inyeccion bloqueada — \(NyxelSupportPolicy.currentSystemDescription)")
             return false
         }
-        nyxelLog("✓ Injection allowed for \(NyxelSupportPolicy.currentSystemDescription)", level: "INFO")
         return true
     }
-    
-    /// Check before downloading/caching assets
+
     static func canProceedWithAssetDownload() -> Bool {
         guard NyxelSupportPolicy.isCurrentSystemSupported else {
-            nyxelLog("🚫 Asset download blocked: \(NyxelSupportPolicy.currentSystemDescription) not supported", level: "WARN")
+            NyxelActivityLog.record("Guard: asset download bloqueado — \(NyxelSupportPolicy.currentSystemDescription)")
             return false
         }
-        nyxelLog("✓ Asset download allowed for \(NyxelSupportPolicy.currentSystemDescription)", level: "INFO")
         return true
     }
 }
@@ -106,9 +100,11 @@ extension URLSession {
                 userInfo: [NSLocalizedDescriptionKey: "Device not supported"]
             )
             completionHandler(nil, nil, error)
-            return dataTask(with: url)
+            let task = dataTask(with: url)
+            task.cancel()
+            return task
         }
-        
+
         return dataTask(with: url, completionHandler: completionHandler)
     }
 }

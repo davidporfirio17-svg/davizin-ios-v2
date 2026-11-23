@@ -37,7 +37,12 @@ enum NyxelBinaryIntegrity {
     static func verify() -> Verdict {
         guard let actual = textSegmentDigest() else { return .unknown }
         guard let expected = expectedDigest(), !expected.isEmpty else { return .unknown }
-        return actual.caseInsensitiveCompare(expected) == .orderedSame ? .match : .mismatch
+        let a = actual.lowercased().utf8
+        let b = expected.lowercased().utf8
+        guard a.count == b.count else { return .mismatch }
+        var diff: UInt8 = 0
+        for (x, y) in zip(a, b) { diff |= x ^ y }
+        return diff == 0 ? .match : .mismatch
     }
 
     // MARK: - Internals

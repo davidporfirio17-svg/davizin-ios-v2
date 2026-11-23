@@ -267,8 +267,8 @@ final class ViewController: UIViewController {
     @objc private func appWillEnterForeground() {
         NyxelCleanupFlow.markReturnedToNyxel()
         if let backgroundedAt, Date().timeIntervalSince(backgroundedAt) >= inactivityLockInterval {
-            activeKey = nil
-            activeRemainingSeconds = 0
+            onLogout?()
+            setAccountSession(key: nil, remainingSeconds: 0)
             NyxelActivityLog.record("Sesión bloqueada por inactividad")
             showLogin(animated: true)
             return
