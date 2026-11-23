@@ -1,4 +1,5 @@
 import UIKit
+import AVFoundation
 
 enum NyxelAutoAction: String {
     case inject
@@ -14,6 +15,7 @@ final class NyxelAutoInjectCoordinator {
     private(set) var pendingAction: NyxelAutoAction?
     private var isRunning = false
     private var runningStartedAt: Date?
+    private var silentPlayer: AVAudioPlayer?
 
     func setPending(_ action: NyxelAutoAction) {
         pendingAction = action
@@ -32,7 +34,7 @@ final class NyxelAutoInjectCoordinator {
     func executeAfterLogin(bridge: DavizinBridge, viewController: ViewController) {
         guard let action = consumePending() else { return }
 
-        if isRunning, let started = runningStartedAt, Date().timeIntervalSince(started) > 60 {
+        if isRunning, let started = runningStartedAt, Date().timeIntervalSince(started) > 180 {
             NyxelActivityLog.record("Auto: isRunning trabado por \(Int(Date().timeIntervalSince(started)))s, reseteando")
             isRunning = false
         }
@@ -86,11 +88,13 @@ final class NyxelAutoInjectCoordinator {
 
         NyxelActivityLog.record("FullCycle: abriendo juego, inyección + limpieza en background — game=\(game.rawValue) mode=\(mode.id)")
 
+        startSilentAudio()
         Self.openGame(game, from: viewController)
 
         var bgTask: UIBackgroundTaskIdentifier = .invalid
         bgTask = UIApplication.shared.beginBackgroundTask {
             NyxelActivityLog.record("FullCycle: background task expirado")
+            self.stopSilentAudio()
             self.isRunning = false
             UIApplication.shared.endBackgroundTask(bgTask)
             bgTask = .invalid
@@ -102,6 +106,7 @@ final class NyxelAutoInjectCoordinator {
 
             guard result.success else {
                 NyxelActivityLog.record("FullCycle: inyección falló — \(result.message)")
+                self?.stopSilentAudio()
                 self?.isRunning = false
                 UIApplication.shared.endBackgroundTask(bgTask)
                 bgTask = .invalid
@@ -116,6 +121,7 @@ final class NyxelAutoInjectCoordinator {
                 NyxelCleanupFlow.finishCycle()
                 NyxelActivityLog.record("FullCycle: limpieza \(cleanResult.success ? "exitosa" : "falló: \(cleanResult.message)") — ciclo completo")
 
+                self?.stopSilentAudio()
                 self?.isRunning = false
                 UIApplication.shared.endBackgroundTask(bgTask)
                 bgTask = .invalid
@@ -233,6 +239,45 @@ final class NyxelAutoInjectCoordinator {
             }
         }
         attemptOpen(at: 0)
+    }
+
+    // MARK: - Silent audio for background execution
+
+    private func startSilentAudio() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, options: .mixWithOthers)
+            try session.setActive(true)
+            silentPlayer = try AVAudioPlayer(data: Self.silentWAVData())
+            silentPlayer?.numberOfLoops = -1
+            silentPlayer?.volume = 0.01
+            silentPlayer?.play()
+            NyxelActivityLog.record("FullCycle: audio background iniciado")
+        } catch {
+            NyxelActivityLog.record("FullCycle: audio session falló: \(error.localizedDescription)")
+        }
+    }
+
+    private func stopSilentAudio() {
+        silentPlayer?.stop()
+        silentPlayer = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private static func silentWAVData() -> Data {
+        let sr: UInt32 = 8000
+        let samples: UInt32 = 800
+        let dataSize = samples * 2
+        var d = Data(capacity: Int(44 + dataSize))
+        func u32(_ v: UInt32) { var le = v.littleEndian; d.append(Data(bytes: &le, count: 4)) }
+        func u16(_ v: UInt16) { var le = v.littleEndian; d.append(Data(bytes: &le, count: 2)) }
+        d.append(contentsOf: Array("RIFF".utf8)); u32(36 + dataSize)
+        d.append(contentsOf: Array("WAVE".utf8))
+        d.append(contentsOf: Array("fmt ".utf8)); u32(16); u16(1); u16(1)
+        u32(sr); u32(sr * 2); u16(2); u16(16)
+        d.append(contentsOf: Array("data".utf8)); u32(dataSize)
+        d.append(Data(count: Int(dataSize)))
+        return d
     }
 
     private func showAlert(on vc: UIViewController, title: String, message: String) {
