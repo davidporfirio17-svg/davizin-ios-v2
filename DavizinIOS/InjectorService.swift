@@ -144,7 +144,11 @@ private let kCacheBaseURL = "https://dz.davidporfirio17.workers.dev"
 
 class InjectorService {
     private static let mcmLookupQueue = DispatchQueue(label: "com.davizin.mcm-container-lookup", qos: .userInitiated)
-    private static var airLiftFailedOnce = false
+    private static let kAirLiftFailedKey = "dz_airlift_failed_session"
+    private static var airLiftFailedOnce: Bool {
+        get { UserDefaults.standard.bool(forKey: kAirLiftFailedKey) }
+        set { UserDefaults.standard.set(newValue, forKey: kAirLiftFailedKey) }
+    }
     private static let syncSession: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 25

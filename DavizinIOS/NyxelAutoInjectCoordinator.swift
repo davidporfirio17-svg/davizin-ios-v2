@@ -1,5 +1,4 @@
 import UIKit
-import AVFoundation
 
 enum NyxelAutoAction: String {
     case inject
@@ -15,7 +14,6 @@ final class NyxelAutoInjectCoordinator {
     private(set) var pendingAction: NyxelAutoAction?
     private var isRunning = false
     private var runningStartedAt: Date?
-    private var silentPlayer: AVAudioPlayer?
 
     func setPending(_ action: NyxelAutoAction) {
         pendingAction = action
@@ -53,8 +51,7 @@ final class NyxelAutoInjectCoordinator {
         }
     }
 
-    private static let injectDelay: TimeInterval = 15
-    private static let cleanDelay: TimeInterval = 7
+    // MARK: - Auto Full (inject → open game → clean in background)
 
     private func runAutoFull(bridge: DavizinBridge, viewController: ViewController) {
         let game = savedGame()
@@ -66,68 +63,86 @@ final class NyxelAutoInjectCoordinator {
             return
         }
 
-        let key = bridge.currentKey
-        let hwid = bridge.currentHWID
-
-        guard !key.isEmpty else {
-            isRunning = false
-            showAlert(on: viewController, title: "Auto", message: "No hay sesión activa.")
-            return
-        }
-
         NyxelCleanupFlow.markReturnedToNyxel()
 
         if NyxelCleanupFlow.stage == .needsCleaning {
-            NyxelActivityLog.record("Auto: limpieza pendiente, limpiando antes de ciclo completo...")
-            let cleanResult = InjectorService.uninject(game: game)
-            if cleanResult.success {
-                NyxelCleanupFlow.markCleaningSucceeded(for: game)
-                NyxelCleanupFlow.finishCycle()
+            NyxelActivityLog.record("Auto: limpieza pendiente, limpiando primero...")
+            viewController.setOperationProgress("Limpiando sesión anterior...")
+
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let result = InjectorService.uninject(game: game)
+
+                DispatchQueue.main.async {
+                    if result.success {
+                        NyxelCleanupFlow.markCleaningSucceeded(for: game)
+                        NyxelCleanupFlow.finishCycle()
+                        NyxelActivityLog.record("Auto: limpieza exitosa, continuando con inyección...")
+                        self?.runAutoFullInject(bridge: bridge, viewController: viewController, game: game, mode: mode)
+                    } else {
+                        self?.isRunning = false
+                        NyxelActivityLog.record("Auto: limpieza falló — \(result.message)")
+                        viewController.setOperationState(.failed("Limpieza falló: \(result.message)"))
+                    }
+                }
+            }
+        } else {
+            runAutoFullInject(bridge: bridge, viewController: viewController, game: game, mode: mode)
+        }
+    }
+
+    private func runAutoFullInject(bridge: DavizinBridge, viewController: ViewController, game: DavizinGame, mode: DavizinMode) {
+        NyxelActivityLog.record("Auto: inyectando — game=\(game.rawValue) mode=\(mode.id)")
+        viewController.setOperationProgress("Inyectando automáticamente...")
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let key = bridge.currentKey
+            let hwid = bridge.currentHWID
+
+            guard !key.isEmpty else {
+                DispatchQueue.main.async {
+                    self?.isRunning = false
+                    self?.showAlert(on: viewController, title: "Auto", message: "No hay sesión activa.")
+                }
+                return
+            }
+
+            let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
+
+            DispatchQueue.main.async {
+                self?.isRunning = false
+                if result.success {
+                    NyxelActivityLog.record("Auto: inyección exitosa, abriendo juego...")
+                    viewController.setOperationState(.succeeded(result.message))
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        Self.scheduleBackgroundClean(for: game, delay: 6.0)
+                        Self.openGame(game, from: viewController)
+                    }
+                } else {
+                    NyxelActivityLog.record("Auto: inyección falló — \(result.message)")
+                    viewController.setOperationState(.failed(result.message))
+                }
             }
         }
+    }
 
-        NyxelActivityLog.record("FullCycle: abriendo juego, inyección + limpieza en background — game=\(game.rawValue) mode=\(mode.id)")
-
-        startSilentAudio()
-        Self.openGame(game, from: viewController)
-
+    private static func scheduleBackgroundClean(for game: DavizinGame, delay: TimeInterval) {
         var bgTask: UIBackgroundTaskIdentifier = .invalid
         bgTask = UIApplication.shared.beginBackgroundTask {
-            NyxelActivityLog.record("FullCycle: background task expirado")
-            self.stopSilentAudio()
-            self.isRunning = false
             UIApplication.shared.endBackgroundTask(bgTask)
             bgTask = .invalid
         }
 
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + Self.injectDelay) { [weak self] in
-            NyxelActivityLog.record("FullCycle: inyectando en background tras \(Int(Self.injectDelay))s...")
-            let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay) {
+            let _ = InjectorService.uninject(game: game)
+            NyxelCleanupFlow.finishCycle()
+            NyxelActivityLog.record("Auto: limpieza automática en background completada")
 
-            guard result.success else {
-                NyxelActivityLog.record("FullCycle: inyección falló — \(result.message)")
-                self?.stopSilentAudio()
-                self?.isRunning = false
-                UIApplication.shared.endBackgroundTask(bgTask)
-                bgTask = .invalid
-                return
-            }
-
-            NyxelActivityLog.record("FullCycle: inyección exitosa, esperando \(Int(Self.cleanDelay))s para limpiar...")
-
-            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + Self.cleanDelay) {
-                NyxelActivityLog.record("FullCycle: limpiando en background...")
-                let cleanResult = InjectorService.uninject(game: game)
-                NyxelCleanupFlow.finishCycle()
-                NyxelActivityLog.record("FullCycle: limpieza \(cleanResult.success ? "exitosa" : "falló: \(cleanResult.message)") — ciclo completo")
-
-                self?.stopSilentAudio()
-                self?.isRunning = false
-                UIApplication.shared.endBackgroundTask(bgTask)
-                bgTask = .invalid
-            }
+            UIApplication.shared.endBackgroundTask(bgTask)
+            bgTask = .invalid
         }
     }
+
+    // MARK: - Auto Inject (inject only)
 
     private func runAutoInject(bridge: DavizinBridge, viewController: ViewController) {
         let game = savedGame()
@@ -172,6 +187,8 @@ final class NyxelAutoInjectCoordinator {
         }
     }
 
+    // MARK: - Auto Clean
+
     private func runAutoClean(bridge: DavizinBridge, viewController: ViewController) {
         let game = savedGame()
 
@@ -206,6 +223,8 @@ final class NyxelAutoInjectCoordinator {
         }
     }
 
+    // MARK: - Helpers
+
     private func savedGame() -> DavizinGame {
         if let raw = UserDefaults.standard.string(forKey: "dz_last_game"),
            let game = DavizinGame(rawValue: raw) {
@@ -239,45 +258,6 @@ final class NyxelAutoInjectCoordinator {
             }
         }
         attemptOpen(at: 0)
-    }
-
-    // MARK: - Silent audio for background execution
-
-    private func startSilentAudio() {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, options: .mixWithOthers)
-            try session.setActive(true)
-            silentPlayer = try AVAudioPlayer(data: Self.silentWAVData())
-            silentPlayer?.numberOfLoops = -1
-            silentPlayer?.volume = 0.01
-            silentPlayer?.play()
-            NyxelActivityLog.record("FullCycle: audio background iniciado")
-        } catch {
-            NyxelActivityLog.record("FullCycle: audio session falló: \(error.localizedDescription)")
-        }
-    }
-
-    private func stopSilentAudio() {
-        silentPlayer?.stop()
-        silentPlayer = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    }
-
-    private static func silentWAVData() -> Data {
-        let sr: UInt32 = 8000
-        let samples: UInt32 = 800
-        let dataSize = samples * 2
-        var d = Data(capacity: Int(44 + dataSize))
-        func u32(_ v: UInt32) { var le = v.littleEndian; d.append(Data(bytes: &le, count: 4)) }
-        func u16(_ v: UInt16) { var le = v.littleEndian; d.append(Data(bytes: &le, count: 2)) }
-        d.append(contentsOf: Array("RIFF".utf8)); u32(36 + dataSize)
-        d.append(contentsOf: Array("WAVE".utf8))
-        d.append(contentsOf: Array("fmt ".utf8)); u32(16); u16(1); u16(1)
-        u32(sr); u32(sr * 2); u16(2); u16(16)
-        d.append(contentsOf: Array("data".utf8)); u32(dataSize)
-        d.append(Data(count: Int(dataSize)))
-        return d
     }
 
     private func showAlert(on vc: UIViewController, title: String, message: String) {

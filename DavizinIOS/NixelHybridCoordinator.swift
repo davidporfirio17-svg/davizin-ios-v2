@@ -306,6 +306,7 @@ final class NixelPairingRecordStore {
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         let status = SecItemAdd(item as CFDictionary, nil)
         guard status == errSecSuccess else { throw StoreError.keychain(status) }
+        UserDefaults.standard.set(false, forKey: "dz_airlift_failed_session")
     }
 
     func load(deviceID: String) -> Data? {
