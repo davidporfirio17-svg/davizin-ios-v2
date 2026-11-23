@@ -21,12 +21,6 @@ enum NyxelAntiTamper {
         var isSuspect: Bool { if case .suspect = self { return true } else { return false } }
     }
 
-    private(set) static var launchImageCount: UInt32 = 0
-
-    static func recordLaunchImageCount() {
-        launchImageCount = _dyld_image_count()
-    }
-
     static func inspect() -> Verdict {
         if isBeingDebugged() { return .suspect("DBG-001") }
         if hasFridaSignature() { return .suspect("DBG-002") }
@@ -35,9 +29,6 @@ enum NyxelAntiTamper {
         if hasFridaNamedPipe() { return .suspect("DBG-005") }
         if hasExceptionPortHijack() { return .suspect("DBG-006") }
         if hasSuspiciousFiles() { return .suspect("DBG-007") }
-        if hasDebuggerParent() { return .suspect("DBG-008") }
-        if hasNewDylibsPostLaunch() { return .suspect("DBG-009") }
-        if hasStderrTerminal() { return .suspect("DBG-010") }
         return .pass
     }
 
@@ -155,20 +146,5 @@ enum NyxelAntiTamper {
             if FileManager.default.fileExists(atPath: p) { return true }
         }
         return false
-    }
-
-    private static func hasDebuggerParent() -> Bool {
-        let parent = getppid()
-        // launchd = 1; anything else means a debugger or injection tool spawned us
-        return parent != 1
-    }
-
-    private static func hasNewDylibsPostLaunch() -> Bool {
-        guard launchImageCount > 0 else { return false }
-        return _dyld_image_count() > launchImageCount
-    }
-
-    private static func hasStderrTerminal() -> Bool {
-        return isatty(STDERR_FILENO) != 0
     }
 }
