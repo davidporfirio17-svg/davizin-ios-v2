@@ -570,13 +570,7 @@ final class ViewController: UIViewController {
 
 	private func performOpenGame(_ game: DavizinGame) {
 		operationView?.setOpeningGame(true)
-		let urls: [URL]
-		switch game {
-		case .freeFireMax:
-			urls = ["freefiremax://", "freefire://"].compactMap(URL.init(string:))
-		case .freeFire:
-			urls = ["freefireth://", "freefire://"].compactMap(URL.init(string:))
-		}
+		let urls = game.urlSchemes
 
 			func showOpenError() {
 				NyxelActivityLog.record("No se pudo abrir \(game.rawValue)")
@@ -752,6 +746,8 @@ extension ViewController: DavizinHeaderViewDelegate {
         )
         alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
         alert.addAction(UIAlertAction(title: "Cerrar sesión", style: .destructive) { [weak self] _ in
+            self?.onLogout?()
+            self?.setAccountSession(key: nil, remainingSeconds: 0)
             self?.showLogin(animated: true)
         })
         present(alert, animated: true)

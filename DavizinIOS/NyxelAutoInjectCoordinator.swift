@@ -89,6 +89,13 @@ final class NyxelAutoInjectCoordinator {
     }
 
     private func runAutoFullInject(bridge: DavizinBridge, viewController: ViewController, game: DavizinGame, mode: DavizinMode) {
+        guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
+            isRunning = false
+            NyxelActivityLog.record("Auto: inyección bloqueada — entorno no confiable")
+            viewController.setOperationState(.failed("No se pudo verificar el entorno. Reinicia la app."))
+            return
+        }
+
         NyxelActivityLog.record("Auto: inyectando — game=\(game.rawValue) mode=\(mode.id)")
         viewController.setOperationProgress("Inyectando automáticamente...")
 
@@ -141,6 +148,13 @@ final class NyxelAutoInjectCoordinator {
     }
 
     private func runAutoInject(bridge: DavizinBridge, viewController: ViewController) {
+        guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
+            isRunning = false
+            NyxelActivityLog.record("AutoInject: bloqueado — entorno no confiable")
+            viewController.setOperationState(.failed("No se pudo verificar el entorno. Reinicia la app."))
+            return
+        }
+
         let game = savedGame()
         let mode = savedMode()
 
@@ -234,13 +248,7 @@ final class NyxelAutoInjectCoordinator {
     }
 
     private static func openGame(_ game: DavizinGame, from viewController: UIViewController) {
-        let urls: [URL]
-        switch game {
-        case .freeFireMax:
-            urls = ["freefiremax://", "freefire://"].compactMap(URL.init(string:))
-        case .freeFire:
-            urls = ["freefireth://", "freefire://"].compactMap(URL.init(string:))
-        }
+        let urls = game.urlSchemes
 
         func attemptOpen(at index: Int) {
             guard index < urls.count else {

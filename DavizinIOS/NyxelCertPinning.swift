@@ -12,7 +12,7 @@ final class NyxelCertPinning: NSObject, URLSessionDelegate {
     }()
 
     lazy var session: URLSession = {
-        URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+        URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
     }()
 
     func urlSession(

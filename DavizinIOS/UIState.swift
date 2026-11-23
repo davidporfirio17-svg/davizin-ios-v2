@@ -12,6 +12,13 @@ enum DavizinGame: String, CaseIterable {
         case .freeFire:    return "com.dts.freefireth"
         }
     }
+
+    var urlSchemes: [URL] {
+        switch self {
+        case .freeFireMax: return ["freefiremax://", "freefire://"].compactMap(URL.init(string:))
+        case .freeFire:    return ["freefireth://", "freefire://"].compactMap(URL.init(string:))
+        }
+    }
 }
 
 struct DavizinMode: Hashable, Codable, Identifiable {
