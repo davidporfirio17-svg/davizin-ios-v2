@@ -55,13 +55,17 @@ enum NyxelActivityLog {
 
     static var recentEntries: [String] { Array(entries.prefix(100)) }
 
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return f
+    }()
+
     static func record(_ message: String) {
         lock.lock()
         defer { lock.unlock() }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-        let entry = "\(formatter.string(from: Date()))  \(sanitized(message))"
+        let entry = "\(dateFormatter.string(from: Date()))  \(sanitized(message))"
         var values = UserDefaults.standard.stringArray(forKey: key) ?? []
         values.insert(entry, at: 0)
         UserDefaults.standard.set(Array(values.prefix(limit)), forKey: key)

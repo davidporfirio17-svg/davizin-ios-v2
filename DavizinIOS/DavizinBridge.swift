@@ -169,6 +169,7 @@ final class DavizinBridge {
         selectedMode = nil
         KeyValidator.clearSession()
         NyxelAuthorizationState.shared.clear()
+        NyxelCleanupFlow.finishCycle()
         NyxelActivityLog.record("Sesion cerrada — estado de seguridad limpiado")
     }
 
