@@ -340,12 +340,6 @@ final class DavizinBridge {
     }
 
     private func startInjectionFlow() {
-            guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
-                operationInFlight = false
-                NyxelActivityLog.record("Inyeccion bloqueada: entorno no confiable")
-                vc?.setOperationState(.failed("No se pudo verificar el entorno. Reinicia la app."))
-                return
-            }
             guard let mode = selectedMode else {
                 vc?.setOperationState(.failed("No hay un modo disponible en el Worker."))
                 return

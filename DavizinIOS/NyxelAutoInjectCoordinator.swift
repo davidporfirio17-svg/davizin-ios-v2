@@ -89,13 +89,6 @@ final class NyxelAutoInjectCoordinator {
     }
 
     private func runAutoFullInject(bridge: DavizinBridge, viewController: ViewController, game: DavizinGame, mode: DavizinMode) {
-        guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
-            isRunning = false
-            NyxelActivityLog.record("Auto: inyección bloqueada — entorno no confiable")
-            viewController.setOperationState(.failed("No se pudo verificar el entorno. Reinicia la app."))
-            return
-        }
-
         NyxelActivityLog.record("Auto: inyectando — game=\(game.rawValue) mode=\(mode.id)")
         viewController.setOperationProgress("Inyectando automáticamente...")
 
@@ -148,13 +141,6 @@ final class NyxelAutoInjectCoordinator {
     }
 
     private func runAutoInject(bridge: DavizinBridge, viewController: ViewController) {
-        guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
-            isRunning = false
-            NyxelActivityLog.record("AutoInject: bloqueado — entorno no confiable")
-            viewController.setOperationState(.failed("No se pudo verificar el entorno. Reinicia la app."))
-            return
-        }
-
         let game = savedGame()
         let mode = savedMode()
 
