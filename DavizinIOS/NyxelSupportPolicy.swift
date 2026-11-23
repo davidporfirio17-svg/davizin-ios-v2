@@ -177,19 +177,8 @@ enum NyxelSupportPolicy {
         ProcessInfo.processInfo.operatingSystemVersion
     }
 
-    /// Obtiene el build Darwin exacto, por ejemplo 24A5355q.
     static var currentBuild: String {
-        var size = 0
-        guard sysctlbyname("kern.osversion", nil, &size, nil, 0) == 0, size > 0 else {
-            return ""
-        }
-
-        var buffer = [CChar](repeating: 0, count: size)
-        let result = buffer.withUnsafeMutableBufferPointer { pointer in
-            sysctlbyname("kern.osversion", pointer.baseAddress, &size, nil, 0)
-        }
-        guard result == 0 else { return "" }
-        return String(cString: buffer)
+        NyxelDeviceInfo.osBuild
     }
 
     static func iOS27BetaNumber(for build: String) -> Int? {

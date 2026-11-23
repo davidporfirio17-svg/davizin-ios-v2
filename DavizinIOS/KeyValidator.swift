@@ -32,6 +32,12 @@ class KeyValidator {
     private(set) static var lastCountryCode: String?
     private(set) static var lastValidationWasVersionUnavailable = false
 
+    static func clearSession() {
+        currentSessionToken = nil
+        lastCountryCode = nil
+        lastValidationWasVersionUnavailable = false
+    }
+
     private static let installationService = "com.davizin.client-installation"
 
     /// Identificador aleatorio por instalación, protegido por Keychain y no incluido en backups.
@@ -142,22 +148,22 @@ class KeyValidator {
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        NSLog("[KeyValidator] Enviando validación — build=%@, version=%@", appBuild, appVersion)
+        NyxelActivityLog.record("KeyValidator enviando validación — build=\(appBuild), version=\(appVersion)")
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        URLSession(configuration: .ephemeral).dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 let httpStatus = (response as? HTTPURLResponse)?.statusCode ?? -1
-                NSLog("[KeyValidator] Respuesta HTTP %d", httpStatus)
+                NyxelActivityLog.record("KeyValidator respuesta HTTP \(httpStatus)")
 
                 if let error = error {
-                    NSLog("[KeyValidator] Error de red: %@", error.localizedDescription)
+                    NyxelActivityLog.record("KeyValidator error de red: \(error.localizedDescription)")
                     NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.workerUnavailable) — \(error.localizedDescription)")
                     completion(false, "Error de conexión: \(error.localizedDescription)", 0, nil)
                     return
                 }
 
                 guard let data = data else {
-                    NSLog("[KeyValidator] Sin datos en respuesta")
+                    NyxelActivityLog.record("KeyValidator sin datos en respuesta")
                     NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.workerUnavailable) — Sin respuesta")
                     completion(false, "Sin respuesta del servidor", 0, nil)
                     return
@@ -184,16 +190,15 @@ class KeyValidator {
                         }
                         currentSessionToken = session
                         NyxelRemoteConfigStore.recordAccepted()
-                        NSLog("[KeyValidator] Login exitoso — %d modos, %d seg restantes", modes.count, rem)
+                        NyxelActivityLog.record("KeyValidator login exitoso — \(modes.count) modos, \(rem) seg restantes")
                     } else {
                         currentSessionToken = nil
-                        NSLog("[KeyValidator] Login rechazado — error_code=%@, message=%@",
-                              resp.error_code ?? "(nil)", resp.message ?? "(nil)")
+                        NyxelActivityLog.record("KeyValidator login rechazado — error_code=\(resp.error_code ?? "(nil)"), message=\(resp.message ?? "(nil)")")
                     }
 
                     completion(resp.success, resp.message ?? "ok", rem, resp.notice)
                 } catch {
-                    NSLog("[KeyValidator] JSON decode error: %@", "\(error)")
+                    NyxelActivityLog.record("KeyValidator JSON decode error: \(error)")
                     lastValidationWasVersionUnavailable = false
                     NyxelRemoteConfigStore.recordFailure("\(NyxelErrorCode.invalidConfiguration) — Respuesta no válida")
                     completion(false, "Error al procesar respuesta del servidor", 0, nil)

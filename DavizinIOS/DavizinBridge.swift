@@ -9,6 +9,13 @@ final class DavizinBridge {
     private var remainingSeconds: Int = 0
     private var injectionProgressObserver: NSObjectProtocol?
 
+    deinit {
+        countdownTimer?.invalidate()
+        if let observer = injectionProgressObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
     /// Modo elegido por el usuario. Define que cache_res se inyecta.
     private var selectedMode: DavizinMode?
 
@@ -84,6 +91,15 @@ final class DavizinBridge {
             self.checkFreeFireBanStatus(uid: uid, completion: completion)
         }
 
+        viewController.onLogout = { [weak self] in
+            self?.sessionKey = ""
+            self?.sessionHWID = ""
+            self?.countdownTimer?.invalidate()
+            self?.remainingSeconds = 0
+            KeyValidator.clearSession()
+            NyxelActivityLog.record("Sesión cerrada por el usuario")
+        }
+
         viewController.onClose = {
             // Nada - no cerramos
         }
@@ -100,11 +116,10 @@ final class DavizinBridge {
         vc?.setLoginChecking(true)
 
         let upperKey = key.uppercased()
-        NSLog("[DavizinBridge] handleLogin iniciado — build=%@", KeyValidator.getAppBuild())
+        NyxelActivityLog.record("handleLogin iniciado — build=\(KeyValidator.getAppBuild())")
 
         KeyValidator.validate(key: upperKey) { [weak self] success, message, remaining, notice in
-            NSLog("[DavizinBridge] Resultado: success=%d, remaining=%d, msg=%@",
-                  success ? 1 : 0, remaining, message ?? "(nil)")
+            NyxelActivityLog.record("Login resultado: success=\(success), remaining=\(remaining), msg=\(message ?? "(nil)")")
             self?.vc?.setLoginChecking(false)
 
             if success && remaining > 0 {
@@ -137,7 +152,7 @@ final class DavizinBridge {
                 }
             } else {
                 if KeyValidator.lastValidationWasVersionUnavailable {
-                    NSLog("[DavizinBridge] Build %@ rechazado por el Worker — actualizar allowed_app_builds", KeyValidator.getAppBuild())
+                    NyxelActivityLog.record("Build \(KeyValidator.getAppBuild()) rechazado por el Worker — actualizar allowed_app_builds")
                     self?.vc?.setLoginStatus("Versión no disponible", success: false)
                     self?.showVersionUnavailableAlert()
                 } else {
@@ -334,7 +349,7 @@ final class DavizinBridge {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         KeyValidator.applySecurityHeaders(to: &request)
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["key": key, "hwid": hwid, "mode": mode.id])
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
+        URLSession(configuration: .ephemeral).dataTask(with: request) { [weak self] data, response, _ in
             let ok = (response as? HTTPURLResponse)?.statusCode == 200 && ((try? JSONSerialization.jsonObject(with: data ?? Data()) as? [String: Any])?["success"] as? Bool == true)
             DispatchQueue.main.async {
                 guard let self = self else { return }

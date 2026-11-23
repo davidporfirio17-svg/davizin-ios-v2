@@ -93,25 +93,6 @@ class NyxelCompatibilityState: ObservableObject {
     }
 }
 
-// MARK: - URLSession Extension for Compatibility Checking
-extension URLSession {
-    func nyxelDataTask(
-        with url: URL,
-        completionHandler: @escaping (Data?, URLResponse?, Error?) -> Void
-    ) -> URLSessionDataTask {
-        guard NyxelOperationGuard.canProceedWithKeyValidation() else {
-            let error = NSError(
-                domain: "NyxelCompatibility",
-                code: -999,
-                userInfo: [NSLocalizedDescriptionKey: "Device not supported"]
-            )
-            completionHandler(nil, nil, error)
-            return dataTask(with: url)
-        }
-        
-        return dataTask(with: url, completionHandler: completionHandler)
-    }
-}
 
 // MARK: - Notification Helper
 extension NSNotification {

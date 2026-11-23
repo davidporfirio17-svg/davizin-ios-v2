@@ -12,6 +12,7 @@ final class ViewController: UIViewController {
     var onFreeFireLookup: ((String, String) -> Void)?
     var onFreeFireAsset: ((String, @escaping (UIImage?) -> Void) -> Void)?
     var onFreeFireBanCheck: ((String, @escaping (Result<FreeFireBanCheck, Error>) -> Void) -> Void)?
+    var onLogout: (() -> Void)?
     var onClose: (() -> Void)?
 
     private let videoBackgroundView = DavizinLoginVideoView()
@@ -874,6 +875,7 @@ extension ViewController: DavizinHeaderViewDelegate {
 
 extension ViewController: ProfileViewDelegate {
     func profileViewDidTapLogout(_ view: ProfileView) {
+        onLogout?()
         setAccountSession(key: nil, remainingSeconds: 0)
         showLogin(animated: true)
     }

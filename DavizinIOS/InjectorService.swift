@@ -406,18 +406,17 @@ class InjectorService {
                 let handleRoot = DavizinGrantContainerAccess(container)
                 let handleDir = DavizinGrantContainerAccess(parentDir)
                 let handleFile = DavizinGrantContainerAccess(fullPath)
+                defer {
+                    DavizinReleaseContainerGrant(handleFile)
+                    DavizinReleaseContainerGrant(handleDir)
+                    DavizinReleaseContainerGrant(handleRoot)
+                }
                 let url = URL(fileURLWithPath: fullPath)
                 do {
                     let data = try Data(contentsOf: url)
-                    DavizinReleaseContainerGrant(handleFile)
-                    DavizinReleaseContainerGrant(handleDir)
-                    DavizinReleaseContainerGrant(handleRoot)
                     NyxelActivityLog.record("DIAG iOS 27+ bad_query read OK bytes=\(data.count)")
                     return data
                 } catch {
-                    DavizinReleaseContainerGrant(handleFile)
-                    DavizinReleaseContainerGrant(handleDir)
-                    DavizinReleaseContainerGrant(handleRoot)
                     NyxelActivityLog.record("DIAG iOS 27+ bad_query read failed: \(error.localizedDescription), trying AirLift fallback")
                 }
             }
