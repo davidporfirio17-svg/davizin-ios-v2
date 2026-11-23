@@ -51,6 +51,9 @@ final class NyxelAutoInjectCoordinator {
         }
     }
 
+    private static let injectDelay: TimeInterval = 15
+    private static let cleanDelay: TimeInterval = 7
+
     private func runAutoFull(bridge: DavizinBridge, viewController: ViewController) {
         let game = savedGame()
         let mode = savedMode()
@@ -61,82 +64,62 @@ final class NyxelAutoInjectCoordinator {
             return
         }
 
+        let key = bridge.currentKey
+        let hwid = bridge.currentHWID
+
+        guard !key.isEmpty else {
+            isRunning = false
+            showAlert(on: viewController, title: "Auto", message: "No hay sesión activa.")
+            return
+        }
+
         NyxelCleanupFlow.markReturnedToNyxel()
 
         if NyxelCleanupFlow.stage == .needsCleaning {
-            NyxelActivityLog.record("Auto: limpieza pendiente, limpiando primero...")
-            viewController.setOperationProgress("Limpiando sesión anterior...")
-
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                let result = InjectorService.uninject(game: game)
-
-                DispatchQueue.main.async {
-                    if result.success {
-                        NyxelCleanupFlow.markCleaningSucceeded(for: game)
-                        NyxelCleanupFlow.finishCycle()
-                        NyxelActivityLog.record("Auto: limpieza exitosa, continuando con inyección...")
-                        self?.runAutoFullInject(bridge: bridge, viewController: viewController, game: game, mode: mode)
-                    } else {
-                        self?.isRunning = false
-                        NyxelActivityLog.record("Auto: limpieza falló — \(result.message)")
-                        viewController.setOperationState(.failed("Limpieza falló: \(result.message)"))
-                    }
-                }
+            NyxelActivityLog.record("Auto: limpieza pendiente, limpiando antes de ciclo completo...")
+            let cleanResult = InjectorService.uninject(game: game)
+            if cleanResult.success {
+                NyxelCleanupFlow.markCleaningSucceeded(for: game)
+                NyxelCleanupFlow.finishCycle()
             }
-        } else {
-            runAutoFullInject(bridge: bridge, viewController: viewController, game: game, mode: mode)
         }
-    }
 
-    private func runAutoFullInject(bridge: DavizinBridge, viewController: ViewController, game: DavizinGame, mode: DavizinMode) {
-        NyxelActivityLog.record("Auto: inyectando — game=\(game.rawValue) mode=\(mode.id)")
-        viewController.setOperationProgress("Inyectando automáticamente...")
+        NyxelActivityLog.record("FullCycle: abriendo juego, inyección + limpieza en background — game=\(game.rawValue) mode=\(mode.id)")
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let key = bridge.currentKey
-            let hwid = bridge.currentHWID
+        Self.openGame(game, from: viewController)
 
-            guard !key.isEmpty else {
-                DispatchQueue.main.async {
-                    self?.isRunning = false
-                    self?.showAlert(on: viewController, title: "Auto", message: "No hay sesión activa.")
-                }
+        var bgTask: UIBackgroundTaskIdentifier = .invalid
+        bgTask = UIApplication.shared.beginBackgroundTask {
+            NyxelActivityLog.record("FullCycle: background task expirado")
+            self.isRunning = false
+            UIApplication.shared.endBackgroundTask(bgTask)
+            bgTask = .invalid
+        }
+
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + Self.injectDelay) { [weak self] in
+            NyxelActivityLog.record("FullCycle: inyectando en background tras \(Int(Self.injectDelay))s...")
+            let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
+
+            guard result.success else {
+                NyxelActivityLog.record("FullCycle: inyección falló — \(result.message)")
+                self?.isRunning = false
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
                 return
             }
 
-            let result = InjectorService.inject(game: game, mode: mode, key: key, hwid: hwid)
+            NyxelActivityLog.record("FullCycle: inyección exitosa, esperando \(Int(Self.cleanDelay))s para limpiar...")
 
-            DispatchQueue.main.async {
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + Self.cleanDelay) {
+                NyxelActivityLog.record("FullCycle: limpiando en background...")
+                let cleanResult = InjectorService.uninject(game: game)
+                NyxelCleanupFlow.finishCycle()
+                NyxelActivityLog.record("FullCycle: limpieza \(cleanResult.success ? "exitosa" : "falló: \(cleanResult.message)") — ciclo completo")
+
                 self?.isRunning = false
-                if result.success {
-                    NyxelActivityLog.record("Auto: inyección exitosa, abriendo juego...")
-                    viewController.setOperationState(.succeeded(result.message))
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        Self.scheduleBackgroundClean(for: game, delay: 6.0)
-                        Self.openGame(game, from: viewController)
-                    }
-                } else {
-                    NyxelActivityLog.record("Auto: inyección falló — \(result.message)")
-                    viewController.setOperationState(.failed(result.message))
-                }
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
             }
-        }
-    }
-
-    private static func scheduleBackgroundClean(for game: DavizinGame, delay: TimeInterval) {
-        var bgTask: UIBackgroundTaskIdentifier = .invalid
-        bgTask = UIApplication.shared.beginBackgroundTask {
-            UIApplication.shared.endBackgroundTask(bgTask)
-            bgTask = .invalid
-        }
-
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay) {
-            let _ = InjectorService.uninject(game: game)
-            NyxelCleanupFlow.finishCycle()
-            NyxelActivityLog.record("Auto: limpieza automática en background completada")
-
-            UIApplication.shared.endBackgroundTask(bgTask)
-            bgTask = .invalid
         }
     }
 
