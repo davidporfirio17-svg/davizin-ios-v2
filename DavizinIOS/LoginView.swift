@@ -558,9 +558,4 @@ private extension UITextField {
         leftViewMode = .always
     }
 
-    func setRightPadding(_ padding: CGFloat) {
-        let container = UIView(frame: CGRect(x: 0.0, y: 0.0, width: padding, height: 1.0))
-        rightView = container
-        rightViewMode = .always
-    }
 }

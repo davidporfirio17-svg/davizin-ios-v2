@@ -770,7 +770,7 @@ class InjectorService {
 		// On iOS 27+, sandbox escape is not available, so we can't reliably verify
 		// if Free Fire is installed. Instead, trust that if the user got this far,
 		// they likely have it installed. Injection will fail clearly if they don't.
-		let bundles = ["com.dts.freefiremax", "com.dts.freefireth"]
+		let bundles = DavizinGame.allCases.map(\.bundleID)
 
         for bid in bundles {
             var err: NSString?

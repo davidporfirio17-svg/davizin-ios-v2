@@ -22,6 +22,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         // Defensa anti-tamper lo más temprano posible: deniega engancharle un
         // debugger. Debe ser la PRIMERA línea del app antes de cualquier otra cosa.
         NyxelAntiTamper.denyPtraceAttach()
+        NyxelAntiTamper.recordLaunchImageCount()
 
         // Si hay señales obvias de debugger/Frida/MobileSubstrate cargados,
         // registramos un flag en memoria. La operación de inyección lo lee y

@@ -91,11 +91,10 @@ final class DavizinBridge {
         vc?.setLoginChecking(true)
 
         let upperKey = key.uppercased()
-        NSLog("[DavizinBridge] handleLogin iniciado — build=%@", KeyValidator.getAppBuild())
+        NyxelActivityLog.record("Bridge: login iniciado — build=\(KeyValidator.getAppBuild())")
 
         KeyValidator.validate(key: upperKey) { [weak self] success, message, remaining, notice in
-            NSLog("[DavizinBridge] Resultado: success=%d, remaining=%d, msg=%@",
-                  success ? 1 : 0, remaining, message ?? "(nil)")
+            NyxelActivityLog.record("Bridge: resultado success=\(success) remaining=\(remaining)")
             self?.vc?.setLoginChecking(false)
 
             if success && remaining > 0 {
@@ -130,7 +129,7 @@ final class DavizinBridge {
                 }
             } else {
                 if KeyValidator.lastValidationWasVersionUnavailable {
-                    NSLog("[DavizinBridge] Build %@ rechazado por el Worker — actualizar allowed_app_builds", KeyValidator.getAppBuild())
+                    NyxelActivityLog.record("Bridge: build \(KeyValidator.getAppBuild()) rechazado por el Worker")
                     self?.vc?.setLoginStatus("Versión no disponible", success: false)
                     self?.showVersionUnavailableAlert()
                 } else {
@@ -341,6 +340,12 @@ final class DavizinBridge {
     }
 
     private func startInjectionFlow() {
+            guard NyxelRuntimeState.shared.isTrustedForCriticalOperation() else {
+                operationInFlight = false
+                NyxelActivityLog.record("Inyeccion bloqueada: entorno no confiable")
+                vc?.setOperationState(.failed("No se pudo verificar el entorno. Reinicia la app."))
+                return
+            }
             guard let mode = selectedMode else {
                 vc?.setOperationState(.failed("No hay un modo disponible en el Worker."))
                 return
