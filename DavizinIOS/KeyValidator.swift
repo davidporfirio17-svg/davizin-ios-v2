@@ -32,6 +32,12 @@ class KeyValidator {
     private(set) static var lastCountryCode: String?
     private(set) static var lastValidationWasVersionUnavailable = false
 
+    static func clearSession() {
+        currentSessionToken = nil
+        lastCountryCode = nil
+        lastValidationWasVersionUnavailable = false
+    }
+
     private static let installationService = "com.davizin.client-installation"
 
     /// Identificador aleatorio por instalación, protegido por Keychain y no incluido en backups.

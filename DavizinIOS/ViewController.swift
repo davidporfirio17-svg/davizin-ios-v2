@@ -9,6 +9,7 @@ final class ViewController: UIViewController {
     var onGameSelected: ((DavizinGame) -> Void)?
     var onModeSelected: ((DavizinMode) -> Void)?
     var onOperation: ((DavizinOperationKind) -> Void)?
+    var onLogout: (() -> Void)?
     var onClose: (() -> Void)?
 
     private let animatedBackgroundView = DavizinAnimatedBackgroundView()
@@ -759,6 +760,7 @@ extension ViewController: DavizinHeaderViewDelegate {
 
 extension ViewController: ProfileViewDelegate {
     func profileViewDidTapLogout(_ view: ProfileView) {
+        onLogout?()
         setAccountSession(key: nil, remainingSeconds: 0)
         showLogin(animated: true)
     }

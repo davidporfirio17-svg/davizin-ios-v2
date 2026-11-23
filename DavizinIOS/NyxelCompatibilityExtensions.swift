@@ -204,6 +204,6 @@ enum NyxelDebug {
     }
     
     static func printSystemInfo() {
-        print(dumpSystemInfo())
+        nyxelLog(dumpSystemInfo(), level: "INFO")
     }
 }

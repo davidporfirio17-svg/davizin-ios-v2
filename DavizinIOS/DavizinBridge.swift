@@ -23,6 +23,13 @@ final class DavizinBridge {
     var currentKey: String { sessionKey }
     var currentHWID: String { sessionHWID }
 
+    deinit {
+        countdownTimer?.invalidate()
+        if let observer = injectionProgressObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
     func connect(to viewController: ViewController) {
         self.vc = viewController
         if let injectionProgressObserver {
@@ -67,6 +74,10 @@ final class DavizinBridge {
         // Operaciones reales
         viewController.onOperation = { [weak self] operation in
             self?.handleOperation(operation)
+        }
+
+        viewController.onLogout = { [weak self] in
+            self?.handleLogout()
         }
 
         viewController.onClose = {
@@ -146,6 +157,19 @@ final class DavizinBridge {
         } else {
             vc?.showGameSelectionScreen()
         }
+    }
+
+    private func handleLogout() {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        sessionKey = ""
+        sessionHWID = ""
+        remainingSeconds = 0
+        operationInFlight = false
+        selectedMode = nil
+        KeyValidator.clearSession()
+        NyxelAuthorizationState.shared.clear()
+        NyxelActivityLog.record("Sesion cerrada — estado de seguridad limpiado")
     }
 
     // MARK: - Operaciones
