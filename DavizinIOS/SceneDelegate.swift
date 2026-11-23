@@ -9,6 +9,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         willConnectTo session: UISceneSession,
         options connectionOptions: UIScene.ConnectionOptions
     ) {
+        if let url = connectionOptions.urlContexts.first?.url,
+           url.scheme == "nyxelext",
+           let action = NyxelAutoAction(rawValue: url.host ?? "") {
+            NyxelAutoInjectCoordinator.shared.setPending(action)
+            NyxelActivityLog.record("URL scheme en launch: \(url.absoluteString)")
+        }
+
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let window = UIWindow(windowScene: windowScene)
@@ -44,6 +51,20 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve) {
             window.rootViewController = rootViewController
+        }
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        guard let url = URLContexts.first?.url,
+              url.scheme == "nyxelext",
+              let action = NyxelAutoAction(rawValue: url.host ?? "") else { return }
+        NyxelAutoInjectCoordinator.shared.setPending(action)
+        NyxelActivityLog.record("URL scheme recibido: \(url.absoluteString)")
+
+        if let bridge, let vc = window?.rootViewController as? ViewController,
+           !bridge.currentKey.isEmpty {
+            vc.showOperationScreen()
+            NyxelAutoInjectCoordinator.shared.executeAfterLogin(bridge: bridge, viewController: vc)
         }
     }
 

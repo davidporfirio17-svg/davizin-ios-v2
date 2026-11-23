@@ -29,7 +29,16 @@ enum NyxelConnectivity {
     }
 }
 
-enum DavizinGame: String, CaseIterable { case freeFire = "Free Fire", freeFireMax = "Free Fire MAX" }
+enum DavizinGame: String, CaseIterable {
+    case freeFire = "Free Fire", freeFireMax = "Free Fire MAX"
+
+    var urlSchemes: [URL] {
+        switch self {
+        case .freeFireMax: return ["freefiremax://", "freefire://"].compactMap(URL.init(string:))
+        case .freeFire:    return ["freefireth://", "freefire://"].compactMap(URL.init(string:))
+        }
+    }
+}
 
 struct DavizinMode: Hashable, Codable, Identifiable {
     let id: String

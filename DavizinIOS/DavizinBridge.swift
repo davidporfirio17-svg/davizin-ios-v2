@@ -25,6 +25,8 @@ final class DavizinBridge {
     /// Credenciales de la sesion actual. Se usan para descargar el cache_res del Worker.
     private var sessionKey: String = ""
     private var sessionHWID: String = ""
+    var currentKey: String { sessionKey }
+    var currentHWID: String { sessionHWID }
     private var operationInFlight = false
 
     func connect(to viewController: ViewController) {
@@ -208,6 +210,14 @@ final class DavizinBridge {
     }
 
     private func continueAfterLogin() {
+        if NyxelAutoInjectCoordinator.shared.hasPending(), let vc = self.vc {
+            vc.showOperationScreen()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self else { return }
+                NyxelAutoInjectCoordinator.shared.executeAfterLogin(bridge: self, viewController: vc)
+            }
+            return
+        }
         if NyxelCleanupFlow.hasPendingWork, let game = NyxelCleanupFlow.game {
             selectedGame = game
             let savedModeID = UserDefaults.standard.string(forKey: "dz_last_mode")
