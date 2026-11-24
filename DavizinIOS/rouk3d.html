@@ -75,6 +75,24 @@
   .frow.sel .ic{color:var(--mark);background:rgba(255,42,58,.14);border-color:rgba(255,42,58,.4)}
   .frow.sel .tagdot{background:var(--mark);box-shadow:0 0 10px var(--mark-glow)}
   .note{text-align:center;color:var(--ink-3);font-size:.68rem;margin-top:4px}
+  .actpanel{margin-top:16px;padding:16px;border-radius:22px;position:relative;overflow:hidden;
+    background:linear-gradient(158deg, rgba(255,255,255,.13), rgba(255,255,255,.03));
+    -webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8);
+    border:1px solid rgba(255,255,255,.14);border-top-color:rgba(255,255,255,.4);
+    box-shadow:0 18px 40px -24px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.24);animation:rise .28s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .acthead{display:flex;justify-content:space-between;align-items:center;font-size:.74rem;font-weight:700;letter-spacing:.05em;color:var(--ink-2);margin-bottom:12px}
+  .acthead b{color:var(--mark);letter-spacing:.08em}
+  #actstate{color:var(--ink-3);font-size:.68rem;letter-spacing:.03em}
+  .hold{position:relative;width:100%;height:62px;border-radius:18px;border:1px solid rgba(255,255,255,.16);border-top-color:rgba(255,255,255,.36);
+    background:rgba(255,255,255,.05);color:var(--ink);font:inherit;font-weight:800;font-size:.98rem;letter-spacing:.03em;cursor:pointer;overflow:hidden;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+  .hold .fill{position:absolute;left:0;top:0;bottom:0;width:0%;background:linear-gradient(90deg,rgba(47,182,255,.55),rgba(122,99,255,.6))}
+  .hold.done .fill{background:linear-gradient(90deg,rgba(47,230,138,.65),rgba(47,182,255,.5))}
+  .hold .hl{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:8px;height:100%}
+  .hold.armed{border-color:var(--accent);box-shadow:0 0 0 1px rgba(47,182,255,.3),0 10px 26px -14px var(--glow)}
+  .hold.done{border-color:#2fe08a}
+  .actnote{text-align:center;color:var(--ink-3);font-size:.66rem;margin-top:10px}
 </style>
 </head>
 <body>
@@ -96,7 +114,13 @@
   <div class="functions">
     <div class="fh"><span class="lbl"><span class="bar"></span>Opciones</span><span class="count" id="count"></span></div>
     <div id="list"></div>
-    <div class="note">Toca una opción para ver la zona de mira en el personaje. Se activan desde la pantalla de Modos.</div>
+    <div class="note">Toca una opción para ver la zona de mira en el personaje.</div>
+  </div>
+
+  <div id="activate" class="actpanel" hidden>
+    <div class="acthead"><span>Zona · <b id="actzone">—</b></span><span id="actstate">Listo para preparar</span></div>
+    <button id="holdbtn" class="hold"><span class="fill" id="holdfill"></span><span class="hl" id="holdlabel">◉ Mantén para inyectar</span></button>
+    <div class="actnote">Mantén presionado para preparar el entorno e inyectar</div>
   </div>
 </div>
 
@@ -199,7 +223,30 @@
     var o=OPTS[idx];
     if(o.zone && markers[o.zone]){ markers[o.zone].visible=true; activeMarker=markers[o.zone]; }
     zoneLbl.innerHTML = o.zone ? ('ZONA DE MIRA · <b>'+o.label+'</b>') : (o.label+' · sin zona');
+    var ap=document.getElementById('activate');
+    if(o.zone){ document.getElementById('actzone').textContent=o.label; ap.hidden=false; resetHold(); }
+    else { ap.hidden=true; resetHold(); }
   }
+
+  // Panel de activar: mantener presionado para "inyectar" (SOLO VISUAL)
+  var holdbtn=document.getElementById('holdbtn'),fill=document.getElementById('holdfill'),
+      hlabel=document.getElementById('holdlabel'),astate=document.getElementById('actstate');
+  var holding=false,hstart=0,hraf=0,done=false,DUR=1800;
+  function resetHold(){holding=false;done=false;if(hraf)cancelAnimationFrame(hraf);fill.style.width='0%';
+    holdbtn.classList.remove('armed','done');hlabel.textContent='◉ Mantén para inyectar';astate.textContent='Listo para preparar';}
+  function tick(){ if(!holding)return;
+    var p=Math.min(1,(performance.now()-hstart)/DUR); fill.style.width=(p*100)+'%';
+    astate.textContent='Preparando entorno… '+Math.round(p*100)+'%'; hlabel.textContent='Inyectando…';
+    if(p>=1){ finishHold(); return; } hraf=requestAnimationFrame(tick);
+  }
+  function startHold(e){ if(done)return; e.preventDefault(); holding=true; hstart=performance.now(); holdbtn.classList.add('armed'); hraf=requestAnimationFrame(tick); }
+  function endHold(){ if(done||!holding)return; resetHold(); }
+  function finishHold(){ holding=false;done=true; fill.style.width='100%'; holdbtn.classList.remove('armed'); holdbtn.classList.add('done');
+    hlabel.textContent='✓ Inyectado'; astate.textContent='Activo'; if(navigator.vibrate)navigator.vibrate(30); setTimeout(resetHold,2600); }
+  holdbtn.addEventListener('pointerdown',startHold);
+  holdbtn.addEventListener('pointerup',endHold);
+  holdbtn.addEventListener('pointerleave',endHold);
+  holdbtn.addEventListener('pointercancel',endHold);
   OPTS.forEach(function(o,idx){
     var row=document.createElement('div');row.className='frow';
     row.innerHTML='<div class="ic">'+o.i+'</div><div class="fl"><b>'+o.n+'</b><small>'+o.d+'</small></div><span class="tagdot"></span>';
