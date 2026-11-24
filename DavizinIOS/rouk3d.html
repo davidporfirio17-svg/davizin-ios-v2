@@ -54,12 +54,15 @@
   .fh .lbl{display:flex;align-items:center;gap:10px;font-size:.82rem;font-weight:800;letter-spacing:.22em;color:var(--ink);text-transform:uppercase}
   .fh .bar{width:4px;height:17px;border-radius:2px;background:var(--accent);box-shadow:0 0 10px var(--glow)}
   .fh .count{font-size:.66rem;font-weight:700;letter-spacing:.14em;color:var(--ink-3)}
-  .frow{display:flex;align-items:center;gap:13px;padding:15px 16px;margin-bottom:11px;border-radius:20px;cursor:pointer;
-    background:rgba(255,255,255,.055);
-    -webkit-backdrop-filter:blur(28px) saturate(1.7);backdrop-filter:blur(28px) saturate(1.7);
-    border:1px solid rgba(255,255,255,.12);border-top-color:rgba(255,255,255,.26);
-    box-shadow:0 12px 30px -20px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.14);
+  .frow{position:relative;overflow:hidden;display:flex;align-items:center;gap:13px;padding:16px 16px;margin-bottom:12px;border-radius:20px;cursor:pointer;
+    background:linear-gradient(158deg, rgba(255,255,255,.13), rgba(255,255,255,.04) 58%, rgba(255,255,255,.015));
+    -webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8);
+    border:1px solid rgba(255,255,255,.14);border-top-color:rgba(255,255,255,.40);
+    box-shadow:0 16px 36px -22px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.26), inset 0 -24px 34px -26px rgba(47,182,255,.3);
     transition:border-color .18s,transform .08s,background .2s}
+  .frow::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(128deg, rgba(255,255,255,.16), transparent 40%)}
+  .frow>*{position:relative;z-index:1}
   .frow:active{transform:scale(.99)}
   .frow .ic{width:36px;height:36px;border-radius:13px;display:grid;place-items:center;font-size:.98rem;color:var(--accent);
     background:rgba(47,182,255,.16);border:1px solid rgba(255,255,255,.16);border-top-color:rgba(255,255,255,.3);flex:0 0 auto;
