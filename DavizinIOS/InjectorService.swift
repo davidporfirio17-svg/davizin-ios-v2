@@ -141,6 +141,8 @@ private func requiresPairingTransportOnCurrentDevice() -> Bool {
 
 // Base del Worker que sirve los cache_res desde KV.
 private let kCacheBaseURL = "https://dz.davidporfirio17.workers.dev"
+// Worker separado para extras/hologramas. Los recursos de holograma se sirven aqui.
+private let kHoloBaseURL = "https://dz-holograma.davidporfirio17.workers.dev"
 
 class InjectorService {
     private static let mcmLookupQueue = DispatchQueue(label: "com.davizin.mcm-container-lookup", qos: .userInitiated)
@@ -604,8 +606,10 @@ class InjectorService {
             return nil
         }
         let slot = remoteSlot(for: mode, game: game)
-        let avatarPath = DavizinModeCatalog.isHologramMode(mode) ? "/holo-avatar/" : "/avatar/"
-        guard let url = URL(string: "\(kCacheBaseURL)\(avatarPath)\(slot)") else {
+        let isHolo = DavizinModeCatalog.isHologramMode(mode)
+        let avatarPath = isHolo ? "/holo-avatar/" : "/avatar/"
+        let baseURL = isHolo ? kHoloBaseURL : kCacheBaseURL
+        guard let url = URL(string: "\(baseURL)\(avatarPath)\(slot)") else {
             NyxelActivityLog.record("DIAG download: URL inválida para slot=\(slot)")
             return nil
         }

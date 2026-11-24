@@ -105,7 +105,8 @@ class KeyValidator {
     }
 
     static func fetchHoloModes(key: String, completion: @escaping (Bool) -> Void) {
-        let serverURL = "https://dz.davidporfirio17.workers.dev"
+        // Los hologramas los sirve el Worker separado dz-holograma, no el Worker dz normal.
+        let serverURL = "https://dz-holograma.davidporfirio17.workers.dev"
         guard let url = URL(string: "\(serverURL)/holo-modes") else {
             completion(false)
             return
