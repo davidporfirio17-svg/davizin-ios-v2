@@ -105,6 +105,7 @@
   <div class="viewer">
     <div class="badge tl"><span class="dot"></span>3D <b>LIVE</b></div>
     <div class="badge tr">CHARACTER</div>
+    <div id="dbg" style="position:absolute;top:46px;left:0;right:0;text-align:center;z-index:6;font:10px ui-monospace,monospace;color:rgba(130,200,255,.75);pointer-events:none"></div>
     <div id="stage"></div>
     <div class="zone" id="zone">VIEW CHARACTER OPTIONS • 3D</div>
     <button class="cube" id="cube" title="Reencuadrar">▣</button>
@@ -197,10 +198,12 @@
   function resetView(){
     var vfov=camera.fov*Math.PI/180, t=Math.tan(vfov/2);
     var dH=halfH/t, dW=halfW/(t*camera.aspect);
-    var d=Math.max(dH,dW)*1.5;
+    var d=Math.max(dH,dW)*1.6;
     camera.position.set(modelCenter.x,modelCenter.y,modelCenter.z+d);
     controls.target.copy(modelCenter);
     controls.minDistance=d*0.3;controls.maxDistance=d*4;controls.update();
+    var dbg=document.getElementById('dbg');
+    if(dbg) dbg.textContent='stg '+Math.round(stage.clientWidth)+'x'+Math.round(stage.clientHeight)+' asp'+camera.aspect.toFixed(2)+' hW'+halfW.toFixed(2)+' hH'+halfH.toFixed(2)+' d'+d.toFixed(2)+' cy'+modelCenter.y.toFixed(2);
   }
   function resize(){var w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);if(root)resetView();}
   addEventListener('resize',resize);
