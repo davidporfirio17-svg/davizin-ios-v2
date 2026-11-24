@@ -1,5 +1,26 @@
 import UIKit
 
+/// Velo en gradiente: oscurece el fondo de marca detras del contenido para legibilidad,
+/// dejandolo sutil en el centro (donde el logo es parte del diseno) y mas fuerte arriba/abajo.
+private final class GradientScrimView: UIView {
+    override class var layerClass: AnyClass { CAGradientLayer.self }
+    init() {
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
+        let g = layer as! CAGradientLayer
+        g.colors = [
+            UIColor.black.withAlphaComponent(0.60).cgColor,
+            UIColor.black.withAlphaComponent(0.30).cgColor,
+            UIColor.black.withAlphaComponent(0.26).cgColor,
+            UIColor.black.withAlphaComponent(0.64).cgColor
+        ]
+        g.locations = [0.0, 0.26, 0.64, 1.0]
+        g.startPoint = CGPoint(x: 0.5, y: 0.0)
+        g.endPoint = CGPoint(x: 0.5, y: 1.0)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
 final class ViewController: UIViewController {
     /// Actívalo en false cuando conectes tus propios callbacks de aplicación.
     var simulateUIStates = true
@@ -17,6 +38,7 @@ final class ViewController: UIViewController {
 
     private let videoBackgroundView = DavizinLoginVideoView()
     private let animatedBackgroundView = DavizinAnimatedBackgroundView()
+    private let brandScrimView = GradientScrimView()
     private let headerView = DavizinHeaderView()
     private let contentContainerView = UIView()
     private let bottomNavView = DavizinBottomNavView()
@@ -334,6 +356,15 @@ final class ViewController: UIViewController {
         animatedBackgroundView.translatesAutoresizingMaskIntoConstraints = false
         animatedBackgroundView.backgroundColor = .clear
         view.addSubview(animatedBackgroundView)
+
+        brandScrimView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(brandScrimView)
+        NSLayoutConstraint.activate([
+            brandScrimView.topAnchor.constraint(equalTo: view.topAnchor),
+            brandScrimView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            brandScrimView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            brandScrimView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
 
         headerView.delegate = self
         view.addSubview(headerView)

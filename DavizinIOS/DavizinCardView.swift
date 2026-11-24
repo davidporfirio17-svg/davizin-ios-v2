@@ -44,8 +44,10 @@ final class DavizinCardView: UIView {
     }
 
     func useTransparentAppearance() {
-        backgroundColor = .clear
-        blurView.alpha = 0.16
+        // Un velo oscuro tenue + un poco mas de blur: mantiene el look glass pero
+        // evita que el fondo de marca se transparente sobre el texto.
+        backgroundColor = AppTheme.background.withAlphaComponent(0.34)
+        blurView.alpha = 0.26
         layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
         layer.shadowColor = AppTheme.accent.cgColor
         layer.shadowOpacity = 0.12
