@@ -2,7 +2,7 @@ import Foundation
 import UserNotifications
 import Network
 
-enum DavizinScreenStage: Equatable { case login, home, gameSelection, modeSelection, operation, player, profile, help }
+enum DavizinScreenStage: Equatable { case login, home, gameSelection, modeSelection, operation, player, profile, help, extras }
 
 extension Notification.Name {
     static let nyxelConnectivityDidChange = Notification.Name("nyxel.connectivity.didChange")

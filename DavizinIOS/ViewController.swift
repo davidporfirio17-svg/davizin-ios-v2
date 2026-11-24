@@ -1,4 +1,5 @@
 import UIKit
+import SafariServices
 
 final class ViewController: UIViewController {
     /// Actívalo en false cuando conectes tus propios callbacks de aplicación.
@@ -39,6 +40,7 @@ final class ViewController: UIViewController {
     private var stageBeforePlayer: DavizinScreenStage = .modeSelection
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
     private var stageBeforeHelp: DavizinScreenStage = .modeSelection
+    private var stageBeforeExtras: DavizinScreenStage = .modeSelection
     private var operationView: OperationView?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -352,6 +354,9 @@ final class ViewController: UIViewController {
         bottomNavView.onHelp = { [weak self] in
             self?.showHelp(animated: true)
         }
+        bottomNavView.onExtras = { [weak self] in
+            self?.showExtras(animated: true)
+        }
         view.addSubview(bottomNavView)
         let bottomNavHeight = bottomNavView.heightAnchor.constraint(equalToConstant: 0)
         bottomNavHeightConstraint = bottomNavHeight
@@ -653,6 +658,19 @@ final class ViewController: UIViewController {
         display(screen, animated: animated)
     }
 
+    private func showExtras(animated: Bool) {
+        if currentStage != .extras { stageBeforeExtras = currentStage }
+        currentStage = .extras
+        setBottomNavigation(visible: true, selected: .extras)
+        headerView.title = "Extras"
+        headerView.showsBackButton = true
+        headerView.showsAvatarButton = false
+
+        let screen = ExtrasView()
+        screen.delegate = self
+        display(screen, animated: animated)
+    }
+
 	/// Abre Free Fire (MAX o normal) usando su esquema de URL.
 	private func openGame(_ game: DavizinGame) {
 		let beginOpening = { [weak self] in
@@ -837,7 +855,19 @@ final class ViewController: UIViewController {
             case .player: showPlayer(animated: true)
             case .profile: showProfile(animated: true)
             case .modeSelection: showModeSelection(animated: true)
+            case .extras: showExtras(animated: true)
             case .gameSelection, .home, .login, .help: showGameSelection(animated: true)
+            }
+        case .extras:
+            switch stageBeforeExtras {
+            case .operation: showOperation(animated: true)
+            case .modeSelection: showModeSelection(animated: true)
+            case .gameSelection: showGameSelection(animated: true)
+            case .home: showGameSelection(animated: true)
+            case .player: showPlayer(animated: true)
+            case .profile: showProfile(animated: true)
+            case .help: showHelp(animated: true)
+            default: showModeSelection(animated: true)
             }
         }
     }
@@ -943,5 +973,14 @@ extension ViewController: OperationViewDelegate {
         onOperation?(operation)
         guard simulateUIStates else { return }
         simulateOperation(operation)
+    }
+}
+
+extension ViewController: ExtrasViewDelegate {
+    func extrasViewDidRequestOpenURL(_ view: ExtrasView, url: URL) {
+        let safari = SFSafariViewController(url: url)
+        safari.preferredControlTintColor = AppTheme.readableAccent
+        safari.modalPresentationStyle = .pageSheet
+        present(safari, animated: true)
     }
 }
