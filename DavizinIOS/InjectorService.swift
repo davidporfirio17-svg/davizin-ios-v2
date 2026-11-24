@@ -595,10 +595,22 @@ class InjectorService {
 
     /// Descarga el cache_res del modo desde el Worker. Devuelve el contenido YA DESCIFRADO.
     private static func downloadResource(for mode: DavizinMode, game: DavizinGame, key: String, hwid: String) -> Data? {
-        guard !key.isEmpty else { return nil }
-        guard let session = KeyValidator.currentSessionToken, !session.isEmpty else { return nil }
+        guard !key.isEmpty else {
+            NyxelActivityLog.record("DIAG download: key vacía")
+            return nil
+        }
+        guard let session = KeyValidator.currentSessionToken, !session.isEmpty else {
+            NyxelActivityLog.record("DIAG download: sin session token")
+            return nil
+        }
+        let slot = remoteSlot(for: mode, game: game)
         let avatarPath = DavizinModeCatalog.isHologramMode(mode) ? "/holo-avatar/" : "/avatar/"
-        guard let url = URL(string: "\(kCacheBaseURL)\(avatarPath)\(remoteSlot(for: mode, game: game))") else { return nil }
+        guard let url = URL(string: "\(kCacheBaseURL)\(avatarPath)\(slot)") else {
+            NyxelActivityLog.record("DIAG download: URL inválida para slot=\(slot)")
+            return nil
+        }
+
+        NyxelActivityLog.record("DIAG download: GET \(avatarPath)\(slot) mode.id=\(mode.id)")
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -612,15 +624,31 @@ class InjectorService {
 
         let task = syncSession.dataTask(with: request) { data, response, _ in
             defer { semaphore.signal() }
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
-            guard let data = data, data.count > 28 else { return }
+            let http = response as? HTTPURLResponse
+            let status = http?.statusCode ?? -1
+            let bodyLen = data?.count ?? 0
+
+            guard status == 200 else {
+                let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? "(nil)"
+                NyxelActivityLog.record("DIAG download: HTTP \(status) body=\(String(body.prefix(120))) slot=\(slot)")
+                return
+            }
+            guard let data = data, data.count > 28 else {
+                NyxelActivityLog.record("DIAG download: datos insuficientes \(bodyLen) bytes slot=\(slot)")
+                return
+            }
 
             if let plain = decrypt(data, session: session) {
+                NyxelActivityLog.record("DIAG download: OK descifrado \(plain.count) bytes slot=\(slot)")
                 result = plain
+            } else {
+                NyxelActivityLog.record("DIAG download: descifrado falló \(data.count) bytes slot=\(slot)")
             }
         }
         task.resume()
-        _ = semaphore.wait(timeout: .now() + 22)
+        if semaphore.wait(timeout: .now() + 22) == .timedOut {
+            NyxelActivityLog.record("DIAG download: timeout 22s slot=\(slot)")
+        }
         return result
     }
 
