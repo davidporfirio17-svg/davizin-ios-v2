@@ -500,24 +500,17 @@ class InjectorService {
 
         let bid = bundleID(for: game)
 
-        // Cache first
-        if let cached = cachedContainerPath(for: bid) {
-            if FileManager.default.fileExists(atPath: cached) { return true }
-        }
-
-        // Discovery (fast on iOS 26+)
-        if requiresPairingTransportOnCurrentDevice() {
-            if let discovered = DavizinDiscoverContainerPath(bid) {
-                cacheContainerPath(discovered, for: bid)
+        // Try MCM first (fast on iOS <= 25, returns nil on iOS 27.2)
+        var error: NSString?
+        if let container = DavizinGetContainerPath(bid, &error) {
+            if FileManager.default.fileExists(atPath: container) {
                 return true
             }
         }
 
-        // MCM fallback
-        var error: NSString?
-        if let container = DavizinGetContainerPath(bid, &error) {
-            if FileManager.default.fileExists(atPath: container) {
-                cacheContainerPath(container, for: bid)
+        // iOS 27+ fallback: discover container via bad_query + directory enumeration
+        if requiresPairingTransportOnCurrentDevice() {
+            if DavizinDiscoverContainerPath(bid) != nil {
                 return true
             }
         }
@@ -654,52 +647,49 @@ class InjectorService {
 
         NyxelActivityLog.record("DIAG PASO 1 OK: iOS verificado")
 
-        // --- Resolver contenedor (cache universal + fallbacks por versión) ---
+        // --- Resolver contenedor ---
         var mcmErr: String?
         var container: String?
 
-        if let cached = cachedContainerPath(for: bid) {
-            container = cached
-            NyxelActivityLog.record("DIAG container from cache: \(cached)")
-        }
+        if pairingRequired {
+            // iOS 27+: cache → Discovery → MCM corto → AirLift
+            if let cached = cachedContainerPath(for: bid) {
+                container = cached
+                NyxelActivityLog.record("DIAG container from cache: \(cached)")
+            }
 
-        if container == nil {
-            if pairingRequired {
-                // iOS 26+: Discovery → MCM 3s → AirLift
-                if let discovered = DavizinDiscoverContainerPath(bid) {
-                    container = discovered
-                    cacheContainerPath(discovered, for: bid)
-                    NyxelActivityLog.record("DIAG container via Discovery (fast): \(discovered)")
-                }
+            if container == nil, let discovered = DavizinDiscoverContainerPath(bid) {
+                container = discovered
+                cacheContainerPath(discovered, for: bid)
+                NyxelActivityLog.record("DIAG container via Discovery (fast): \(discovered)")
+            }
 
-                if container == nil {
-                    container = getContainerPathWithTimeout(bundleID: bid, timeout: 3, error: &mcmErr)
-                    if let c = container { cacheContainerPath(c, for: bid) }
-                }
-
-                if container == nil {
-                    if let airLiftContainer = resolveContainerViaAirLift(bundleID: bid) {
-                        container = airLiftContainer
-                        cacheContainerPath(airLiftContainer, for: bid)
-                        NyxelActivityLog.record("DIAG container via AirLift InstProxy: \(airLiftContainer)")
-                    } else if NixelAirLiftFileChannel.isAvailable {
-                        NyxelActivityLog.record("DIAG all container lookups failed on iOS 27; continuing without local container")
-                    } else {
-                        let detail = mcmErr ?? "container_query devolvió nil"
-                        let mcmDiag = DavizinMCMLastDiagnostic() ?? "sin dato"
-                        NyxelActivityLog.record("DIAG MCM+Discovery fallo en iOS 27+: \(detail). Cadena MCM: \(mcmDiag)")
-                        return InjectorResult(success: false, message: "No se encontró el contenedor del juego. Verifica que esté instalado.")
-                    }
-                }
-            } else {
-                // iOS <= 25: MCM 5s
-                container = getContainerPathWithTimeout(bundleID: bid, timeout: 5, error: &mcmErr)
+            if container == nil {
+                container = getContainerPathWithTimeout(bundleID: bid, timeout: 3, error: &mcmErr)
                 if let c = container { cacheContainerPath(c, for: bid) }
-                if container == nil {
-                    let msg = mcmErr ?? "MCM fallo - container nil"
-                    NyxelActivityLog.record("DIAG MCM fallo fatal: \(msg)")
+            }
+
+            if container == nil {
+                if let airLiftContainer = resolveContainerViaAirLift(bundleID: bid) {
+                    container = airLiftContainer
+                    cacheContainerPath(airLiftContainer, for: bid)
+                    NyxelActivityLog.record("DIAG container via AirLift InstProxy: \(airLiftContainer)")
+                } else if NixelAirLiftFileChannel.isAvailable {
+                    NyxelActivityLog.record("DIAG all container lookups failed on iOS 27; continuing without local container")
+                } else {
+                    let detail = mcmErr ?? "container_query devolvió nil"
+                    let mcmDiag = DavizinMCMLastDiagnostic() ?? "sin dato"
+                    NyxelActivityLog.record("DIAG MCM+Discovery fallo en iOS 27+: \(detail). Cadena MCM: \(mcmDiag)")
                     return InjectorResult(success: false, message: "No se encontró el contenedor del juego. Verifica que esté instalado.")
                 }
+            }
+        } else {
+            // iOS <= 25: MCM con timeout normal
+            container = getContainerPathWithTimeout(bundleID: bid, timeout: 25, error: &mcmErr)
+            if container == nil {
+                let msg = mcmErr ?? "MCM fallo - container nil"
+                NyxelActivityLog.record("DIAG MCM fallo fatal: \(msg)")
+                return InjectorResult(success: false, message: "No se encontró el contenedor del juego. Verifica que esté instalado.")
             }
         }
 
