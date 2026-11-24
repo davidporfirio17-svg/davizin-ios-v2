@@ -531,7 +531,8 @@ final class ViewController: UIViewController {
 
     private func showOperation(animated: Bool) {
         setBottomNavigation(visible: true, selected: extrasMode ? .extras : .modes)
-        guard let selectedMode, DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) else {
+        let validModes = extrasMode ? DavizinModeCatalog.holoEnabledModes(for: selectedGame) : DavizinModeCatalog.enabledModes(for: selectedGame)
+        guard let selectedMode, validModes.contains(selectedMode) else {
             if extrasMode { showExtras(animated: animated) } else { showModeSelection(animated: animated) }
             return
         }
@@ -960,18 +961,31 @@ extension ViewController: MissionMapViewDelegate {
             return
         }
         view.setSyncState("Sincronizando con el Worker…", syncing: true)
-        KeyValidator.validate(key: key) { [weak self, weak view] success, message, remaining, _ in
-            guard let self else { return }
-            if success && remaining > 0 {
-                self.setAccountSession(key: key, remainingSeconds: remaining, countryCode: KeyValidator.lastCountryCode)
-                NyxelActivityLog.record("Configuración remota sincronizada")
-                DispatchQueue.main.async {
-                    view?.setSyncState("Configuración sincronizada", syncing: false)
-                    self.showModeSelection(animated: false)
+        if extrasMode {
+            KeyValidator.fetchHoloModes(key: key) { [weak self, weak view] success in
+                guard let self else { return }
+                if success {
+                    NyxelActivityLog.record("Hologramas sincronizados")
+                    view?.setSyncState("Hologramas sincronizados", syncing: false)
+                    self.showExtras(animated: false)
+                } else {
+                    view?.setSyncState("No se pudo sincronizar hologramas", syncing: false)
                 }
-            } else {
-                NyxelRemoteConfigStore.recordFailure(message)
-                view?.setSyncState("No se pudo sincronizar: \(message)", syncing: false)
+            }
+        } else {
+            KeyValidator.validate(key: key) { [weak self, weak view] success, message, remaining, _ in
+                guard let self else { return }
+                if success && remaining > 0 {
+                    self.setAccountSession(key: key, remainingSeconds: remaining, countryCode: KeyValidator.lastCountryCode)
+                    NyxelActivityLog.record("Configuración remota sincronizada")
+                    DispatchQueue.main.async {
+                        view?.setSyncState("Configuración sincronizada", syncing: false)
+                        self.showModeSelection(animated: false)
+                    }
+                } else {
+                    NyxelRemoteConfigStore.recordFailure(message)
+                    view?.setSyncState("No se pudo sincronizar: \(message)", syncing: false)
+                }
             }
         }
     }

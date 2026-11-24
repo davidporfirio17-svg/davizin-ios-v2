@@ -97,6 +97,7 @@ struct DavizinMode: Hashable, Codable, Identifiable {
 
 enum DavizinModeCatalog {
     private static let storageKey = "dz_remote_mode_config_v4"
+    private static let holoStorageKey = "dz_holo_mode_config_v1"
     static func all() -> [DavizinMode] {
         for key in [storageKey, "dz_remote_mode_config_v3", "dz_remote_mode_config_v2"] {
             guard let data = UserDefaults.standard.data(forKey: key), let saved = try? JSONDecoder().decode([DavizinMode].self, from: data) else { continue }
@@ -104,17 +105,27 @@ enum DavizinModeCatalog {
         }
         return []
     }
+    static func allHoloModes() -> [DavizinMode] {
+        guard let data = UserDefaults.standard.data(forKey: holoStorageKey),
+              let saved = try? JSONDecoder().decode([DavizinMode].self, from: data) else { return [] }
+        return saved.filter { isSafeID($0.id) && !$0.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
     static func enabledModes() -> [DavizinMode] { all().filter(\.enabled) }
     /// Visibilidad real que ve el usuario en el mapa: filtra tambien por juego.
     static func enabledModes(for game: DavizinGame) -> [DavizinMode] { all().filter { $0.isEnabled(for: game) } }
     static func isHologramMode(_ mode: DavizinMode) -> Bool { mode.id == "holograma" || mode.id.hasPrefix("holograma_") }
     static func regularEnabledModes(for game: DavizinGame) -> [DavizinMode] { enabledModes(for: game).filter { !isHologramMode($0) } }
-    static func holoEnabledModes(for game: DavizinGame) -> [DavizinMode] { enabledModes(for: game).filter { isHologramMode($0) } }
-    static func mode(id: String) -> DavizinMode? { all().first { $0.id == id } }
+    static func holoEnabledModes(for game: DavizinGame) -> [DavizinMode] { allHoloModes().filter { $0.isEnabled(for: game) } }
+    static func mode(id: String) -> DavizinMode? { all().first { $0.id == id } ?? allHoloModes().first { $0.id == id } }
     static func save(_ modes: [DavizinMode]) {
         let clean = modes.filter { isSafeID($0.id) && !$0.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard let data = try? JSONEncoder().encode(clean) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
+    }
+    static func saveHoloModes(_ modes: [DavizinMode]) {
+        let clean = modes.filter { isSafeID($0.id) && !$0.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        guard let data = try? JSONEncoder().encode(clean) else { return }
+        UserDefaults.standard.set(data, forKey: holoStorageKey)
     }
     static func markConsumed(_ id: String) {
         let updated = all().map { mode in

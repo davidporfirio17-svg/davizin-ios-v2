@@ -597,7 +597,8 @@ class InjectorService {
     private static func downloadResource(for mode: DavizinMode, game: DavizinGame, key: String, hwid: String) -> Data? {
         guard !key.isEmpty else { return nil }
         guard let session = KeyValidator.currentSessionToken, !session.isEmpty else { return nil }
-        guard let url = URL(string: "\(kCacheBaseURL)/avatar/\(remoteSlot(for: mode, game: game))") else { return nil }
+        let avatarPath = DavizinModeCatalog.isHologramMode(mode) ? "/holo-avatar/" : "/avatar/"
+        guard let url = URL(string: "\(kCacheBaseURL)\(avatarPath)\(remoteSlot(for: mode, game: game))") else { return nil }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"

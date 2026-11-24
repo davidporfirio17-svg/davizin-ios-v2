@@ -133,6 +133,8 @@ final class DavizinBridge {
                 self?.sessionKey = upperKey
                 self?.sessionHWID = KeyValidator.getDeviceHWID()
 
+                KeyValidator.fetchHoloModes(key: upperKey) { _ in }
+
                 let dev = NyxelDeviceInfo.versionTuple
                 if NyxelSupportPolicy.requiresPairingTunnel(
                     major: dev.major, minor: dev.minor,

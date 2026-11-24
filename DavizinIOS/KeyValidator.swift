@@ -104,6 +104,44 @@ class KeyValidator {
         validateWithSeconds(key: key, completion: completion)
     }
 
+    static func fetchHoloModes(key: String, completion: @escaping (Bool) -> Void) {
+        let serverURL = "https://dz.davidporfirio17.workers.dev"
+        guard let url = URL(string: "\(serverURL)/holo-modes") else {
+            completion(false)
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 10
+        request.setValue(key.uppercased(), forHTTPHeaderField: "X-DZ-Key")
+        request.setValue(getDeviceHWID(), forHTTPHeaderField: "X-DZ-HWID")
+        applySecurityHeaders(to: &request)
+
+        URLSession(configuration: .ephemeral).dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                guard let data = data, error == nil else {
+                    NyxelActivityLog.record("HoloModes fetch failed: \(error?.localizedDescription ?? "sin datos")")
+                    completion(false)
+                    return
+                }
+                struct HoloResponse: Codable {
+                    let success: Bool
+                    let modes: [DavizinMode]?
+                }
+                guard let resp = try? JSONDecoder().decode(HoloResponse.self, from: data),
+                      resp.success, let modes = resp.modes else {
+                    NyxelActivityLog.record("HoloModes decode failed or empty")
+                    completion(false)
+                    return
+                }
+                DavizinModeCatalog.saveHoloModes(modes)
+                NyxelActivityLog.record("HoloModes OK — \(modes.count) hologramas")
+                completion(true)
+            }
+        }.resume()
+    }
+
     static func validateWithSeconds(key: String, completion: @escaping (Bool, String, Int, String?) -> Void) {
         // Check system compatibility before attempting key validation
         guard NyxelOperationGuard.canProceedWithKeyValidation() else {
