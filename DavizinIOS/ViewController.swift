@@ -1,5 +1,4 @@
 import UIKit
-import SafariServices
 
 final class ViewController: UIViewController {
     /// Actívalo en false cuando conectes tus propios callbacks de aplicación.
@@ -41,6 +40,7 @@ final class ViewController: UIViewController {
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
     private var stageBeforeHelp: DavizinScreenStage = .modeSelection
     private var stageBeforeExtras: DavizinScreenStage = .modeSelection
+    private var extrasMode = false
     private var operationView: OperationView?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -512,8 +512,10 @@ final class ViewController: UIViewController {
 
     private func showModeSelection(animated: Bool) {
         currentStage = .modeSelection
+        extrasMode = false
         setBottomNavigation(visible: true, selected: .modes)
-        if let firstActive = DavizinModeCatalog.enabledModes(for: selectedGame).first, selectedMode == nil || !DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode!) {
+        let modes = DavizinModeCatalog.regularEnabledModes(for: selectedGame)
+        if let firstActive = modes.first, selectedMode == nil || !modes.contains(selectedMode!) {
             selectedMode = firstActive
         }
 		headerView.title = "Configurar / \(selectedGame.rawValue)"
@@ -522,15 +524,15 @@ final class ViewController: UIViewController {
 
         let screen = MissionMapView()
         screen.delegate = self
-        screen.setModes(DavizinModeCatalog.enabledModes(for: selectedGame), selected: selectedMode)
+        screen.setModes(modes, selected: selectedMode)
         missionMapView = screen
         display(screen, animated: animated)
     }
 
     private func showOperation(animated: Bool) {
-        setBottomNavigation(visible: true, selected: .modes)
+        setBottomNavigation(visible: true, selected: extrasMode ? .extras : .modes)
         guard let selectedMode, DavizinModeCatalog.enabledModes(for: selectedGame).contains(selectedMode) else {
-            showModeSelection(animated: animated)
+            if extrasMode { showExtras(animated: animated) } else { showModeSelection(animated: animated) }
             return
         }
         currentStage = .operation
@@ -661,13 +663,20 @@ final class ViewController: UIViewController {
     private func showExtras(animated: Bool) {
         if currentStage != .extras { stageBeforeExtras = currentStage }
         currentStage = .extras
+        extrasMode = true
         setBottomNavigation(visible: true, selected: .extras)
-        headerView.title = "Extras"
+        let modes = DavizinModeCatalog.holoEnabledModes(for: selectedGame)
+        if let firstHolo = modes.first, selectedMode == nil || !modes.contains(selectedMode!) {
+            selectedMode = firstHolo
+        }
+        headerView.title = "Hologramas / \(selectedGame.rawValue)"
         headerView.showsBackButton = true
         headerView.showsAvatarButton = false
 
-        let screen = ExtrasView()
+        let screen = MissionMapView()
         screen.delegate = self
+        screen.setModes(modes, selected: selectedMode)
+        missionMapView = screen
         display(screen, animated: animated)
     }
 
@@ -829,7 +838,7 @@ final class ViewController: UIViewController {
         case .modeSelection:
             showGameSelection(animated: true)
         case .operation:
-            showModeSelection(animated: true)
+            if extrasMode { showExtras(animated: true) } else { showModeSelection(animated: true) }
         case .player:
             switch stageBeforePlayer {
             case .operation: showOperation(animated: true)
@@ -976,11 +985,3 @@ extension ViewController: OperationViewDelegate {
     }
 }
 
-extension ViewController: ExtrasViewDelegate {
-    func extrasViewDidRequestOpenURL(_ view: ExtrasView, url: URL) {
-        let safari = SFSafariViewController(url: url)
-        safari.preferredControlTintColor = AppTheme.readableAccent
-        safari.modalPresentationStyle = .pageSheet
-        present(safari, animated: true)
-    }
-}
