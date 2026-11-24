@@ -44,6 +44,12 @@
     background:linear-gradient(145deg,rgba(47,182,255,.2),rgba(47,182,255,.05));color:var(--accent);font-size:1.2rem;
     display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 20px -8px var(--glow)}
   .cube:active{transform:scale(.94)}
+  #reticle{position:absolute;left:0;top:0;z-index:5;pointer-events:none;opacity:0;transition:opacity .22s;will-change:transform}
+  .ret-ring{position:absolute;left:-27px;top:-27px;width:54px;height:54px;border:2px solid var(--mark);border-radius:50%;box-shadow:0 0 16px var(--mark-glow);animation:retpulse 1.5s ease-in-out infinite}
+  .ret-ring::after{content:"";position:absolute;inset:7px;border:1px solid rgba(255,42,58,.5);border-radius:50%}
+  .ret-x{position:absolute;left:-15px;top:-1px;width:30px;height:2px;background:linear-gradient(90deg,transparent,var(--mark),transparent)}
+  .ret-x::before{content:"";position:absolute;left:14px;top:-14px;width:2px;height:30px;background:linear-gradient(180deg,transparent,var(--mark),transparent)}
+  @keyframes retpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.16);opacity:.55}}
   #loader{position:absolute;inset:0;z-index:5;display:grid;place-items:center;color:var(--ink-3);font-size:.8rem;letter-spacing:.1em;background:#010209}
   #loader.hide{opacity:0;pointer-events:none;transition:opacity .5s}
   .spin{width:30px;height:30px;border:3px solid rgba(80,150,255,.25);border-top-color:var(--accent);border-radius:50%;animation:r 1s linear infinite;margin:0 auto .7rem}
@@ -108,6 +114,7 @@
     <div id="stage"></div>
     <div class="zone" id="zone">VIEW CHARACTER OPTIONS • 3D</div>
     <button class="cube" id="cube" title="Reencuadrar">▣</button>
+    <div id="reticle"><div class="ret-ring"></div><div class="ret-x"></div></div>
     <div id="loader"><div><div class="spin"></div>Cargando modelo…</div></div>
   </div>
 
@@ -192,6 +199,13 @@
       // marcadores en coords locales (sin escalar): media-altura = size.y/2
       var hh=size.y/2;
       Object.keys(ZSPEC).forEach(function(z){ var sp=ZSPEC[z]; var m=makeMarker(sp.zf*hh, sp.rad*hh*0.8); pivot.add(m); markers[z]=m; });
+      // plataforma holografica azul bajo los pies (showcase)
+      var ring=new THREE.Mesh(new THREE.RingGeometry(hh*0.30, hh*0.44, 56),
+        new THREE.MeshBasicMaterial({color:0x2fb6ff,transparent:true,opacity:0.55,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+      ring.rotation.x=-Math.PI/2; ring.position.y=-hh*0.98; pivot.add(ring);
+      var disc=new THREE.Mesh(new THREE.CircleGeometry(hh*0.42, 56),
+        new THREE.MeshBasicMaterial({color:0x1550ff,transparent:true,opacity:0.16,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+      disc.rotation.x=-Math.PI/2; disc.position.y=-hh*0.99; pivot.add(disc);
       pivot.updateMatrixWorld(true);
       var bb=new THREE.Box3().setFromObject(obj); // SOLO el modelo (los marcadores cuelgan del pivot, no de obj)
       modelCenter.copy(bb.getCenter(new THREE.Vector3()));
@@ -214,11 +228,19 @@
   addEventListener('resize',resize);
   resize(); [60,250,600,1200].forEach(function(ms){setTimeout(resize,ms);});
 
-  var pulse=0;
+  var pulse=0, reticle=document.getElementById('reticle'), _pv=new THREE.Vector3();
   (function loop(){requestAnimationFrame(loop);
     pulse+=0.08; var sc=1+Math.sin(pulse)*0.12;
     if(activeMarker) activeMarker.scale.setScalar(sc);
     controls.update(); renderer.render(scene,camera);
+    // retícula 2D que sigue la zona de mira proyectada a la pantalla
+    if(activeMarker && activeMarker.visible){
+      activeMarker.getWorldPosition(_pv); _pv.project(camera);
+      if(_pv.z<1){
+        var x=(_pv.x*0.5+0.5)*stage.clientWidth, y=(-_pv.y*0.5+0.5)*stage.clientHeight;
+        reticle.style.transform='translate('+x+'px,'+y+'px)'; reticle.style.opacity='1';
+      } else reticle.style.opacity='0';
+    } else reticle.style.opacity='0';
   })();
 
   // UI opciones
