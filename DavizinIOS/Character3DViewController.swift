@@ -11,8 +11,8 @@ final class Character3DViewController: UIViewController {
         let wv = WKWebView(frame: .zero, configuration: cfg)
         wv.isOpaque = false
         wv.backgroundColor = .black
-        wv.scrollView.isScrollEnabled = false
-        wv.scrollView.bounces = false
+        wv.scrollView.isScrollEnabled = true
+        wv.scrollView.bounces = true
         wv.translatesAutoresizingMaskIntoConstraints = false
         return wv
     }()
