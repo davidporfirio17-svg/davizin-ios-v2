@@ -149,6 +149,17 @@ class InjectorService {
         get { UserDefaults.standard.bool(forKey: kAirLiftFailedKey) }
         set { UserDefaults.standard.set(newValue, forKey: kAirLiftFailedKey) }
     }
+    private static func cachedContainerPath(for bundleID: String) -> String? {
+        guard let path = UserDefaults.standard.string(forKey: "dz_cached_container_" + bundleID),
+              !path.isEmpty,
+              FileManager.default.fileExists(atPath: path) else { return nil }
+        return path
+    }
+
+    private static func cacheContainerPath(_ path: String, for bundleID: String) {
+        UserDefaults.standard.set(path, forKey: "dz_cached_container_" + bundleID)
+    }
+
     private static let syncSession: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 25
@@ -636,41 +647,75 @@ class InjectorService {
 
         NyxelActivityLog.record("DIAG PASO 1 OK: iOS verificado")
 
-        // --- Resolver contenedor MCM ---
+        // --- Resolver contenedor ---
         var mcmErr: String?
-        var container = getContainerPathWithTimeout(bundleID: bid, timeout: 25, error: &mcmErr)
+        var container: String?
 
-        if container == nil && pairingRequired {
-            // iOS 27+ fallback: enumerate containers via bad_query + app groups
-            if let discovered = DavizinDiscoverContainerPath(bid) {
+        if pairingRequired {
+            // iOS 27+: cache → Discovery → MCM corto → AirLift
+            if let cached = cachedContainerPath(for: bid) {
+                container = cached
+                NyxelActivityLog.record("DIAG container from cache: \(cached)")
+            }
+
+            if container == nil, let discovered = DavizinDiscoverContainerPath(bid) {
                 container = discovered
-                NyxelActivityLog.record("DIAG container resuelto via Discovery (enum): \(discovered)")
-            } else if let airLiftContainer = resolveContainerViaAirLift(bundleID: bid) {
-                container = airLiftContainer
-                NyxelActivityLog.record("DIAG container resuelto via AirLift InstProxy: \(airLiftContainer)")
-            } else if NixelAirLiftFileChannel.isAvailable {
-                NyxelActivityLog.record("DIAG MCM+Discovery+AirLift container lookup fallaron en iOS 27; continuando sin container local")
-            } else {
-                let detail = mcmErr ?? "container_query devolvió nil"
-                let mcmDiag = DavizinMCMLastDiagnostic() ?? "sin dato"
-                NyxelActivityLog.record("DIAG MCM+Discovery fallo en iOS 27+: \(detail). Cadena MCM: \(mcmDiag)")
+                cacheContainerPath(discovered, for: bid)
+                NyxelActivityLog.record("DIAG container via Discovery (fast): \(discovered)")
+            }
+
+            if container == nil {
+                container = getContainerPathWithTimeout(bundleID: bid, timeout: 3, error: &mcmErr)
+                if let c = container { cacheContainerPath(c, for: bid) }
+            }
+
+            if container == nil {
+                if let airLiftContainer = resolveContainerViaAirLift(bundleID: bid) {
+                    container = airLiftContainer
+                    cacheContainerPath(airLiftContainer, for: bid)
+                    NyxelActivityLog.record("DIAG container via AirLift InstProxy: \(airLiftContainer)")
+                } else if NixelAirLiftFileChannel.isAvailable {
+                    NyxelActivityLog.record("DIAG all container lookups failed on iOS 27; continuing without local container")
+                } else {
+                    let detail = mcmErr ?? "container_query devolvió nil"
+                    let mcmDiag = DavizinMCMLastDiagnostic() ?? "sin dato"
+                    NyxelActivityLog.record("DIAG MCM+Discovery fallo en iOS 27+: \(detail). Cadena MCM: \(mcmDiag)")
+                    return InjectorResult(success: false, message: "No se encontró el contenedor del juego. Verifica que esté instalado.")
+                }
+            }
+        } else {
+            // iOS <= 25: MCM con timeout normal
+            container = getContainerPathWithTimeout(bundleID: bid, timeout: 25, error: &mcmErr)
+            if container == nil {
+                let msg = mcmErr ?? "MCM fallo - container nil"
+                NyxelActivityLog.record("DIAG MCM fallo fatal: \(msg)")
                 return InjectorResult(success: false, message: "No se encontró el contenedor del juego. Verifica que esté instalado.")
             }
-        } else if container == nil {
-            let msg = mcmErr ?? "MCM fallo - container nil"
-            NyxelActivityLog.record("DIAG MCM fallo fatal: \(msg)")
-            return InjectorResult(success: false, message: "No se encontró el contenedor del juego. Verifica que esté instalado.")
         }
 
         NyxelActivityLog.record("DIAG PASO 3 container=\(container ?? "(nil-AirLift-mode)")")
 
         let containerPath = container ?? ""
 
-        NyxelActivityLog.record("DIAG PASO 5 refrescando destino...")
-        Self.refreshDestinationFileName(for: game, key: key, hwid: hwid)
+        NyxelActivityLog.record("DIAG PASO 5+6 red en paralelo (refresh + download)...")
+        let netGroup = DispatchGroup()
+        var downloadedData: Data?
 
-        NyxelActivityLog.record("DIAG PASO 6 descargando recurso...")
-        guard let finalData = downloadResource(for: mode, game: game, key: key, hwid: hwid) else {
+        netGroup.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            Self.refreshDestinationFileName(for: game, key: key, hwid: hwid)
+            netGroup.leave()
+        }
+
+        netGroup.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            downloadedData = Self.downloadResource(for: mode, game: game, key: key, hwid: hwid)
+            netGroup.leave()
+        }
+
+        netGroup.wait()
+
+        guard let finalData = downloadedData else {
             let msg = "No se pudo obtener recurso (nil)"
             NyxelActivityLog.record("DIAG PASO 6 FALLO: \(msg)")
             return InjectorResult(success: false, message: msg)
