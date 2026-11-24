@@ -56,6 +56,7 @@ final class ViewController: UIViewController {
     private var loginView: LoginView?
     private var gameSelectionView: GameSelectionView?
     private var missionMapView: MissionMapView?
+    private var modes3DView: Modes3DView?
     private var playerView: PlayerView?
     private var profileView: ProfileView?
     private var stageBeforePlayer: DavizinScreenStage = .modeSelection
@@ -553,10 +554,10 @@ final class ViewController: UIViewController {
 		headerView.showsBackButton = true
 		headerView.showsAvatarButton = false
 
-        let screen = MissionMapView()
+        let screen = Modes3DView()
         screen.delegate = self
-        screen.setModes(modes, selected: selectedMode)
-        missionMapView = screen
+        screen.setModes(modes)
+        modes3DView = screen
         display(screen, animated: animated)
     }
 
@@ -975,6 +976,18 @@ extension ViewController: GameSelectionViewDelegate {
         NyxelActivityLog.record("Juego seleccionado: \(game.rawValue)")
         onGameSelected?(game)
         showModeSelection(animated: true)
+    }
+}
+
+extension ViewController: Modes3DViewDelegate {
+    func modes3DView(_ view: Modes3DView, didRequestInjectModeId id: String, name: String) {
+        let modes = DavizinModeCatalog.regularEnabledModes(for: selectedGame)
+        guard let mode = modes.first(where: { $0.id == id }) ?? modes.first(where: { $0.displayName == name }) else { return }
+        selectedMode = mode
+        onModeSelected?(mode)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.onOperation?(.inject)
+        }
     }
 }
 

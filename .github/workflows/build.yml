@@ -101,6 +101,14 @@ jobs:
             puts "Added Character3DViewController.swift"
           end
 
+          # Add Modes3DView.swift (pantalla de Modos basada en el visor 3D)
+          m3d = davizin_group.files.find { |f| f.path.end_with?("Modes3DView.swift") }
+          if m3d.nil?
+            m3d = davizin_group.new_file("Modes3DView.swift")
+            target.add_file_references([m3d])
+            puts "Added Modes3DView.swift"
+          end
+
           # Add 3D viewer resources (html + glb) to the resources build phase
           ["rouk3d.html", "rouk.glb"].each do |res|
             next if davizin_group.files.any? { |f| f.path.end_with?(res) }
