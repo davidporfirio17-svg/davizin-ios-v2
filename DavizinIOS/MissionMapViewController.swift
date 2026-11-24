@@ -108,7 +108,18 @@ final class MissionMapView: UIView {
         syncButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .bold)
         syncButton.addTarget(self, action: #selector(refreshTapped), for: .touchUpInside)
 
-        let headerStack = UIStackView(arrangedSubviews: [eyebrow, title, subtitle, modeStatusLabel, syncButton, scrollHint])
+        let view3DButton = UIButton(type: .system)
+        view3DButton.setTitle("◆  Ver personaje en 3D", for: .normal)
+        view3DButton.setTitleColor(AppTheme.primaryText, for: .normal)
+        view3DButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .heavy)
+        view3DButton.backgroundColor = AppTheme.accent.withAlphaComponent(0.16)
+        view3DButton.layer.cornerRadius = 14
+        view3DButton.layer.borderWidth = 1
+        view3DButton.layer.borderColor = AppTheme.accent.withAlphaComponent(0.5).cgColor
+        view3DButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+        view3DButton.addTarget(self, action: #selector(open3DTapped), for: .touchUpInside)
+
+        let headerStack = UIStackView(arrangedSubviews: [eyebrow, title, subtitle, modeStatusLabel, syncButton, view3DButton, scrollHint])
         headerStack.axis = .vertical
         headerStack.spacing = 4
         headerStack.setCustomSpacing(8, after: subtitle)
@@ -154,6 +165,17 @@ final class MissionMapView: UIView {
 
     @objc private func refreshTapped() {
         delegate?.missionMapViewDidRequestRefresh(self)
+    }
+
+    @objc private func open3DTapped() {
+        var responder: UIResponder? = self
+        while let next = responder?.next {
+            if let vc = next as? UIViewController {
+                vc.present(Character3DViewController(), animated: true)
+                return
+            }
+            responder = next
+        }
     }
 
     /// Muestra "desliza para ver mas" solo si de verdad hay contenido oculto
