@@ -129,10 +129,10 @@
   function makeMarker(y,rad){
     var g=new THREE.Group();
     var core=new THREE.Mesh(new THREE.SphereGeometry(rad,24,24),
-      new THREE.MeshBasicMaterial({color:MARK,transparent:true,opacity:.95,depthTest:false,depthWrite:false}));
+      new THREE.MeshBasicMaterial({color:MARK,transparent:false,opacity:1,depthTest:false,depthWrite:false}));
     core.renderOrder=20;
-    var halo=new THREE.Mesh(new THREE.SphereGeometry(rad*1.8,24,24),
-      new THREE.MeshBasicMaterial({color:MARK,transparent:true,opacity:.2,depthTest:false,depthWrite:false}));
+    var halo=new THREE.Mesh(new THREE.SphereGeometry(rad*1.45,24,24),
+      new THREE.MeshBasicMaterial({color:MARK,transparent:true,opacity:.34,depthTest:false,depthWrite:false}));
     halo.renderOrder=19;
     g.add(halo); g.add(core); g.position.set(0,y,0); g.visible=false; g.userData.rad=rad;
     return g;
@@ -151,7 +151,7 @@
       root=pivot;scene.add(pivot);
       // marcadores en coords locales (sin escalar): media-altura = size.y/2
       var hh=size.y/2;
-      OPTS.forEach(function(o){ if(o.zone){ var m=makeMarker(o.zf*hh, o.rad*hh); pivot.add(m); markers[o.zone]=m; } });
+      OPTS.forEach(function(o){ if(o.zone){ var m=makeMarker(o.zf*hh, o.rad*hh*0.8); pivot.add(m); markers[o.zone]=m; } });
       pivot.updateMatrixWorld(true);
       var bb=new THREE.Box3().setFromObject(obj); // SOLO el modelo (los marcadores cuelgan del pivot, no de obj)
       modelCenter.copy(bb.getCenter(new THREE.Vector3()));
