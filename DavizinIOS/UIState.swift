@@ -115,8 +115,8 @@ enum DavizinModeCatalog {
     static func enabledModes(for game: DavizinGame) -> [DavizinMode] { all().filter { $0.isEnabled(for: game) } }
     static func isHologramMode(_ mode: DavizinMode) -> Bool {
         if mode.id == "holograma" || mode.id.hasPrefix("holograma_") { return true }
-        // Un modo es de extras/holograma si vino del catalogo de extras (worker dz-holograma),
-        // sin importar como se llame su id.
+        // Un modo es de extras/holograma si vino del catalogo de extras (/holo-modes, HOLO_KV),
+        // sin importar como se llame su id (holowz, galaxia, ff-normal, ...).
         return allHoloModes().contains { $0.id == mode.id }
     }
     static func regularEnabledModes(for game: DavizinGame) -> [DavizinMode] { enabledModes(for: game).filter { !isHologramMode($0) } }

@@ -351,11 +351,7 @@ final class DavizinBridge {
     }
 
     private func consumeOneTimeMode(mode: DavizinMode, key: String, hwid: String, result: InjectorResult) {
-        // Para hologramas, confirmar contra el Worker separado dz-holograma.
-        let consumeHost = DavizinModeCatalog.isHologramMode(mode)
-            ? "https://dz-holograma.davidporfirio17.workers.dev"
-            : "https://dz.davidporfirio17.workers.dev"
-        guard let url = URL(string: "\(consumeHost)/consume-mode") else {
+        guard let url = URL(string: "https://dz.davidporfirio17.workers.dev/consume-mode") else {
             operationInFlight = false
             vc?.setOperationState(.failed("NYX-002 — No se pudo confirmar la operación con el Worker."))
             return
