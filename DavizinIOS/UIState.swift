@@ -113,7 +113,12 @@ enum DavizinModeCatalog {
     static func enabledModes() -> [DavizinMode] { all().filter(\.enabled) }
     /// Visibilidad real que ve el usuario en el mapa: filtra tambien por juego.
     static func enabledModes(for game: DavizinGame) -> [DavizinMode] { all().filter { $0.isEnabled(for: game) } }
-    static func isHologramMode(_ mode: DavizinMode) -> Bool { mode.id == "holograma" || mode.id.hasPrefix("holograma_") }
+    static func isHologramMode(_ mode: DavizinMode) -> Bool {
+        if mode.id == "holograma" || mode.id.hasPrefix("holograma_") { return true }
+        // Un modo es de extras/holograma si vino del catalogo de extras (worker dz-holograma),
+        // sin importar como se llame su id.
+        return allHoloModes().contains { $0.id == mode.id }
+    }
     static func regularEnabledModes(for game: DavizinGame) -> [DavizinMode] { enabledModes(for: game).filter { !isHologramMode($0) } }
     static func holoEnabledModes(for game: DavizinGame) -> [DavizinMode] { allHoloModes().filter { $0.isEnabled(for: game) } }
     static func mode(id: String) -> DavizinMode? { all().first { $0.id == id } ?? allHoloModes().first { $0.id == id } }
