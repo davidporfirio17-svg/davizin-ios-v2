@@ -50,6 +50,14 @@
   .ret-x{position:absolute;left:-15px;top:-1px;width:30px;height:2px;background:linear-gradient(90deg,transparent,var(--mark),transparent)}
   .ret-x::before{content:"";position:absolute;left:14px;top:-14px;width:2px;height:30px;background:linear-gradient(180deg,transparent,var(--mark),transparent)}
   @keyframes retpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.16);opacity:.55}}
+  .scan{position:absolute;left:0;right:0;top:0;height:120px;z-index:3;pointer-events:none;opacity:.5;
+    background:linear-gradient(180deg,transparent,rgba(47,182,255,.12) 50%,transparent);animation:scanmove 5s linear infinite}
+  @keyframes scanmove{0%{transform:translateY(-130px)}100%{transform:translateY(560px)}}
+  @media (prefers-reduced-motion:reduce){.scan{display:none}}
+  .viewer.flash{animation:cardflash .55s ease}
+  @keyframes cardflash{0%{box-shadow:0 0 0 2px var(--mark),0 0 46px -4px var(--mark-glow),inset 0 1px 0 rgba(255,255,255,.22)}100%{}}
+  .hold.hint{animation:hintpulse 1.3s ease-in-out 2}
+  @keyframes hintpulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 1px var(--accent),0 0 28px -6px var(--glow)}}
   #loader{position:absolute;inset:0;z-index:5;display:grid;place-items:center;color:var(--ink-3);font-size:.8rem;letter-spacing:.1em;background:#010209}
   #loader.hide{opacity:0;pointer-events:none;transition:opacity .5s}
   .spin{width:30px;height:30px;border:3px solid rgba(80,150,255,.25);border-top-color:var(--accent);border-radius:50%;animation:r 1s linear infinite;margin:0 auto .7rem}
@@ -114,6 +122,7 @@
     <div id="stage"></div>
     <div class="zone" id="zone">VIEW CHARACTER OPTIONS • 3D</div>
     <button class="cube" id="cube" title="Reencuadrar">▣</button>
+    <div class="scan"></div>
     <div id="reticle"><div class="ret-ring"></div><div class="ret-x"></div></div>
     <div id="loader"><div><div class="spin"></div>Cargando modelo…</div></div>
   </div>
@@ -230,6 +239,7 @@
 
   var pulse=0, reticle=document.getElementById('reticle'), _pv=new THREE.Vector3();
   (function loop(){requestAnimationFrame(loop);
+    if(document.hidden)return; // ahorra batería cuando la pantalla no se ve
     pulse+=0.08; var sc=1+Math.sin(pulse)*0.12;
     if(activeMarker) activeMarker.scale.setScalar(sc);
     controls.update(); renderer.render(scene,camera);
@@ -258,9 +268,12 @@
     zoneLbl.innerHTML = z ? ('ZONA DE MIRA · <b>'+(ZLABEL[z]||z)+'</b>') : (esc(o.name)+' · listo');
     document.getElementById('actzone').textContent = z ? (ZLABEL[z]||z) : esc(o.name).toUpperCase();
     document.getElementById('activate').hidden=false; resetHold();
+    var vw=document.querySelector('.viewer'); if(vw){ vw.classList.remove('flash'); void vw.offsetWidth; vw.classList.add('flash'); }
+    try{ if(!localStorage.getItem('nyxel_hold_tip')){ var hb=document.getElementById('holdbtn'); hb.classList.add('hint'); setTimeout(function(){hb.classList.remove('hint');},3000); localStorage.setItem('nyxel_hold_tip','1'); } }catch(e){}
   }
   function renderOptions(items){
     currentItems=items; rows=[]; list.innerHTML='';
+    if(!items.length){ list.innerHTML='<div class="frow" style="justify-content:center;color:var(--ink-3)">Sin modos disponibles</div>'; document.getElementById('count').textContent='0 disponibles'; document.getElementById('activate').hidden=true; return; }
     items.forEach(function(o,idx){
       var row=document.createElement('div'); row.className='frow';
       row.innerHTML='<div class="ic">'+iconFor(o.zone)+'</div><div class="fl"><b>'+esc(o.name)+'</b><small>'+esc(o.sub||'')+'</small></div><span class="tagdot"></span>';
@@ -273,7 +286,7 @@
   // La app inyecta los modos REALES por aqui:
   window.NYXEL_setModes=function(json){
     var arr; try{ arr=(typeof json==='string')?JSON.parse(json):json; }catch(e){ return; }
-    if(!arr||!arr.length) return;
+    if(!arr) return;
     renderOptions(arr.map(function(m){ return {id:m.id, name:m.name||m.id, sub:m.sub||'', zone:detectZone(m.name||m.id)}; }));
   };
 
