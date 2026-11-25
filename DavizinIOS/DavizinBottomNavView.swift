@@ -59,11 +59,26 @@ final class DavizinBottomNavView: UIView {
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
-        backgroundColor = AppTheme.backgroundRaise.withAlphaComponent(0.78)
-        layer.cornerRadius = 18
+        backgroundColor = AppTheme.backgroundRaise.withAlphaComponent(0.30)
+        layer.cornerRadius = 22
         layer.cornerCurve = .continuous
         layer.borderWidth = 1
-        layer.borderColor = AppTheme.hairline.cgColor
+        layer.borderColor = AppTheme.hairlineStrong.cgColor
+
+        // Desenfoque glass detrás de los iconos
+        let navBlur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+        navBlur.isUserInteractionEnabled = false
+        navBlur.layer.cornerRadius = 22
+        navBlur.layer.cornerCurve = .continuous
+        navBlur.clipsToBounds = true
+        navBlur.translatesAutoresizingMaskIntoConstraints = false
+        insertSubview(navBlur, at: 0)
+        NSLayoutConstraint.activate([
+            navBlur.leadingAnchor.constraint(equalTo: leadingAnchor),
+            navBlur.trailingAnchor.constraint(equalTo: trailingAnchor),
+            navBlur.topAnchor.constraint(equalTo: topAnchor),
+            navBlur.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.20
         layer.shadowRadius = 14

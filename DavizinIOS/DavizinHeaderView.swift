@@ -84,15 +84,30 @@ final class DavizinHeaderView: UIView {
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
-        backgroundColor = AppTheme.card.withAlphaComponent(0.58)
+        backgroundColor = AppTheme.card.withAlphaComponent(0.24)
         layer.cornerRadius = 18.0
         layer.cornerCurve = .continuous
         layer.borderWidth = 1.0
-        layer.borderColor = AppTheme.hairlineStrong.withAlphaComponent(0.62).cgColor
+        layer.borderColor = AppTheme.hairlineStrong.withAlphaComponent(0.7).cgColor
         layer.shadowColor = AppTheme.accent.cgColor
         layer.shadowOpacity = 0.0
         layer.shadowRadius = 18.0
         layer.shadowOffset = .zero
+
+        // Desenfoque glass detrás del contenido
+        let bandBlur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+        bandBlur.isUserInteractionEnabled = false
+        bandBlur.layer.cornerRadius = 18.0
+        bandBlur.layer.cornerCurve = .continuous
+        bandBlur.clipsToBounds = true
+        bandBlur.translatesAutoresizingMaskIntoConstraints = false
+        insertSubview(bandBlur, at: 0)
+        NSLayoutConstraint.activate([
+            bandBlur.leadingAnchor.constraint(equalTo: leadingAnchor),
+            bandBlur.trailingAnchor.constraint(equalTo: trailingAnchor),
+            bandBlur.topAnchor.constraint(equalTo: topAnchor),
+            bandBlur.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
 
         statusDot.translatesAutoresizingMaskIntoConstraints = false
         statusDot.backgroundColor = AppTheme.accent
