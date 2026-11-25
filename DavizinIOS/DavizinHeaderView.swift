@@ -11,7 +11,10 @@ final class DavizinHeaderView: UIView {
     weak var delegate: DavizinHeaderViewDelegate?
 
     var title: String = "" {
-        didSet { titleLabel.text = title.uppercased() }
+        didSet {
+            titleLabel.text = title
+            applyTitleTracking(titleLabel, value: 0.2)
+        }
     }
 
     var countdownText: String = "" {
@@ -113,13 +116,13 @@ final class DavizinHeaderView: UIView {
         statusDot.backgroundColor = AppTheme.accent
         statusDot.layer.cornerRadius = 4.0
         statusDot.layer.shadowColor = AppTheme.accent.cgColor
-        statusDot.layer.shadowOpacity = 0.8
-        statusDot.layer.shadowRadius = 7.0
+        statusDot.layer.shadowOpacity = 0.55
+        statusDot.layer.shadowRadius = 5.0
         addSubview(statusDot)
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.textColor = AppTheme.primaryText
-        titleLabel.font = UIFont.systemFont(ofSize: 13.0, weight: .heavy)
+        titleLabel.font = UIFont.systemFont(ofSize: 16.0, weight: .semibold)
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.setContentHuggingPriority(.required, for: .vertical)
@@ -201,7 +204,7 @@ final class DavizinHeaderView: UIView {
             closeButton.heightAnchor.constraint(equalToConstant: 38.0)
         ])
 
-        titleLabel.text = title.uppercased()
+        titleLabel.text = title
         showsBackButton = true
     }
 
