@@ -258,6 +258,7 @@
   var rows=[], currentItems=[], selectedIdx=-1;
   function esc(t){return String(t==null?'':t).replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];});}
   function iconFor(z){return z==='cuello'?'◈':z==='pecho'?'✦':z==='head'?'⬡':z==='drag'?'◆':'❖';}
+  function nhaptic(s){try{var h=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nyxel;if(h)h.postMessage({t:'haptic',s:s});}catch(e){}}
 
   function selectOpt(idx){
     selectedIdx=idx;
@@ -269,6 +270,7 @@
     document.getElementById('actzone').textContent = z ? (ZLABEL[z]||z) : esc(o.name).toUpperCase();
     document.getElementById('activate').hidden=false; resetHold();
     var vw=document.querySelector('.viewer'); if(vw){ vw.classList.remove('flash'); void vw.offsetWidth; vw.classList.add('flash'); }
+    nhaptic('light');
     try{ if(!localStorage.getItem('nyxel_hold_tip')){ var hb=document.getElementById('holdbtn'); hb.classList.add('hint'); setTimeout(function(){hb.classList.remove('hint');},3000); localStorage.setItem('nyxel_hold_tip','1'); } }catch(e){}
   }
   function renderOptions(items){
@@ -304,7 +306,7 @@
   function startHold(e){ if(done||selectedIdx<0)return; e.preventDefault(); holding=true; hstart=performance.now(); holdbtn.classList.add('armed'); hraf=requestAnimationFrame(tick); }
   function endHold(){ if(done||!holding)return; resetHold(); }
   function finishHold(){ holding=false;done=true; fill.style.width='100%'; holdbtn.classList.remove('armed'); holdbtn.classList.add('done');
-    hlabel.textContent='✓ Iniciando inyección…'; astate.textContent='Enviando'; if(navigator.vibrate)navigator.vibrate(30);
+    hlabel.textContent='✓ Iniciando inyección…'; astate.textContent='Enviando'; if(navigator.vibrate)navigator.vibrate(30); nhaptic('heavy');
     var o=currentItems[selectedIdx];
     try{ if(o && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nyxel){ window.webkit.messageHandlers.nyxel.postMessage({t:'inject', id:o.id, name:o.name}); } }catch(e){}
     setTimeout(resetHold,2600);

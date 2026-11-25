@@ -74,7 +74,14 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
 
     func userContentController(_ u: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == "nyxel", let body = message.body as? [String: Any] else { return }
-        if (body["t"] as? String) == "inject" {
+        let t = body["t"] as? String ?? ""
+        if t == "haptic" {
+            let s = body["s"] as? String ?? "light"
+            let style: UIImpactFeedbackGenerator.FeedbackStyle = (s == "heavy") ? .heavy : (s == "medium" ? .medium : .light)
+            UIImpactFeedbackGenerator(style: style).impactOccurred()
+            return
+        }
+        if t == "inject" {
             let id = body["id"] as? String ?? ""
             let name = body["name"] as? String ?? ""
             delegate?.modes3DView(self, didRequestInjectModeId: id, name: name)
