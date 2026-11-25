@@ -13,6 +13,7 @@ final class PlayerView: UIView {
     private let heroGradient = CAGradientLayer()
     private var heroSheenLayer: CAGradientLayer?
     private let avatarImageView = UIImageView()
+    private let heroEyebrowLabel = UILabel()
     private let heroNameLabel = UILabel()
     private let heroSubtitleLabel = UILabel()
     private let heroUIDLabel = UILabel()
@@ -418,6 +419,11 @@ final class PlayerView: UIView {
             avatarImageView.bottomAnchor.constraint(equalTo: avatarShell.bottomAnchor)
         ])
 
+        heroEyebrowLabel.text = "PERFIL DE JUGADOR"
+        heroEyebrowLabel.font = .systemFont(ofSize: 10, weight: .bold)
+        heroEyebrowLabel.textColor = AppTheme.readableAccent
+        heroEyebrowLabel.adjustsFontForContentSizeCategory = true
+
         heroNameLabel.text = "Tu perfil de jugador"
         heroNameLabel.font = .systemFont(ofSize: isPad ? 24 : 20, weight: .bold)
         heroNameLabel.textColor = .white
@@ -453,10 +459,11 @@ final class PlayerView: UIView {
         pillRow.alignment = .center
         pillRow.spacing = 8
 
-        let textStack = UIStackView(arrangedSubviews: [heroNameLabel, heroSubtitleLabel, uidRow, pillRow])
+        let textStack = UIStackView(arrangedSubviews: [heroEyebrowLabel, heroNameLabel, heroSubtitleLabel, uidRow, pillRow])
         textStack.axis = .vertical
         textStack.alignment = .leading
         textStack.spacing = 6
+        textStack.setCustomSpacing(3, after: heroEyebrowLabel)
 
         let heroContent = UIStackView(arrangedSubviews: [avatarShell, textStack])
         heroContent.axis = .horizontal

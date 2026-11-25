@@ -203,8 +203,14 @@ final class ProfileView: UIView {
         avatarImageView.layer.addSublayer(progressTrack)
         avatarImageView.layer.addSublayer(progressRing)
 
+        let eyebrow = UILabel()
+        eyebrow.text = "TU CUENTA"
+        eyebrow.font = .systemFont(ofSize: 10, weight: .bold)
+        eyebrow.textColor = AppTheme.readableAccent
+        eyebrow.adjustsFontForContentSizeCategory = true
+
         nameLabel.text = "NYXEL EXTERNAL"
-        nameLabel.font = AppTheme.titleFont(19)
+        nameLabel.font = AppTheme.titleFont(22)
         nameLabel.textColor = AppTheme.primaryText
         rankLabel.font = .systemFont(ofSize: 10, weight: .semibold)
         rankLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -213,8 +219,9 @@ final class ProfileView: UIView {
         rankBadge.translatesAutoresizingMaskIntoConstraints = false
         rankBadge.addSubview(rankLabel)
 
-        let nameStack = UIStackView(arrangedSubviews: [nameLabel, rankBadge])
-        nameStack.axis = .vertical; nameStack.alignment = .leading; nameStack.spacing = 6
+        let nameStack = UIStackView(arrangedSubviews: [eyebrow, nameLabel, rankBadge])
+        nameStack.axis = .vertical; nameStack.alignment = .leading; nameStack.spacing = 5
+        nameStack.setCustomSpacing(7, after: nameLabel)
         let heroStack = UIStackView(arrangedSubviews: [avatarCircle, nameStack])
         heroStack.axis = .horizontal; heroStack.alignment = .center; heroStack.spacing = 16
         heroStack.translatesAutoresizingMaskIntoConstraints = false
@@ -348,10 +355,24 @@ final class ProfileView: UIView {
     }
 
     private func makeRow(label: String, valueLabel: UILabel) -> UIView {
-        let left = UILabel(); left.text = label; left.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 14, weight: .semibold)); left.textColor = AppTheme.primaryText; left.adjustsFontForContentSizeCategory = true
-        valueLabel.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .monospacedSystemFont(ofSize: 13, weight: .semibold)); valueLabel.textColor = AppTheme.primaryText; valueLabel.textAlignment = .right; valueLabel.adjustsFontForContentSizeCategory = true; valueLabel.adjustsFontSizeToFitWidth = true; valueLabel.minimumScaleFactor = 0.8
-        let row = UIStackView(arrangedSubviews: [left, valueLabel]); row.axis = .horizontal; row.distribution = .equalSpacing
-        return row
+        // Jerarquía: etiqueta tenue (izq) · valor fuerte (der), con separador hairline debajo.
+        let left = UILabel(); left.text = label.uppercased(); left.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: .systemFont(ofSize: 11, weight: .semibold)); left.textColor = AppTheme.secondaryText; left.adjustsFontForContentSizeCategory = true
+        valueLabel.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .monospacedSystemFont(ofSize: 14, weight: .bold)); valueLabel.textColor = AppTheme.primaryText; valueLabel.textAlignment = .right; valueLabel.adjustsFontForContentSizeCategory = true; valueLabel.adjustsFontSizeToFitWidth = true; valueLabel.minimumScaleFactor = 0.75
+        left.setContentHuggingPriority(.required, for: .horizontal)
+        left.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        let row = UIStackView(arrangedSubviews: [left, valueLabel]); row.axis = .horizontal; row.alignment = .firstBaseline; row.distribution = .equalSpacing; row.spacing = 12
+        row.translatesAutoresizingMaskIntoConstraints = false
+
+        let separator = UIView()
+        separator.backgroundColor = AppTheme.hairline
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        separator.heightAnchor.constraint(equalToConstant: 1).isActive = true
+
+        let container = UIStackView(arrangedSubviews: [row, separator])
+        container.axis = .vertical
+        container.spacing = 9
+        return container
     }
 
     private func updatePrivacySummary() {
