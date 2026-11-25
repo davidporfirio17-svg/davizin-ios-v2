@@ -4,14 +4,21 @@
 <style>
   html,body{margin:0;height:100%;background:#05060d;overflow:hidden}
   #sky{position:fixed;inset:0;display:block}
+  #ext{position:fixed;left:0;right:0;top:53%;text-align:center;z-index:2;opacity:0;
+       font-family:-apple-system,"SF Pro Display",system-ui,sans-serif;font-weight:600;
+       font-size:15px;letter-spacing:0.62em;padding-left:0.62em;color:#9fccff;
+       transition:opacity .6s cubic-bezier(.23,1,.32,1),transform .6s cubic-bezier(.23,1,.32,1);
+       transform:translateY(10px)}
+  #ext.on{opacity:1;transform:translateY(0)}
 </style></head>
 <body>
 <canvas id="sky"></canvas>
+<div id="ext">EXTERNAL</div>
 <script>
 (function(){
-  var cv=document.getElementById('sky'),ctx=cv.getContext('2d');
+  var cv=document.getElementById('sky'),ctx=cv.getContext('2d'),ext=document.getElementById('ext');
   var DPR=Math.min(2,window.devicePixelRatio||1),W,H,CX,CY;
-  function size(){W=cv.width=innerWidth*DPR;H=cv.height=innerHeight*DPR;cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';CX=W/2;CY=H*0.46;}
+  function size(){W=cv.width=innerWidth*DPR;H=cv.height=innerHeight*DPR;cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';CX=W/2;CY=H*0.45;}
   size();addEventListener('resize',size);
 
   function samplePix(fn){var oc=document.createElement('canvas'),o=oc.getContext('2d');oc.width=W;oc.height=H;o.clearRect(0,0,W,H);fn(o);
@@ -21,49 +28,51 @@
   function sLogo(){return samplePix(function(o){var fs=Math.min(W*0.2,160*DPR);o.fillStyle='#fff';o.textAlign='center';o.textBaseline='middle';
     o.font='700 '+fs+'px -apple-system,"SF Pro Display",system-ui,sans-serif';o.fillText('NYXEL',CX,CY);});}
 
+  // Manzana mordida LIMPIA (silueta clásica con hoja, tallo y mordida)
   function sApple(){return samplePix(function(o){
-    var fs=Math.min(W,H)*0.44, s=fs*0.5;o.fillStyle='#fff';
-    function lobe(dx,dir){o.beginPath();o.moveTo(CX+dx,CY-0.35*s);
-      o.bezierCurveTo(CX+dx+dir*0.74*s,CY-0.64*s,CX+dx+dir*0.84*s,CY+0.22*s,CX+dx+dir*0.33*s,CY+0.64*s);
-      o.bezierCurveTo(CX+dx+dir*0.12*s,CY+0.8*s,CX+dx-dir*0.02*s,CY+0.8*s,CX+dx,CY+0.6*s);o.closePath();o.fill();}
-    lobe(-0.17*s,-1);lobe(0.17*s,1);
+    var R=Math.min(W,H)*0.165, cx=CX, cy=CY+R*0.16;o.fillStyle='#fff';
+    o.beginPath();
+    o.moveTo(cx,cy-0.42*R);
+    o.bezierCurveTo(cx-0.5*R,cy-0.98*R, cx-1.14*R,cy-0.5*R, cx-1.06*R,cy+0.1*R);
+    o.bezierCurveTo(cx-1.0*R,cy+0.64*R, cx-0.58*R,cy+1.02*R, cx,cy+0.92*R);
+    o.bezierCurveTo(cx+0.58*R,cy+1.02*R, cx+1.0*R,cy+0.64*R, cx+1.06*R,cy+0.1*R);
+    o.bezierCurveTo(cx+1.14*R,cy-0.5*R, cx+0.5*R,cy-0.98*R, cx,cy-0.42*R);
+    o.closePath();o.fill();
     // tallo
-    o.save();o.translate(CX+0.04*s,CY-0.58*s);o.rotate(0.12);o.fillRect(-0.03*s,-0.16*s,0.06*s,0.2*s);o.restore();
+    o.save();o.translate(cx-0.02*R,cy-0.5*R);o.rotate(0.22);o.fillRect(-0.045*R,-0.34*R,0.09*R,0.4*R);o.restore();
     // hoja
-    o.save();o.translate(CX+0.16*s,CY-0.6*s);o.rotate(-0.6);o.beginPath();o.ellipse(0,0,0.28*s,0.13*s,0,0,6.28);o.fill();o.restore();
-    // MORDIDA (lado derecho) — manzanita tipo Apple
+    o.save();o.translate(cx+0.28*R,cy-0.66*R);o.rotate(-0.5);o.beginPath();o.ellipse(0,0,0.32*R,0.15*R,0,0,6.28);o.fill();o.restore();
+    // MORDIDA derecha (tipo Apple)
     o.globalCompositeOperation='destination-out';
-    o.beginPath();o.arc(CX+0.66*s,CY+0.04*s,0.3*s,0,6.28);o.fill();
+    o.beginPath();o.arc(cx+1.0*R,cy+0.02*R,0.42*R,0,6.28);o.fill();
     o.globalCompositeOperation='source-over';
   });}
 
-  var nyx=sLogo(),apl=sApple(),N=Math.min(nyx.length,1100),P=[];
+  var nyx=sLogo(),apl=sApple(),N=Math.min(nyx.length,1150),P=[];
   function edge(){var a=Math.random()*6.283,r=Math.max(W,H)*0.65;return{x:CX+Math.cos(a)*r*(0.6+Math.random()*0.8),y:CY+Math.sin(a)*r*(0.6+Math.random()*0.8)};}
   function build(){[nyx,apl].forEach(function(A){for(var i=A.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=A[i];A[i]=A[j];A[j]=t;}});
     P=[];for(var i=0;i<N;i++){var s=edge(),a=nyx[i%nyx.length],b=apl[i%apl.length];
-      P.push({x:s.x,y:s.y,sx:s.x,sy:s.y,ax:a.x,ay:a.y,bx:b.x,by:b.y,mx:0,my:0,
-        hx:CX+(Math.random()-0.5)*W*1.4,hy:CY+(Math.random()-0.5)*H*1.4,d:Math.random()*0.25,r:(Math.random()*1.2+0.5)*DPR,tw:Math.random()*6.28});}}
+      P.push({x:s.x,y:s.y,sx:s.x,sy:s.y,ax:a.x,ay:a.y,bx:b.x,by:b.y,mx:0,my:0,d:Math.random()*0.25,r:(Math.random()*1.2+0.5)*DPR,tw:Math.random()*6.28});}}
   build();
 
   var t0=null,phase='form',fade=0,done=false;
-  var T_FORM=1.5,T_G1=0.75,H1=0.45,T_M=1.2,T_G2=0.75,H2=0.7,T_FADE=0.6;
+  var T_FORM=1.5,T_G1=0.65,HOLD1=1.1,T_M=1.15,T_G2=0.65,H2=0.75,T_FADE=0.6;
   function eo(p){return 1-Math.pow(1-p,3);}function eio(p){return p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;}
   function finish(){if(done)return;done=true;try{window.webkit.messageHandlers.intro.postMessage('done');}catch(e){}}
   addEventListener('pointerdown',finish);
 
-  function loop(ts){if(!t0)t0=ts;var el=(ts-t0)/1000;ctx.clearRect(0,0,W,H);var gx=-1,tint='160,205,255';
-    if(phase==='form'){for(var i=0;i<P.length;i++){var p=P[i];var lo=Math.min(1,Math.max(0,(el/T_FORM-p.d)/(1-p.d))),e=eo(lo);p.x=p.sx+(p.ax-p.sx)*e;p.y=p.sy+(p.ay-p.sy)*e;}if(el>=T_FORM){phase='g1';t0=ts;}}
-    else if(phase==='g1'){gx=(-0.2+1.4*eio(Math.min(1,el/T_G1)))*W;if(el>=T_G1+H1){phase='morph';t0=ts;for(var i=0;i<P.length;i++){P[i].mx=P[i].ax;P[i].my=P[i].ay;}}}
+  function loop(ts){if(!t0)t0=ts;var el=(ts-t0)/1000;ctx.clearRect(0,0,W,H);var gx=-1,tint='170,210,255';
+    if(phase==='form'){for(var i=0;i<P.length;i++){var p=P[i];var lo=Math.min(1,Math.max(0,(el/T_FORM-p.d)/(1-p.d))),e=eo(lo);p.x=p.sx+(p.ax-p.sx)*e;p.y=p.sy+(p.ay-p.sy)*e;}if(el>=T_FORM){phase='g1';t0=ts;ext.classList.add('on');}}
+    else if(phase==='g1'){gx=(-0.2+1.4*eio(Math.min(1,el/T_G1)))*W;if(el>=T_G1+HOLD1){phase='morph';t0=ts;ext.classList.remove('on');for(var i=0;i<P.length;i++){P[i].mx=P[i].ax;P[i].my=P[i].ay;}}}
     else if(phase==='morph'){var e=eio(Math.min(1,el/T_M));for(var i=0;i<P.length;i++){var p=P[i];p.x=p.mx+(p.bx-p.mx)*e;p.y=p.my+(p.by-p.my)*e;}if(el>=T_M){phase='g2';t0=ts;}}
-    else if(phase==='g2'){tint='215,230,255';gx=(-0.2+1.4*eio(Math.min(1,el/T_G2)))*W;if(el>=T_G2+H2){phase='fade';t0=ts;}}
+    else if(phase==='g2'){tint='220,235,255';gx=(-0.2+1.4*eio(Math.min(1,el/T_G2)))*W;if(el>=T_G2+H2){phase='fade';t0=ts;}}
     else if(phase==='fade'){fade=Math.min(1,el/T_FADE);if(el>=T_FADE+0.05){finish();return;}}
     var ga=phase==='fade'?(1-fade):1;
     for(var i=0;i<P.length;i++){var p=P[i];var tw=0.55+0.45*Math.sin(el*2+p.tw),a=(0.3+tw*0.5)*ga;if(gx>=0){var dd=Math.abs(p.x-gx);if(dd<72*DPR)a=Math.min(1,a+(1-dd/(72*DPR))*0.9*ga);}
       ctx.fillStyle='rgba('+tint+','+a+')';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);ctx.fill();}
     requestAnimationFrame(loop);}
   requestAnimationFrame(loop);
-  // seguro: termina a los 6s pase lo que pase
-  setTimeout(finish,6000);
+  setTimeout(finish,8000);
 })();
 </script>
 </body></html>
