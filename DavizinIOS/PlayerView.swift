@@ -533,12 +533,27 @@ final class PlayerView: UIView {
         let card = DavizinCardView()
         card.useTransparentAppearance()
         card.contentInsets = UIEdgeInsets(top: 13, left: 13, bottom: 13, right: 13)
+        let iconChip = UIView()
+        iconChip.backgroundColor = AppTheme.readableAccent.withAlphaComponent(0.14)
+        iconChip.layer.cornerRadius = 8
+        iconChip.layer.cornerCurve = .continuous
+        iconChip.layer.borderWidth = 1
+        iconChip.layer.borderColor = AppTheme.readableAccent.withAlphaComponent(0.28).cgColor
+        iconChip.translatesAutoresizingMaskIntoConstraints = false
         let icon = UIImageView(image: UIImage(systemName: symbol))
         icon.tintColor = AppTheme.readableAccent
         icon.contentMode = .scaleAspectFit
-        icon.widthAnchor.constraint(equalToConstant: 18).isActive = true
-        icon.heightAnchor.constraint(equalToConstant: 18).isActive = true
-        let heading = UIStackView(arrangedSubviews: [icon, label(title, size: 9, weight: .bold, color: AppTheme.secondaryText)])
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        iconChip.addSubview(icon)
+        NSLayoutConstraint.activate([
+            iconChip.widthAnchor.constraint(equalToConstant: 26),
+            iconChip.heightAnchor.constraint(equalToConstant: 26),
+            icon.centerXAnchor.constraint(equalTo: iconChip.centerXAnchor),
+            icon.centerYAnchor.constraint(equalTo: iconChip.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 15),
+            icon.heightAnchor.constraint(equalToConstant: 15)
+        ])
+        let heading = UIStackView(arrangedSubviews: [iconChip, label(title, size: 9, weight: .bold, color: AppTheme.secondaryText)])
         heading.axis = .horizontal
         heading.alignment = .center
         heading.spacing = 7
@@ -559,13 +574,28 @@ final class PlayerView: UIView {
         let card = DavizinCardView()
         card.useTransparentAppearance()
         card.contentInsets = UIEdgeInsets(top: 16, left: 17, bottom: 15, right: 17)
+        let iconChip = UIView()
+        iconChip.backgroundColor = AppTheme.readableAccent.withAlphaComponent(0.14)
+        iconChip.layer.cornerRadius = 10
+        iconChip.layer.cornerCurve = .continuous
+        iconChip.layer.borderWidth = 1
+        iconChip.layer.borderColor = AppTheme.readableAccent.withAlphaComponent(0.28).cgColor
+        iconChip.translatesAutoresizingMaskIntoConstraints = false
         let icon = UIImageView(image: UIImage(systemName: symbol))
         icon.tintColor = AppTheme.readableAccent
         icon.contentMode = .scaleAspectFit
-        icon.widthAnchor.constraint(equalToConstant: 25).isActive = true
-        icon.heightAnchor.constraint(equalToConstant: 25).isActive = true
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        iconChip.addSubview(icon)
+        NSLayoutConstraint.activate([
+            iconChip.widthAnchor.constraint(equalToConstant: 34),
+            iconChip.heightAnchor.constraint(equalToConstant: 34),
+            icon.centerXAnchor.constraint(equalTo: iconChip.centerXAnchor),
+            icon.centerYAnchor.constraint(equalTo: iconChip.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 20),
+            icon.heightAnchor.constraint(equalToConstant: 20)
+        ])
         let titleLabel = label(title, size: 10, weight: .heavy, color: AppTheme.readableAccent)
-        let header = UIStackView(arrangedSubviews: [icon, titleLabel, UIView()])
+        let header = UIStackView(arrangedSubviews: [iconChip, titleLabel, UIView()])
         header.axis = .horizontal
         header.alignment = .center
         header.spacing = 9
