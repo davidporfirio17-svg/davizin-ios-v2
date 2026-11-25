@@ -11,6 +11,7 @@ final class PlayerView: UIView {
     private let heroCard = UIView()
     private let bannerImageView = UIImageView()
     private let heroGradient = CAGradientLayer()
+    private var heroSheenLayer: CAGradientLayer?
     private let avatarImageView = UIImageView()
     private let heroNameLabel = UILabel()
     private let heroSubtitleLabel = UILabel()
@@ -70,6 +71,9 @@ final class PlayerView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         heroGradient.frame = heroCard.bounds
+        if let sheen = heroSheenLayer {
+            sheen.frame = CGRect(x: 0, y: 0, width: heroCard.bounds.width, height: max(0, heroCard.bounds.height * 0.42))
+        }
     }
 
     func setLookupLoading(_ loading: Bool, message: String) {
@@ -354,11 +358,11 @@ final class PlayerView: UIView {
         heroCard.layer.cornerRadius = AppTheme.cardCornerRadius
         heroCard.layer.cornerCurve = .continuous
         heroCard.layer.borderWidth = 1
-        heroCard.layer.borderColor = UIColor.white.withAlphaComponent(0.20).cgColor
+        heroCard.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
         heroCard.layer.shadowColor = AppTheme.accent.cgColor
-        heroCard.layer.shadowOpacity = 0.13
-        heroCard.layer.shadowRadius = 24
-        heroCard.layer.shadowOffset = CGSize(width: 0, height: 10)
+        heroCard.layer.shadowOpacity = 0.18
+        heroCard.layer.shadowRadius = 28
+        heroCard.layer.shadowOffset = CGSize(width: 0, height: 12)
         heroCard.clipsToBounds = true
 
         bannerImageView.translatesAutoresizingMaskIntoConstraints = false
@@ -369,6 +373,18 @@ final class PlayerView: UIView {
         bannerImageView.tintColor = AppTheme.readableAccent.withAlphaComponent(0.24)
         heroCard.addSubview(bannerImageView)
         bannerImageView.davizinPinEdges(to: heroCard)
+
+        // Brillo superior tipo glass: una capa de acento tenue en la parte alta de la tarjeta
+        let heroSheen = CAGradientLayer()
+        heroSheen.colors = [
+            AppTheme.accent.withAlphaComponent(0.22).cgColor,
+            UIColor.clear.cgColor
+        ]
+        heroSheen.locations = [0.0, 1.0]
+        heroSheen.startPoint = CGPoint(x: 0.5, y: 0.0)
+        heroSheen.endPoint = CGPoint(x: 0.5, y: 1.0)
+        heroCard.layer.addSublayer(heroSheen)
+        self.heroSheenLayer = heroSheen
 
         heroGradient.colors = [
             UIColor.black.withAlphaComponent(0.18).cgColor,
