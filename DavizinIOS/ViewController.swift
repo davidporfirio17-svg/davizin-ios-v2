@@ -9,10 +9,10 @@ private final class GradientScrimView: UIView {
         isUserInteractionEnabled = false
         let g = layer as! CAGradientLayer
         g.colors = [
-            UIColor.black.withAlphaComponent(0.60).cgColor,
-            UIColor.black.withAlphaComponent(0.30).cgColor,
-            UIColor.black.withAlphaComponent(0.26).cgColor,
-            UIColor.black.withAlphaComponent(0.64).cgColor
+            UIColor.black.withAlphaComponent(0.78).cgColor,
+            UIColor.black.withAlphaComponent(0.70).cgColor,
+            UIColor.black.withAlphaComponent(0.70).cgColor,
+            UIColor.black.withAlphaComponent(0.84).cgColor
         ]
         g.locations = [0.0, 0.26, 0.64, 1.0]
         g.startPoint = CGPoint(x: 0.5, y: 0.0)

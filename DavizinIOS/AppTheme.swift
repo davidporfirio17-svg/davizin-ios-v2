@@ -34,7 +34,7 @@ enum AppTheme {
         UIColor { traits in
             guard traits.userInterfaceStyle == .light else { return NyxelAppearanceStore.accent }
             switch NyxelAppearanceStore.theme {
-            case .cyan: return UIColor(red: 0.00, green: 0.40, blue: 0.31, alpha: 1.0)
+            case .cyan: return UIColor(red: 0.09, green: 0.42, blue: 0.80, alpha: 1.0)
             case .ember: return UIColor(red: 0.60, green: 0.19, blue: 0.04, alpha: 1.0)
             case .violet: return UIColor(red: 0.35, green: 0.18, blue: 0.63, alpha: 1.0)
             }

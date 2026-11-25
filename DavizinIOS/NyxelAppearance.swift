@@ -16,7 +16,7 @@ enum NyxelAppearanceStore {
     }
     static var accent: UIColor {
         switch theme {
-        case .cyan: return UIColor(red: 0.0, green: 1.0, blue: 0.761, alpha: 1)
+        case .cyan: return UIColor(red: 0.30, green: 0.66, blue: 1.0, alpha: 1)
         case .ember: return UIColor(red: 1.0, green: 0.42, blue: 0.16, alpha: 1)
         case .violet: return UIColor(red: 0.68, green: 0.42, blue: 1.0, alpha: 1)
         }
