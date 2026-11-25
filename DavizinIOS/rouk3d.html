@@ -58,6 +58,23 @@
   @keyframes cardflash{0%{box-shadow:0 0 0 2px var(--mark),0 0 46px -4px var(--mark-glow),inset 0 1px 0 rgba(255,255,255,.22)}100%{}}
   .hold.hint{animation:hintpulse 1.3s ease-in-out 2}
   @keyframes hintpulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 1px var(--accent),0 0 28px -6px var(--glow)}}
+  #moon{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);width:76%;aspect-ratio:1;border-radius:50%;z-index:0;pointer-events:none;
+    background:radial-gradient(circle, rgba(120,170,255,.17), rgba(80,120,255,.05) 46%, transparent 64%)}
+  #moon::after{content:"";position:absolute;inset:4%;border-radius:50%;border:1px solid rgba(150,190,255,.14)}
+  #lines{position:absolute;inset:0;z-index:4;pointer-events:none;overflow:visible}
+  #lines line{stroke:rgba(150,205,255,.55);stroke-width:1.4;filter:drop-shadow(0 0 4px rgba(80,160,255,.6))}
+  #lines circle{fill:rgba(150,205,255,.9)}
+  #callouts{position:absolute;inset:0;z-index:5;pointer-events:none}
+  .callout{position:absolute;pointer-events:auto;transition:opacity .2s}
+  .cpill{display:inline-flex;align-items:center;gap:8px;font:inherit;font-weight:800;font-size:.72rem;letter-spacing:.07em;color:var(--ink);
+    background:rgba(10,16,32,.58);border:1px solid rgba(120,180,255,.34);border-radius:999px;padding:8px 13px;cursor:pointer;white-space:nowrap;
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 8px 22px -12px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.14)}
+  .cpill:active{transform:scale(.96)}
+  .cpill .cdot{width:17px;height:17px;border-radius:6px;background:rgba(120,180,255,.2);display:grid;place-items:center;font-size:.62rem;color:var(--accent);font-weight:900}
+  .cpill .cv{opacity:.55}
+  .callout.on .cpill{border-color:var(--mark);box-shadow:0 0 0 1px var(--mark),0 10px 24px -10px var(--mark-glow)}
+  .callout.on .cpill .cdot{background:rgba(255,42,58,.18);color:var(--mark)}
+  .callout.on .cpill .cv{opacity:1;color:var(--mark)}
   #loader{position:absolute;inset:0;z-index:5;display:grid;place-items:center;color:var(--ink-3);font-size:.8rem;letter-spacing:.1em;background:#010209}
   #loader.hide{opacity:0;pointer-events:none;transition:opacity .5s}
   .spin{width:30px;height:30px;border:3px solid rgba(80,150,255,.25);border-top-color:var(--accent);border-radius:50%;animation:r 1s linear infinite;margin:0 auto .7rem}
@@ -117,13 +134,15 @@
   </div>
 
   <div class="viewer">
+    <div id="moon"></div>
     <div class="badge tl"><span class="dot"></span>3D <b>LIVE</b></div>
     <div class="badge tr">CHARACTER</div>
     <div id="stage"></div>
+    <svg id="lines"></svg>
+    <div id="callouts"></div>
     <div class="zone" id="zone">VIEW CHARACTER OPTIONS • 3D</div>
     <button class="cube" id="cube" title="Reencuadrar">▣</button>
     <div class="scan"></div>
-    <div id="reticle"><div class="ret-ring"></div><div class="ret-x"></div></div>
     <div id="loader"><div><div class="spin"></div>Cargando modelo…</div></div>
   </div>
 
@@ -237,28 +256,62 @@
   addEventListener('resize',resize);
   resize(); [60,250,600,1200].forEach(function(ms){setTimeout(resize,ms);});
 
-  var pulse=0, reticle=document.getElementById('reticle'), _pv=new THREE.Vector3();
+  var pulse=0, _pv=new THREE.Vector3();
   (function loop(){requestAnimationFrame(loop);
     if(document.hidden)return; // ahorra batería cuando la pantalla no se ve
     pulse+=0.08; var sc=1+Math.sin(pulse)*0.12;
     if(activeMarker) activeMarker.scale.setScalar(sc);
     controls.update(); renderer.render(scene,camera);
-    // retícula 2D que sigue la zona de mira proyectada a la pantalla
-    if(activeMarker && activeMarker.visible){
-      activeMarker.getWorldPosition(_pv); _pv.project(camera);
-      if(_pv.z<1){
-        var x=(_pv.x*0.5+0.5)*stage.clientWidth, y=(-_pv.y*0.5+0.5)*stage.clientHeight;
-        reticle.style.transform='translate('+x+'px,'+y+'px)'; reticle.style.opacity='1';
-      } else reticle.style.opacity='0';
-    } else reticle.style.opacity='0';
+    updateCallouts();
   })();
+  // Etiquetas de zona: línea que apunta al punto del cuerpo + resalta la seleccionada
+  function updateCallouts(){
+    if(!root) return;
+    var sr=stage.getBoundingClientRect();
+    var selZone=(selectedIdx>=0 && currentItems[selectedIdx]) ? currentItems[selectedIdx].zone : null;
+    for(var z in zonePills){
+      var zp=zonePills[z], m=markers[z];
+      if(!m){ zp.el.style.opacity='0'; zp.line.style.opacity='0'; zp.dot.style.opacity='0'; continue; }
+      m.getWorldPosition(_pv); _pv.project(camera);
+      if(_pv.z>=1){ zp.el.style.opacity='0'; zp.line.style.opacity='0'; zp.dot.style.opacity='0'; continue; }
+      var px=(_pv.x*0.5+0.5)*sr.width, py=(-_pv.y*0.5+0.5)*sr.height;
+      var pr=zp.el.getBoundingClientRect();
+      var ax=(zp.side==='left'?pr.right:pr.left)-sr.left, ay=pr.top+pr.height/2-sr.top;
+      zp.line.setAttribute('x1',ax); zp.line.setAttribute('y1',ay); zp.line.setAttribute('x2',px); zp.line.setAttribute('y2',py);
+      zp.dot.setAttribute('cx',px); zp.dot.setAttribute('cy',py);
+      zp.el.style.opacity='1'; zp.line.style.opacity='1'; zp.dot.style.opacity='1';
+      zp.el.classList.toggle('on', z===selZone);
+    }
+  }
 
   // UI opciones
   var list=document.getElementById('list'), zoneLbl=document.getElementById('zone');
+  var linesSvg=document.getElementById('lines'), calloutsEl=document.getElementById('callouts'), zonePills={};
   var rows=[], currentItems=[], selectedIdx=-1;
   function esc(t){return String(t==null?'':t).replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];});}
   function iconFor(z){return z==='cuello'?'◈':z==='pecho'?'✦':z==='head'?'⬡':z==='drag'?'◆':'❖';}
   function nhaptic(s){try{var h=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nyxel;if(h)h.postMessage({t:'haptic',s:s});}catch(e){}}
+
+  // Posición fija de cada etiqueta de zona (fracción de alto); la línea apunta al cuerpo
+  var ANCHORS={ drag:{side:'right',top:0.17,label:ZLABEL.drag}, head:{side:'left',top:0.20,label:ZLABEL.head}, cuello:{side:'right',top:0.37,label:ZLABEL.cuello}, pecho:{side:'left',top:0.58,label:ZLABEL.pecho} };
+  var ORDER=['drag','head','cuello','pecho'];
+  function buildCallouts(items){
+    calloutsEl.innerHTML=''; linesSvg.innerHTML=''; zonePills={};
+    ORDER.forEach(function(z){
+      var idx=-1; for(var i=0;i<items.length;i++){ if(items[i].zone===z){ idx=i; break; } }
+      if(idx<0) return;
+      var a=ANCHORS[z];
+      var co=document.createElement('div'); co.className='callout'; co.style.top=(a.top*100)+'%';
+      if(a.side==='left'){ co.style.left='14px'; } else { co.style.right='14px'; }
+      co.innerHTML='<button class="cpill"><span class="cdot">⌖</span>'+esc(a.label)+' <span class="cv">›</span></button>';
+      co.querySelector('.cpill').onclick=(function(i){return function(){ selectOpt(i); };})(idx);
+      calloutsEl.appendChild(co);
+      var ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+      var ci=document.createElementNS('http://www.w3.org/2000/svg','circle'); ci.setAttribute('r','3');
+      linesSvg.appendChild(ln); linesSvg.appendChild(ci);
+      zonePills[z]={el:co,line:ln,dot:ci,side:a.side};
+    });
+  }
 
   function selectOpt(idx){
     selectedIdx=idx;
@@ -275,7 +328,7 @@
   }
   function renderOptions(items){
     currentItems=items; rows=[]; list.innerHTML='';
-    if(!items.length){ list.innerHTML='<div class="frow" style="justify-content:center;color:var(--ink-3)">Sin modos disponibles</div>'; document.getElementById('count').textContent='0 disponibles'; document.getElementById('activate').hidden=true; return; }
+    if(!items.length){ list.innerHTML='<div class="frow" style="justify-content:center;color:var(--ink-3)">Sin modos disponibles</div>'; document.getElementById('count').textContent='0 disponibles'; document.getElementById('activate').hidden=true; buildCallouts([]); return; }
     items.forEach(function(o,idx){
       var row=document.createElement('div'); row.className='frow';
       row.innerHTML='<div class="ic">'+iconFor(o.zone)+'</div><div class="fl"><b>'+esc(o.name)+'</b><small>'+esc(o.sub||'')+'</small></div><span class="tagdot"></span>';
@@ -283,6 +336,7 @@
       list.appendChild(row); rows.push(row);
     });
     document.getElementById('count').textContent=items.length+' disponibles';
+    buildCallouts(items);
     selectedIdx=-1; document.getElementById('activate').hidden=true;
   }
   // La app inyecta los modos REALES por aqui:
