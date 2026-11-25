@@ -481,7 +481,37 @@ final class PlayerView: UIView {
         ])
     }
 
+    private func makeScreenTitle() -> UIView {
+        let eyebrow = UILabel()
+        eyebrow.text = "PERFIL DE JUGADOR"
+        eyebrow.font = .systemFont(ofSize: 11, weight: .bold)
+        eyebrow.textColor = AppTheme.readableAccent
+        applyTitleTracking(eyebrow, value: 1.4)
+
+        let big = UILabel()
+        big.text = "Jugador"
+        big.font = .systemFont(ofSize: isPad ? 40 : 34, weight: .heavy)
+        big.textColor = AppTheme.primaryText
+        applyTitleTracking(big, value: -0.6)
+
+        let subtitle = UILabel()
+        subtitle.text = "Estadísticas en vivo de tu cuenta."
+        subtitle.font = .systemFont(ofSize: 13, weight: .medium)
+        subtitle.textColor = AppTheme.secondaryText
+        subtitle.numberOfLines = 0
+
+        let stack = UIStackView(arrangedSubviews: [eyebrow, big, subtitle])
+        stack.axis = .vertical
+        stack.alignment = .leading
+        stack.spacing = 3
+        stack.setCustomSpacing(6, after: big)
+        stack.isLayoutMarginsRelativeArrangement = true
+        stack.layoutMargins = UIEdgeInsets(top: 4, left: 2, bottom: 6, right: 2)
+        return stack
+    }
+
     private func buildContent() {
+        contentStack.addArrangedSubview(makeScreenTitle())
         let topRow = row([queryCard, heroCard], axis: isPad ? .horizontal : .vertical)
         if isPad {
             queryCard.widthAnchor.constraint(equalTo: heroCard.widthAnchor).isActive = true
@@ -582,15 +612,17 @@ final class PlayerView: UIView {
         heading.alignment = .center
         heading.spacing = 7
         value.text = "—"
-        value.font = AppTheme.monoFont(isPad ? 19 : 16)
+        value.font = .systemFont(ofSize: isPad ? 34 : 29, weight: .heavy)
         value.textColor = AppTheme.primaryText
         value.adjustsFontSizeToFitWidth = true
-        value.minimumScaleFactor = 0.72
+        value.minimumScaleFactor = 0.6
+        value.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let stack = UIStackView(arrangedSubviews: [heading, value])
         stack.axis = .vertical
-        stack.spacing = 9
+        stack.alignment = .leading
+        stack.spacing = 10
         card.addContent(stack)
-        card.heightAnchor.constraint(equalToConstant: isPad ? 82 : 76).isActive = true
+        card.heightAnchor.constraint(equalToConstant: isPad ? 112 : 104).isActive = true
         return card
     }
 
