@@ -26,27 +26,29 @@
   function sLogo(){return samplePix(function(o){var fs=Math.min(W*0.2,160*DPR);o.fillStyle='#fff';o.textAlign='center';o.textBaseline='middle';
     o.font='700 '+fs+'px -apple-system,"SF Pro Display",system-ui,sans-serif';o.fillText('NYXEL',CX,CY);});}
 
-  // Traza el cuerpo de la manzana (para rellenar / recortar)
-  function applePath(c){var R=AR,cx=CX,cy=CY+R*0.16;
-    c.beginPath();c.moveTo(cx,cy-0.42*R);
-    c.bezierCurveTo(cx-0.5*R,cy-0.98*R,cx-1.14*R,cy-0.5*R,cx-1.06*R,cy+0.1*R);
-    c.bezierCurveTo(cx-1.0*R,cy+0.64*R,cx-0.58*R,cy+1.02*R,cx,cy+0.92*R);
-    c.bezierCurveTo(cx+0.58*R,cy+1.02*R,cx+1.0*R,cy+0.64*R,cx+1.06*R,cy+0.1*R);
-    c.bezierCurveTo(cx+1.14*R,cy-0.5*R,cx+0.5*R,cy-0.98*R,cx,cy-0.42*R);c.closePath();}
-  function sApple(){return samplePix(function(o){var R=AR,cx=CX,cy=CY+R*0.16;o.fillStyle='#fff';
-    applePath(o);o.fill();
-    o.save();o.translate(cx-0.02*R,cy-0.5*R);o.rotate(0.22);o.fillRect(-0.045*R,-0.34*R,0.09*R,0.4*R);o.restore();
-    o.save();o.translate(cx+0.28*R,cy-0.66*R);o.rotate(-0.5);o.beginPath();o.ellipse(0,0,0.32*R,0.15*R,0,0,6.28);o.fill();o.restore();
-    o.globalCompositeOperation='destination-out';o.beginPath();o.arc(cx+1.17*R,cy-0.02*R,0.46*R,0,6.28);o.fill();o.globalCompositeOperation='source-over';});}
+  // Cuerpo de la manzana — silueta tipo logo de Apple (hoyuelos arriba y abajo)
+  function applePath(c){var R=AR,cx=CX,cy=CY+R*0.14;
+    c.beginPath();c.moveTo(cx+0.05*R,cy-0.55*R);
+    c.bezierCurveTo(cx+0.55*R,cy-0.74*R, cx+1.02*R,cy-0.46*R, cx+1.02*R,cy+0.06*R);
+    c.bezierCurveTo(cx+1.02*R,cy+0.58*R, cx+0.62*R,cy+1.0*R, cx+0.12*R,cy+0.9*R);
+    c.bezierCurveTo(cx+0.04*R,cy+0.88*R, cx-0.04*R,cy+0.88*R, cx-0.12*R,cy+0.9*R);
+    c.bezierCurveTo(cx-0.62*R,cy+1.0*R, cx-1.02*R,cy+0.58*R, cx-1.02*R,cy+0.06*R);
+    c.bezierCurveTo(cx-1.02*R,cy-0.46*R, cx-0.55*R,cy-0.74*R, cx-0.05*R,cy-0.55*R);
+    c.bezierCurveTo(cx-0.02*R,cy-0.57*R, cx+0.02*R,cy-0.57*R, cx+0.05*R,cy-0.55*R);c.closePath();}
+  // Hoja de gota inclinada (sin tallo), como el logo de Apple
+  function appleLeaf(c){var R=AR,cx=CX,cy=CY+R*0.14;
+    c.save();c.translate(cx+0.12*R,cy-0.72*R);c.rotate(-0.74);
+    c.beginPath();c.moveTo(0,-0.3*R);
+    c.quadraticCurveTo(0.24*R,-0.08*R, 0,0.3*R);
+    c.quadraticCurveTo(-0.24*R,-0.08*R, 0,-0.3*R);
+    c.closePath();c.fill();c.restore();}
+  function appleBite(c){var R=AR,cx=CX,cy=CY+R*0.14;c.globalCompositeOperation='destination-out';c.beginPath();c.arc(cx+1.12*R,cy-0.02*R,0.46*R,0,6.28);c.fill();c.globalCompositeOperation='source-over';}
+  function sApple(){return samplePix(function(o){o.fillStyle='#fff';applePath(o);o.fill();appleLeaf(o);appleBite(o);});}
 
   // Lienzo con la manzana YA mordida (blanca), para que el glow siga la silueta.
   var appleCv=null;
-  function makeAppleCanvas(){var R=AR,cx=CX,cy=CY+R*0.16;var c=document.createElement('canvas');c.width=W;c.height=H;var o=c.getContext('2d');
-    o.fillStyle='#eff6ff';applePath(o);o.fill();
-    o.save();o.translate(cx-0.02*R,cy-0.5*R);o.rotate(0.22);o.fillRect(-0.045*R,-0.34*R,0.09*R,0.4*R);o.restore();
-    o.save();o.translate(cx+0.28*R,cy-0.66*R);o.rotate(-0.5);o.beginPath();o.ellipse(0,0,0.32*R,0.15*R,0,0,6.28);o.fill();o.restore();
-    o.globalCompositeOperation='destination-out';o.beginPath();o.arc(cx+1.17*R,cy-0.02*R,0.46*R,0,6.28);o.fill();
-    appleCv=c;}
+  function makeAppleCanvas(){var c=document.createElement('canvas');c.width=W;c.height=H;var o=c.getContext('2d');
+    o.fillStyle='#eff6ff';applePath(o);o.fill();appleLeaf(o);appleBite(o);appleCv=c;}
 
   // Manzana SÓLIDA brillante con glow + barrido de luz (como el logo de Apple)
   function drawSolidApple(a,sweep){var R=AR,cx=CX,cy=CY+R*0.16;if(!appleCv)makeAppleCanvas();
