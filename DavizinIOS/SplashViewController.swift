@@ -1,9 +1,21 @@
 import UIKit
 import AVFoundation
+import WebKit
+
+// Envoltura débil para el handler de mensajes de la intro (evita ciclo de retención).
+private final class SplashWeakScriptHandler: NSObject, WKScriptMessageHandler {
+    weak var target: WKScriptMessageHandler?
+    init(_ t: WKScriptMessageHandler) { target = t }
+    func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
+        target?.userContentController(u, didReceive: m)
+    }
+}
 
 // MARK: - SplashViewController — bienvenida audiovisual de Nyxel External.
-final class SplashViewController: UIViewController {
+final class SplashViewController: UIViewController, WKScriptMessageHandler {
     var onFinished: (() -> Void)?
+    private var introWebView: WKWebView?
+    private var introActive = false
 
     private let portraitView = UIImageView()
     private let wordLabel = UILabel()
@@ -24,7 +36,44 @@ final class SplashViewController: UIViewController {
         view.isAccessibilityElement = true
         view.accessibilityLabel = "Bienvenido a Nyxel External. Iniciando la aplicación."
         configureFallbackBranding()
-        installWelcomeVideo()
+        if !installParticleIntro() {
+            installWelcomeVideo()
+        }
+    }
+
+    /// Intro de partículas (NYXEL → manzanita mordida) en un WKWebView.
+    /// Devuelve false si no se puede montar (entonces se usa el video/estático).
+    private func installParticleIntro() -> Bool {
+        guard NyxelAppearanceStore.animationsEnabled,
+              let url = Bundle.main.url(forResource: "nyxel_intro", withExtension: "html") else { return false }
+        let cfg = WKWebViewConfiguration()
+        let ucc = WKUserContentController()
+        ucc.add(SplashWeakScriptHandler(self), name: "intro")
+        cfg.userContentController = ucc
+        let wv = WKWebView(frame: view.bounds, configuration: cfg)
+        wv.isOpaque = false
+        wv.backgroundColor = UIColor(red: 0.019, green: 0.023, blue: 0.051, alpha: 1)
+        wv.scrollView.isScrollEnabled = false
+        wv.scrollView.bounces = false
+        wv.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(wv)
+        NSLayoutConstraint.activate([
+            wv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            wv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            wv.topAnchor.constraint(equalTo: view.topAnchor),
+            wv.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        wv.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        introWebView = wv
+        introActive = true
+        portraitView.isHidden = true
+        wordLabel.isHidden = true
+        captionLabel.isHidden = true
+        // Seguro: si el webview nunca avisa, termina solo.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 7.0) { [weak self] in
+            self?.finishSplash()
+        }
+        return true
     }
 
     override func viewDidLayoutSubviews() {
@@ -36,9 +85,15 @@ final class SplashViewController: UIViewController {
         super.viewDidAppear(animated)
         if videoIsActive {
             player?.play()
+        } else if introActive {
+            // La intro de partículas se controla sola (avisa por 'intro' o por el seguro).
         } else if !didFinish {
             animateFallbackSplash()
         }
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "intro" { finishSplash() }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
