@@ -26,29 +26,17 @@
   function sLogo(){return samplePix(function(o){var fs=Math.min(W*0.2,160*DPR);o.fillStyle='#fff';o.textAlign='center';o.textBaseline='middle';
     o.font='700 '+fs+'px -apple-system,"SF Pro Display",system-ui,sans-serif';o.fillText('NYXEL',CX,CY);});}
 
-  // Cuerpo de la manzana — silueta tipo logo de Apple (hoyuelos arriba y abajo)
-  function applePath(c){var R=AR,cx=CX,cy=CY+R*0.1;
-    c.beginPath();c.moveTo(cx+0.04*R,cy-0.64*R);
-    c.bezierCurveTo(cx+0.42*R,cy-0.86*R, cx+0.8*R,cy-0.52*R, cx+0.8*R,cy+0.14*R);
-    c.bezierCurveTo(cx+0.8*R,cy+0.72*R, cx+0.5*R,cy+1.08*R, cx+0.1*R,cy+0.98*R);
-    c.bezierCurveTo(cx+0.035*R,cy+0.96*R, cx-0.035*R,cy+0.96*R, cx-0.1*R,cy+0.98*R);
-    c.bezierCurveTo(cx-0.5*R,cy+1.08*R, cx-0.8*R,cy+0.72*R, cx-0.8*R,cy+0.14*R);
-    c.bezierCurveTo(cx-0.8*R,cy-0.52*R, cx-0.42*R,cy-0.86*R, cx-0.04*R,cy-0.64*R);
-    c.bezierCurveTo(cx-0.02*R,cy-0.66*R, cx+0.02*R,cy-0.66*R, cx+0.04*R,cy-0.64*R);c.closePath();}
-  // Hoja de gota inclinada (sin tallo), como el logo de Apple
-  function appleLeaf(c){var R=AR,cx=CX,cy=CY+R*0.1;
-    c.save();c.translate(cx+0.1*R,cy-0.82*R);c.rotate(-0.72);
-    c.beginPath();c.moveTo(0,-0.32*R);
-    c.quadraticCurveTo(0.22*R,-0.08*R, 0,0.32*R);
-    c.quadraticCurveTo(-0.22*R,-0.08*R, 0,-0.32*R);
-    c.closePath();c.fill();c.restore();}
-  function appleBite(c){var R=AR,cx=CX,cy=CY+R*0.1;c.globalCompositeOperation='destination-out';c.beginPath();c.arc(cx+0.9*R,cy+0.0*R,0.4*R,0,6.28);c.fill();c.globalCompositeOperation='source-over';}
-  function sApple(){return samplePix(function(o){o.fillStyle='#fff';applePath(o);o.fill();appleLeaf(o);appleBite(o);});}
+  // Emblema propio de NYXEL: placa redondeada con la "N" calada.
+  function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+  function emblemFill(o,fill){var size=Math.min(W,H)*0.4,r=size*0.27,x=CX-size/2,y=CY-size/2;
+    o.fillStyle=fill;roundRect(o,x,y,size,size,r);o.fill();
+    o.save();o.globalCompositeOperation='destination-out';o.textAlign='center';o.textBaseline='middle';
+    o.font='800 '+(size*0.64)+'px -apple-system,"SF Pro Display",system-ui,sans-serif';o.fillText('N',CX,CY+size*0.02);o.restore();}
+  function sApple(){return samplePix(function(o){emblemFill(o,'#fff');});}
 
-  // Lienzo con la manzana YA mordida (blanca), para que el glow siga la silueta.
+  // Lienzo con el emblema (blanco) para que el glow siga su silueta.
   var appleCv=null;
-  function makeAppleCanvas(){var c=document.createElement('canvas');c.width=W;c.height=H;var o=c.getContext('2d');
-    o.fillStyle='#eff6ff';applePath(o);o.fill();appleLeaf(o);appleBite(o);appleCv=c;}
+  function makeAppleCanvas(){var c=document.createElement('canvas');c.width=W;c.height=H;var o=c.getContext('2d');emblemFill(o,'#eff6ff');appleCv=c;}
 
   // Manzana SÓLIDA brillante con glow + barrido de luz (como el logo de Apple)
   function drawSolidApple(a,sweep){var R=AR,cx=CX,cy=CY+R*0.16;if(!appleCv)makeAppleCanvas();
