@@ -212,6 +212,7 @@ final class ProfileView: UIView {
         nameLabel.text = "NYXEL EXTERNAL"
         nameLabel.font = AppTheme.titleFont(22)
         nameLabel.textColor = AppTheme.primaryText
+        applyTitleTracking(nameLabel, value: AppTheme.titleTracking)
         rankLabel.font = .systemFont(ofSize: 10, weight: .semibold)
         rankLabel.translatesAutoresizingMaskIntoConstraints = false
         rankBadge.layer.cornerRadius = 100

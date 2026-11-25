@@ -360,10 +360,10 @@ final class PlayerView: UIView {
         heroCard.layer.cornerCurve = .continuous
         heroCard.layer.borderWidth = 1
         heroCard.layer.borderColor = UIColor.white.withAlphaComponent(0.16).cgColor
-        heroCard.layer.shadowColor = AppTheme.accent.cgColor
-        heroCard.layer.shadowOpacity = 0.18
-        heroCard.layer.shadowRadius = 28
-        heroCard.layer.shadowOffset = CGSize(width: 0, height: 12)
+        heroCard.layer.shadowColor = UIColor.black.cgColor
+        heroCard.layer.shadowOpacity = 0.30
+        heroCard.layer.shadowRadius = 26
+        heroCard.layer.shadowOffset = CGSize(width: 0, height: 14)
         heroCard.clipsToBounds = true
 
         bannerImageView.translatesAutoresizingMaskIntoConstraints = false
@@ -378,10 +378,11 @@ final class PlayerView: UIView {
         // Brillo superior tipo glass: una capa de acento tenue en la parte alta de la tarjeta
         let heroSheen = CAGradientLayer()
         heroSheen.colors = [
-            AppTheme.accent.withAlphaComponent(0.22).cgColor,
+            UIColor.white.withAlphaComponent(0.10).cgColor,
+            AppTheme.accent.withAlphaComponent(0.08).cgColor,
             UIColor.clear.cgColor
         ]
-        heroSheen.locations = [0.0, 1.0]
+        heroSheen.locations = [0.0, 0.5, 1.0]
         heroSheen.startPoint = CGPoint(x: 0.5, y: 0.0)
         heroSheen.endPoint = CGPoint(x: 0.5, y: 1.0)
         heroCard.layer.addSublayer(heroSheen)

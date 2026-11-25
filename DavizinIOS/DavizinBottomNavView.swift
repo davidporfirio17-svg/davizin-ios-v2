@@ -133,11 +133,11 @@ final class DavizinBottomNavView: UIView {
 
     private func makeItem(button: UIButton, label: UILabel, indicator: UIView) -> UIView {
         // indicator = pill de acento relleno detrás del icono+texto cuando está activo
-        indicator.backgroundColor = AppTheme.readableAccent.withAlphaComponent(0.18)
+        indicator.backgroundColor = AppTheme.readableAccent.withAlphaComponent(0.15)
         indicator.layer.cornerRadius = 16
         indicator.layer.cornerCurve = .continuous
         indicator.layer.borderWidth = 1
-        indicator.layer.borderColor = AppTheme.readableAccent.withAlphaComponent(0.45).cgColor
+        indicator.layer.borderColor = AppTheme.readableAccent.withAlphaComponent(0.32).cgColor
         indicator.alpha = 0.0
         indicator.isUserInteractionEnabled = false
         indicator.translatesAutoresizingMaskIntoConstraints = false

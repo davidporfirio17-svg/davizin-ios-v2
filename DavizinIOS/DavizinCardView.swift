@@ -46,16 +46,16 @@ final class DavizinCardView: UIView {
     func useTransparentAppearance() {
         // Un velo oscuro tenue + un poco mas de blur: mantiene el look glass pero
         // evita que el fondo de marca se transparente sobre el texto.
-        backgroundColor = AppTheme.background.withAlphaComponent(0.34)
-        blurView.alpha = 0.26
-        layer.borderColor = UIColor.white.withAlphaComponent(0.22).cgColor
-        layer.shadowColor = AppTheme.accent.cgColor
-        layer.shadowOpacity = 0.12
-        layer.shadowRadius = 32.0
+        backgroundColor = AppTheme.background.withAlphaComponent(0.38)
+        blurView.alpha = 0.24
+        layer.borderColor = UIColor.white.withAlphaComponent(0.13).cgColor
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.26
+        layer.shadowRadius = 30.0
         layer.shadowOffset = CGSize(width: 0.0, height: 14.0)
         glassHighlight.colors = [
-            UIColor.white.withAlphaComponent(0.11).cgColor,
-            UIColor.white.withAlphaComponent(0.022).cgColor,
+            UIColor.white.withAlphaComponent(0.085).cgColor,
+            UIColor.white.withAlphaComponent(0.018).cgColor,
             UIColor.clear.cgColor
         ]
         glassHighlight.locations = [0.0, 0.14, 0.46]

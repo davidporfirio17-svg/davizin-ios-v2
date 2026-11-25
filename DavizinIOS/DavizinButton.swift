@@ -164,7 +164,7 @@ final class DavizinButton: UIButton {
         layer.borderWidth = selectedVisual || style != .secondary ? 1.0 : 0.0
         layer.borderColor = borderColor.withAlphaComponent(visualAlpha).cgColor
         layer.shadowColor = selectedVisual || style == .primary ? AppTheme.readableAccent.cgColor : UIColor.clear.cgColor
-        layer.shadowOpacity = selectedVisual || style == .primary ? 0.28 : 0.0
+        layer.shadowOpacity = selectedVisual || style == .primary ? 0.20 : 0.0
         layer.shadowRadius = usesLoginEmphasis ? 18.0 : 14.0
         layer.shadowOffset = CGSize(width: 0, height: usesLoginEmphasis ? 7.0 : 6.0)
         spinner.color = titleColor
