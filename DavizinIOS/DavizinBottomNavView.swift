@@ -132,17 +132,37 @@ final class DavizinBottomNavView: UIView {
     }
 
     private func makeItem(button: UIButton, label: UILabel, indicator: UIView) -> UIView {
-        indicator.backgroundColor = AppTheme.readableAccent
-        indicator.layer.cornerRadius = 1.5
+        // indicator = pill de acento relleno detrás del icono+texto cuando está activo
+        indicator.backgroundColor = AppTheme.readableAccent.withAlphaComponent(0.18)
+        indicator.layer.cornerRadius = 16
+        indicator.layer.cornerCurve = .continuous
+        indicator.layer.borderWidth = 1
+        indicator.layer.borderColor = AppTheme.readableAccent.withAlphaComponent(0.45).cgColor
         indicator.alpha = 0.0
+        indicator.isUserInteractionEnabled = false
         indicator.translatesAutoresizingMaskIntoConstraints = false
-        indicator.widthAnchor.constraint(equalToConstant: 26).isActive = true
-        indicator.heightAnchor.constraint(equalToConstant: 2).isActive = true
-        let stack = UIStackView(arrangedSubviews: [button, label, indicator])
-        stack.axis = .vertical
-        stack.alignment = .center
-        stack.spacing = 2
-        return stack
+
+        let content = UIStackView(arrangedSubviews: [button, label])
+        content.axis = .vertical
+        content.alignment = .center
+        content.spacing = 2
+        content.translatesAutoresizingMaskIntoConstraints = false
+
+        let container = UIView()
+        container.addSubview(indicator)
+        container.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+            content.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -6),
+            content.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            content.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: 4),
+            content.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -4),
+            indicator.topAnchor.constraint(equalTo: content.topAnchor, constant: -5),
+            indicator.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: 5),
+            indicator.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: -16),
+            indicator.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: 16)
+        ])
+        return container
     }
 
     @objc private func modesTapped() { onModes?() }
