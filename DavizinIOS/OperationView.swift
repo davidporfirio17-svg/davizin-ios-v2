@@ -24,6 +24,7 @@ final class OperationView: UIView {
 
     // Estado 2 (despues de inyectar con exito): solo estos dos son visibles.
     private let cleanButton = DavizinButton(title: "LIMPIAR SESIÓN", style: .destructive)
+    private var lastWasClean = false
     private let openGameButton = DavizinButton(title: "ABRIR JUEGO")
     var onOpenGame: (() -> Void)?
 
@@ -161,6 +162,10 @@ final class OperationView: UIView {
                 showPostInjectButtons(animated: true)
             } else {
                 // Exito de "Ejecutar" o "Limpiar" -> se queda/regresa al estado pre-inyeccion.
+                if lastWasClean {
+                    SoundService.shared.playDeactivationVoice()
+                    lastWasClean = false
+                }
                 showPreInjectButtons(animated: true)
             }
         case .failed(let message):
@@ -549,14 +554,17 @@ final class OperationView: UIView {
         } completion: { _ in
             self.holdRingLayer.strokeEnd = 0
         }
+        lastWasClean = false
         delegate?.operationView(self, didTap: .inject)
     }
 
     @objc private func runTapped() {
+        lastWasClean = false
         delegate?.operationView(self, didTap: .runExploit)
     }
 
     @objc private func cleanTapped() {
+        lastWasClean = true
         delegate?.operationView(self, didTap: .clean)
     }
 

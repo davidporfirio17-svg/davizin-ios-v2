@@ -25,6 +25,7 @@ final class SoundService {
     private let engine = AVAudioEngine()
     private let mixer: AVAudioMixerNode
     private var activationPlayer: AVAudioPlayer?
+    private var deactivationPlayer: AVAudioPlayer?
     private var holdPlayer: AVAudioSourceNode?
     private var holdFrequency: Double = 220
     private var holdPhase: Double = 0
@@ -102,6 +103,21 @@ final class SoundService {
             activationPlayer?.play()
         } catch {
             activationPlayer = nil
+        }
+    }
+
+    /// Voz de confirmación que se reproduce cuando se limpia/desactiva la sesión.
+    func playDeactivationVoice() {
+        guard isEnabled, activationVoiceEnabled,
+              let url = Bundle.main.url(forResource: "opcion_desactivada", withExtension: "m4a") else { return }
+        do {
+            deactivationPlayer?.stop()
+            deactivationPlayer = try AVAudioPlayer(contentsOf: url)
+            deactivationPlayer?.volume = 1.0
+            deactivationPlayer?.prepareToPlay()
+            deactivationPlayer?.play()
+        } catch {
+            deactivationPlayer = nil
         }
     }
 
