@@ -1,8 +1,8 @@
 import UIKit
 import WebKit
 
-/// Muestra el visor 3D del personaje (archivo rouk.glb del bundle) dentro de un
-/// WKWebView, cargando la pagina local rouk3d.html. three.js se carga por CDN.
+/// Muestra el visor 3D de personajes intercambiables dentro de un WKWebView,
+/// cargando rouk3d.html con el catálogo GLB embebido. three.js se carga por CDN.
 final class Character3DViewController: UIViewController {
 
     private let webView: WKWebView = {
