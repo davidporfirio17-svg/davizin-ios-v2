@@ -134,6 +134,53 @@
   .credits{text-align:center;font-size:.62rem;letter-spacing:.06em;color:rgba(160,185,235,.30);margin:18px 2px 2px}
   .credits b{font-weight:700;color:rgba(170,195,240,.46)}
   .credits a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(160,185,235,.18)}
+  /* === SKIN TOGGLE + SHEET === */
+  .sktog{position:absolute;left:14px;bottom:14px;z-index:5;display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:14px;cursor:pointer;
+    font-size:.62rem;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#eaf0ff;
+    background:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.04));
+    border:0.5px solid rgba(255,255,255,.18);
+    -webkit-backdrop-filter:blur(18px) saturate(1.6);backdrop-filter:blur(18px) saturate(1.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(0,0,0,.25), 0 8px 18px -10px rgba(0,0,0,.5)}
+  .sktog:active{transform:scale(.95)}
+  .sktog .mini{width:18px;height:18px;border-radius:50%;background:linear-gradient(140deg,#5ac8fa,#7a5cff);box-shadow:0 0 0 1px rgba(255,255,255,.3),0 0 8px rgba(90,200,250,.5)}
+  .skbd{position:fixed;inset:0;z-index:40;background:rgba(2,4,10,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);opacity:0;transition:opacity .25s;pointer-events:none}
+  .skbd.on{opacity:1;pointer-events:auto}
+  .sksheet{position:fixed;left:0;right:0;bottom:0;z-index:45;max-height:70vh;overflow:hidden;border-top-left-radius:28px;border-top-right-radius:28px;
+    background:linear-gradient(180deg,rgba(14,18,30,.9),rgba(8,10,18,.95));
+    -webkit-backdrop-filter:blur(40px) saturate(1.6);backdrop-filter:blur(40px) saturate(1.6);
+    border-top:0.5px solid rgba(255,255,255,.16);box-shadow:0 -24px 60px -20px rgba(0,0,0,.85);
+    transform:translateY(100%);transition:transform .35s cubic-bezier(.3,1,.4,1);display:flex;flex-direction:column;padding:10px 14px max(16px,env(safe-area-inset-bottom))}
+  .sksheet.on{transform:translateY(0)}
+  .skhd{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 14px}
+  .skhd .grab{position:absolute;left:50%;top:7px;transform:translateX(-50%);width:36px;height:4px;border-radius:3px;background:rgba(255,255,255,.22)}
+  .sktitle{font-size:1.05rem;font-weight:700;letter-spacing:-.015em;color:#fff}
+  .skclose{width:32px;height:32px;border-radius:50%;border:0;color:#cfdcfa;background:rgba(255,255,255,.08);font-size:18px;cursor:pointer;display:grid;place-items:center}
+  .skclose:active{transform:scale(.92)}
+  .skscroll{overflow-y:auto;scrollbar-width:none;padding-bottom:8px}
+  .skscroll::-webkit-scrollbar{display:none}
+  .skgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+  .skitem{position:relative;overflow:hidden;border-radius:14px;cursor:pointer;aspect-ratio:3/4;
+    background:linear-gradient(170deg,rgba(255,255,255,.1),rgba(255,255,255,.03));
+    border:0.5px solid rgba(255,255,255,.1);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.22), 0 8px 16px -12px rgba(0,0,0,.5);
+    transition:transform .14s,border-color .2s,box-shadow .2s}
+  .skitem:active{transform:scale(.96)}
+  .skitem .skbg{position:absolute;inset:0;background:var(--skc,linear-gradient(140deg,#555,#333));opacity:.92}
+  .skitem .skbg::after{content:"";position:absolute;inset:0;background:radial-gradient(90% 50% at 50% 30%,rgba(255,255,255,.26),transparent 65%),linear-gradient(180deg,transparent 48%,rgba(0,0,0,.55) 100%)}
+  .skitem .skn{position:absolute;left:7px;right:7px;bottom:6px;z-index:2;font-size:.64rem;font-weight:700;color:#fff;letter-spacing:-.005em;line-height:1.12;text-shadow:0 1px 3px rgba(0,0,0,.65)}
+  .skitem .skr{position:absolute;top:6px;left:6px;z-index:2;font-size:.5rem;font-weight:900;letter-spacing:.18em;padding:2px 6px;border-radius:999px;color:#fff;text-transform:uppercase;
+    background:rgba(10,14,22,.55);border:0.5px solid rgba(255,255,255,.2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+  .skitem .skr.l{color:#ffd48a;border-color:rgba(255,200,100,.4);background:rgba(50,30,10,.55)}
+  .skitem .skr.m{color:#b7a8ff;border-color:rgba(170,150,255,.4);background:rgba(28,20,50,.55)}
+  .skitem.sel{border-color:rgba(10,132,255,.6);box-shadow:0 0 0 1px rgba(10,132,255,.5),0 12px 26px -10px rgba(10,132,255,.5),inset 0 1px 0 rgba(255,255,255,.3)}
+  .skitem.sel::after{content:"✓";position:absolute;right:5px;bottom:5px;width:20px;height:20px;border-radius:50%;background:linear-gradient(145deg,#5ac8fa,#0a84ff);color:#031320;display:grid;place-items:center;font-weight:900;font-size:.66rem;z-index:3;box-shadow:0 0 0 1px rgba(10,132,255,.5),0 4px 10px -2px rgba(10,132,255,.6);animation:skpop .3s cubic-bezier(.3,1.5,.4,1) both}
+  @keyframes skpop{from{transform:scale(0);opacity:0}}
+  .skcnt{font-size:.7rem;font-weight:700;color:rgba(200,215,245,.55)}
+  .skcnt b{color:#fff}
+  .skapplied{position:absolute;top:8px;right:8px;z-index:6;font-size:.52rem;font-weight:900;letter-spacing:.18em;padding:4px 9px;border-radius:999px;color:#9fe1bf;text-transform:uppercase;
+    background:rgba(5,25,15,.6);border:0.5px solid rgba(47,224,138,.4);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);display:none}
+  .skapplied.on{display:inline-flex;align-items:center;gap:5px;animation:skpop .28s cubic-bezier(.3,1.5,.4,1) both}
+  .skapplied .dot{width:5px;height:5px;border-radius:50%;background:#2fe08a;box-shadow:0 0 6px #2fe08a}
 </style>
 </head>
 <body>
@@ -152,12 +199,27 @@
     <div id="callouts"></div>
     <div class="zone" id="zone">VIEW CHARACTER OPTIONS • 3D</div>
     <button class="cube" id="cube" title="Reencuadrar">▣</button>
+    <button class="sktog" id="sktog" title="Probar skins"><span class="mini"></span>Skins</button>
+    <span class="skapplied" id="skapplied"><span class="dot"></span><span id="skappliedTxt">Original</span></span>
     <button id="prevM" class="navm nleft" title="Anterior">‹</button>
     <button id="nextM" class="navm nright" title="Siguiente">›</button>
     <div id="mname" class="mname">Modelo 1</div>
     <div id="mdots" class="mdots"></div>
     <div class="scan"></div>
     <div id="loader"><div><div class="spin"></div>Cargando modelo…</div></div>
+  </div>
+
+  <!-- Bottom sheet de skins (oculto por default; se abre con el botón "Skins" del visor) -->
+  <div class="skbd" id="skbd" onclick="closeSkin()"></div>
+  <div class="sksheet" id="sksheet">
+    <span class="grab"></span>
+    <div class="skhd">
+      <div><div class="sktitle">Skins</div><div class="skcnt"><b id="skCount">0</b> / <span id="skTotal">0</span> · prueba en vivo</div></div>
+      <button class="skclose" onclick="closeSkin()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="skscroll">
+      <div class="skgrid" id="skgrid"></div>
+    </div>
   </div>
 
   <div class="functions">
@@ -217,6 +279,29 @@
 
   var root=null,halfW=1,halfH=1,modelCenter=new THREE.Vector3();
   var markers={}, activeMarker=null, MARK=0xff2a3a;
+  // === SKINS: materiales del modelo cargado para poder cambiar color/textura en vivo ===
+  var cur_mats=[], cur_origColors=[], cur_origMaps=[], curSkin=-1;
+  /* Catálogo de skins — tú lo amplías. Cada entrada acepta:
+     - name   : nombre que se muestra
+     - r      : rareza mostrada (chip "EPIC" / "LEGEND" / "MYTHIC", opcional)
+     - tag    : '' | 'l' (dorado) | 'm' (morado) para el color del chip
+     - c      : color PRIMARIO (hex) - se aplica a todos los materiales
+     - c2     : color secundario, opcional, para dar matiz
+     - metal  : metalness (0..1), opcional
+     - rough  : roughness (0..1), opcional
+     - tex    : (opcional) base64 PNG de una textura real para aplicar como material.map
+  */
+  var SKINS = [
+    { name:'Original',       r:'OG',     tag:'', c:null }, // null = restaurar lo del modelo
+    { name:'Noche Titanio',  r:'Epic',   tag:'', c:0x3f4a5e, c2:0x7a8ca8, metal:.9,  rough:.25 },
+    { name:'Cristal Lunar',  r:'Legend', tag:'l',c:0xe8edf5, c2:0x6b7fd8, metal:.7,  rough:.15 },
+    { name:'Aurora Boreal',  r:'Mythic', tag:'m',c:0x2fd3a5, c2:0x7a5cff, metal:.5,  rough:.3  },
+    { name:'Dark Galaxy',    r:'Mythic', tag:'m',c:0x2a1e5c, c2:0xff2d92, metal:.6,  rough:.35 },
+    { name:'Robot Dorado',   r:'Legend', tag:'l',c:0xffc96b, c2:0x1a1a1a, metal:1.0, rough:.2  },
+    { name:'Cotton Candy',   r:'Epic',   tag:'', c:0xff9bd0, c2:0x8ad0ff, metal:.3,  rough:.4  },
+    { name:'Espejos',        r:'Mythic', tag:'m',c:0xdbe4f0, c2:0x303642, metal:1.0, rough:.05 },
+    { name:'Infierno Rojo',  r:'Epic',   tag:'', c:0xff2a3a, c2:0x1a0506, metal:.6,  rough:.3  }
+  ];
   function makeMarker(y,rad){
     var g=new THREE.Group();
     var core=new THREE.Mesh(new THREE.SphereGeometry(rad*0.60,20,20),
@@ -1254,7 +1339,8 @@
       root.traverse(function(o){ if(o.geometry&&o.geometry.dispose)o.geometry.dispose();
         if(o.material){ if(Array.isArray(o.material))o.material.forEach(function(m){m&&m.dispose&&m.dispose();}); else o.material.dispose&&o.material.dispose(); } });
       root=null; }
-    markers={}; activeMarker=null;
+    markers={}; activeMarker=null; cur_mats=[]; cur_origColors=[]; cur_origMaps=[]; curSkin=-1;
+    try{ var ap=document.getElementById('skapplied'); if(ap) ap.classList.remove('on'); }catch(e){}
   }
 
   function loadModel(idx){
@@ -1267,7 +1353,16 @@
       new THREE.GLTFLoader().parse(b64buf(entry.b64),'',function(gltf){
         clearModel();
         var obj=gltf.scene;
-        obj.traverse(function(c){if(c.isMesh&&c.material){c.material.side=THREE.DoubleSide;if(c.material.map)c.material.map.anisotropy=4;}});
+        cur_mats = []; cur_origColors = []; cur_origMaps = [];
+        obj.traverse(function(c){if(c.isMesh&&c.material){
+          var mats = Array.isArray(c.material) ? c.material : [c.material];
+          mats.forEach(function(m){ if(!m) return;
+            m.side=THREE.DoubleSide; if(m.map) m.map.anisotropy=4;
+            cur_mats.push(m);
+            cur_origColors.push(m.color ? m.color.clone() : null);
+            cur_origMaps.push(m.map || null);
+          });
+        }});
         obj.updateMatrixWorld(true);
         var box=new THREE.Box3().setFromObject(obj),size=box.getSize(new THREE.Vector3()),ctr=box.getCenter(new THREE.Vector3());
         obj.position.x-=ctr.x;obj.position.y-=ctr.y;obj.position.z-=ctr.z;
@@ -1435,6 +1530,108 @@
   document.getElementById('prevM').onclick=function(){nhapticTap();loadModel(curModel-1);};
   document.getElementById('nextM').onclick=function(){nhapticTap();loadModel(curModel+1);};
   loadModel(0);
+
+  // =============== SKINS: aplicar en vivo al modelo cargado ===============
+  function applySkin(idx){
+    var s=SKINS[idx]; if(!s) return;
+    curSkin=idx;
+    if(!cur_mats.length) return;  // modelo aún no cargado
+    var ap=document.getElementById('skapplied'), apT=document.getElementById('skappliedTxt');
+    if(ap && apT){ apT.textContent=s.name; ap.classList.remove('on'); void ap.offsetWidth; ap.classList.add('on'); }
+    // Si es "Original", restaurar colores/mapas originales del modelo
+    if(s.c===null){
+      cur_mats.forEach(function(m,i){
+        if(cur_origColors[i] && m.color) m.color.copy(cur_origColors[i]);
+        if('map' in m) m.map = cur_origMaps[i] || null;
+        if(m.needsUpdate!==undefined) m.needsUpdate=true;
+      });
+      document.querySelectorAll('.skitem').forEach(function(el,i){ el.classList.toggle('sel', i===idx); });
+      try{if(navigator.vibrate)navigator.vibrate(10);}catch(e){}
+      return;
+    }
+    var primary=new THREE.Color(s.c);
+    var secondary=s.c2!=null ? new THREE.Color(s.c2) : primary;
+    cur_mats.forEach(function(m,i){
+      if(!m.color) return;
+      // alterna primary / secondary según el índice del material para dar variedad
+      var tgt = (i % 2 === 0) ? primary : secondary;
+      // transición suave de color
+      var from=m.color.clone(), start=performance.now();
+      (function animate(){
+        var t=Math.min(1,(performance.now()-start)/350);
+        m.color.r = from.r + (tgt.r - from.r) * t;
+        m.color.g = from.g + (tgt.g - from.g) * t;
+        m.color.b = from.b + (tgt.b - from.b) * t;
+        if(s.metal!=null && m.metalness!==undefined) m.metalness = s.metal;
+        if(s.rough!=null && m.roughness!==undefined) m.roughness = s.rough;
+        // textura opcional
+        if(s.tex && 'map' in m && !m.__nyxelSkinTex){
+          try{
+            var img=new Image(); img.src='data:image/png;base64,'+s.tex;
+            img.onload=function(){ var tx=new THREE.Texture(img); tx.needsUpdate=true; m.map=tx; m.needsUpdate=true; };
+            m.__nyxelSkinTex=true;
+          }catch(e){}
+        }
+        if(m.needsUpdate!==undefined) m.needsUpdate=true;
+        if(t<1) requestAnimationFrame(animate);
+      })();
+    });
+    document.querySelectorAll('.skitem').forEach(function(el,i){ el.classList.toggle('sel', i===idx); });
+    document.getElementById('skCount').textContent = idx;
+    try{if(navigator.vibrate)navigator.vibrate(10);}catch(e){}
+  }
+
+  function openSkin(){
+    document.getElementById('skbd').classList.add('on');
+    document.getElementById('sksheet').classList.add('on');
+    try{if(navigator.vibrate)navigator.vibrate(8);}catch(e){}
+  }
+  function closeSkin(){
+    document.getElementById('skbd').classList.remove('on');
+    document.getElementById('sksheet').classList.remove('on');
+  }
+  // exponer al scope global los close/open para que los onclick inline funcionen
+  window.closeSkin = closeSkin;
+  window.openSkin = openSkin;
+
+  // Construir el grid
+  (function buildSkins(){
+    var g=document.getElementById('skgrid'); if(!g) return;
+    SKINS.forEach(function(s,i){
+      var hx=function(n){return '#'+(n>>>0).toString(16).padStart(6,'0');};
+      var bg;
+      if(s.c===null){ bg='linear-gradient(140deg,#5a6c7f,#2a2f3a)'; }
+      else { bg='linear-gradient(140deg,'+hx(s.c)+','+hx(s.c2!=null?s.c2:s.c)+')'; }
+      var el=document.createElement('div'); el.className='skitem'; el.style.setProperty('--skc',bg);
+      el.innerHTML = '<div class="skbg"></div>'+
+        (s.r ? '<span class="skr '+(s.tag||'')+'">'+s.r+'</span>' : '')+
+        '<span class="skn">'+s.name+'</span>';
+      el.onclick=(function(k){return function(){ applySkin(k); };})(i);
+      g.appendChild(el);
+    });
+    document.getElementById('skTotal').textContent = SKINS.length;
+  })();
+
+  document.getElementById('sktog').onclick=function(){ openSkin(); };
+
+  // API Swift: la app puede inyectar/reemplazar skins si lo deseas
+  window.NYXEL_setSkins=function(arr){
+    if(!Array.isArray(arr)) return;
+    SKINS = arr.slice();
+    var g=document.getElementById('skgrid'); if(!g) return;
+    g.innerHTML='';
+    var hx=function(n){return '#'+(n>>>0).toString(16).padStart(6,'0');};
+    SKINS.forEach(function(s,i){
+      var bg = (s.c===null||s.c==null) ? 'linear-gradient(140deg,#5a6c7f,#2a2f3a)'
+             : 'linear-gradient(140deg,'+hx(s.c)+','+hx(s.c2!=null?s.c2:s.c)+')';
+      var el=document.createElement('div'); el.className='skitem'; el.style.setProperty('--skc',bg);
+      el.innerHTML='<div class="skbg"></div>'+(s.r?'<span class="skr '+(s.tag||'')+'">'+s.r+'</span>':'')+'<span class="skn">'+(s.name||('Skin '+(i+1)))+'</span>';
+      el.onclick=(function(k){return function(){ applySkin(k); };})(i);
+      g.appendChild(el);
+    });
+    document.getElementById('skTotal').textContent = SKINS.length;
+    curSkin=-1;
+  };
 })();
 </script>
 </body></html>
