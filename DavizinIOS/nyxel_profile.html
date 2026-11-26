@@ -42,7 +42,10 @@ body{color:var(--ink);font-family:var(--f);-webkit-font-smoothing:antialiased;le
 .status{margin-top:12px;font-size:13px;color:var(--muted);text-align:center;min-height:16px}
 
 /* perfil */
-#profile{display:none}
+#profile{display:none;perspective:1100px}
+.st,.rkc{transition:transform .12s var(--eo)}
+.st:active,.rkc:active{transform:scale(.965)}
+.pcard{will-change:transform}
 .pcard{position:relative;overflow:hidden;margin-top:18px;border-radius:24px;padding:18px;display:flex;align-items:center;gap:14px;background:var(--glass);backdrop-filter:blur(26px) saturate(1.3);-webkit-backdrop-filter:blur(26px) saturate(1.3);border:1px solid rgba(255,255,255,.7);box-shadow:0 20px 50px -24px rgba(60,70,100,.35),inset 0 1px 0 rgba(255,255,255,.8)}
 .pcard::after{content:"";position:absolute;top:0;left:-70%;width:55%;height:100%;pointer-events:none;background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-16deg);animation:sheen 4.8s ease-in-out 1s infinite}
 @keyframes sheen{0%,72%{left:-70%}100%{left:150%}}
@@ -178,6 +181,20 @@ body{color:var(--ink);font-family:var(--f);-webkit-font-smoothing:antialiased;le
     for(var i=0;i<n;i++){var d=document.createElement('div');d.className='oit';d.id='oit'+i;d.innerHTML='<div class="sq"></div>';o.appendChild(d);}
   };
   window.NYXEL_setOutfitItem=function(i,uri){var el=document.getElementById('oit'+i);if(!el||!uri)return;el.querySelector('.sq').style.backgroundImage="url('"+uri+"')";};
+
+  // Inclinación 3D de la tarjeta de jugador siguiendo el dedo (con regreso suave).
+  (function(){
+    var card=document.querySelector('.pcard');if(!card||REDUCE)return;
+    function tilt(e){var r=card.getBoundingClientRect();
+      var rx=(((e.clientY-r.top)/r.height)-0.5)*-7, ry=(((e.clientX-r.left)/r.width)-0.5)*9;
+      card.style.transition='transform .08s linear';
+      card.style.transform='perspective(1100px) rotateX('+rx.toFixed(2)+'deg) rotateY('+ry.toFixed(2)+'deg)';}
+    function reset(){card.style.transition='transform .6s cubic-bezier(.2,1,.3,1)';card.style.transform='';}
+    card.addEventListener('pointermove',tilt,{passive:true});
+    card.addEventListener('pointerleave',reset,{passive:true});
+    card.addEventListener('pointerup',reset,{passive:true});
+    card.addEventListener('pointercancel',reset,{passive:true});
+  })();
 })();
 </script>
 </body></html>
