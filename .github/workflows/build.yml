@@ -109,8 +109,16 @@ jobs:
             puts "Added Modes3DView.swift"
           end
 
+          # Add TitaniumPlayerView.swift (pantalla Jugador estilo titanio en WebView)
+          tpv = davizin_group.files.find { |f| f.path.end_with?("TitaniumPlayerView.swift") }
+          if tpv.nil?
+            tpv = davizin_group.new_file("TitaniumPlayerView.swift")
+            target.add_file_references([tpv])
+            puts "Added TitaniumPlayerView.swift"
+          end
+
           # Add 3D viewer resources (html + glb) to the resources build phase
-          ["rouk3d.html", "rouk.glb", "opcion_desactivada.m4a", "nyxel_intro.html"].each do |res|
+          ["rouk3d.html", "rouk.glb", "opcion_desactivada.m4a", "nyxel_intro.html", "nyxel_profile.html"].each do |res|
             next if davizin_group.files.any? { |f| f.path.end_with?(res) }
             ref = davizin_group.new_file(res)
             target.resources_build_phase.add_file_reference(ref)

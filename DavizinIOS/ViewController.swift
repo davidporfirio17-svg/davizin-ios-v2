@@ -57,7 +57,7 @@ final class ViewController: UIViewController {
     private var gameSelectionView: GameSelectionView?
     private var missionMapView: MissionMapView?
     private var modes3DView: Modes3DView?
-    private var playerView: PlayerView?
+    private var playerView: TitaniumPlayerView?
     private var profileView: ProfileView?
     private var stageBeforePlayer: DavizinScreenStage = .modeSelection
     private var stageBeforeProfile: DavizinScreenStage = .modeSelection
@@ -655,7 +655,7 @@ final class ViewController: UIViewController {
         headerView.showsBackButton = true
         headerView.showsAvatarButton = false
 
-        let screen = PlayerView()
+        let screen = TitaniumPlayerView()
         screen.onLookupRequested = { [weak self, weak screen] uid, region in
             guard let self, let onFreeFireLookup = self.onFreeFireLookup else {
                 screen?.setLookupError("El servicio aún no está configurado.")
