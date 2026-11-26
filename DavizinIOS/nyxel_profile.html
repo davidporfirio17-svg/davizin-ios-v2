@@ -18,9 +18,19 @@ body{color:var(--fg);font-family:var(--f);-webkit-font-smoothing:antialiased;let
  box-shadow:0 0 90px -10px rgba(31,110,240,0.5),inset -20px -14px 60px rgba(0,0,0,0.6);opacity:.9;animation:float 13s ease-in-out infinite}
 .glow2{position:fixed;top:-120px;left:50%;transform:translateX(-50%);width:460px;height:380px;z-index:0;pointer-events:none;background:radial-gradient(ellipse,rgba(31,110,240,0.22),transparent 66%)}
 @keyframes float{50%{transform:translateY(14px)}}
+#stars{position:fixed;inset:0;z-index:0;pointer-events:none}
+.mark{animation:markpulse 3.2s ease-in-out infinite}
+@keyframes markpulse{0%,100%{box-shadow:0 0 16px -4px rgba(78,162,255,.5),inset 0 0 0 1px rgba(255,255,255,.14)}50%{box-shadow:0 0 26px -2px rgba(78,162,255,.85),inset 0 0 0 1px rgba(255,255,255,.2)}}
+.hero h1 .i{animation:iglow 3.6s ease-in-out infinite}
+@keyframes iglow{0%,100%{text-shadow:0 0 0 rgba(78,162,255,0)}50%{text-shadow:0 0 22px rgba(78,162,255,.55)}}
+.st,.rkc{position:relative;overflow:hidden}
+.st::before,.rkc::before{content:"";position:absolute;top:0;left:-80%;width:60%;height:100%;pointer-events:none;background:linear-gradient(105deg,transparent,rgba(255,255,255,.14),transparent);transform:skewX(-16deg);animation:tileshine 1s var(--eo) both}
+.st:nth-child(2)::before,.rkc:nth-child(2)::before{animation-delay:.12s}
+.st:nth-child(3)::before{animation-delay:.24s}
+@keyframes tileshine{0%{left:-80%}60%,100%{left:160%}}
 .wrap{position:relative;z-index:1;max-width:460px;margin:0 auto;padding:0 max(22px,env(safe-area-inset-left,0px)) 40px}
-.rise{opacity:0;transform:translateY(16px);animation:rise .7s var(--eo) forwards}
-@keyframes rise{to{opacity:1;transform:none}}
+.rise{opacity:0;transform:translateY(18px) scale(.98);animation:rise .72s var(--eo) forwards}
+@keyframes rise{to{opacity:1;transform:translateY(0) scale(1)}}
 .d1{animation-delay:.04s}.d2{animation-delay:.12s}.d3{animation-delay:.2s}.d4{animation-delay:.3s}.d5{animation-delay:.4s}.d6{animation-delay:.5s}
 
 .hero{text-align:center;padding-top:24px}
@@ -85,6 +95,7 @@ body{color:var(--fg);font-family:var(--f);-webkit-font-smoothing:antialiased;let
 @media (prefers-reduced-motion:reduce){.pc-sheen{display:none}.glow{animation:none}}
 </style></head>
 <body>
+<canvas id="stars"></canvas>
 <div class="glow"></div><div class="glow2"></div>
 <div class="wrap">
   <div class="hero rise d1">
@@ -192,6 +203,22 @@ body{color:var(--fg);font-family:var(--f);-webkit-font-smoothing:antialiased;let
       card.style.transition='transform .08s linear';card.style.transform='perspective(1100px) rotateX('+rx.toFixed(2)+'deg) rotateY('+ry.toFixed(2)+'deg)';}
     function reset(){card.style.transition='transform .6s cubic-bezier(.2,1,.3,1)';card.style.transform='';}
     card.addEventListener('pointermove',tilt,{passive:true});card.addEventListener('pointerleave',reset,{passive:true});card.addEventListener('pointerup',reset,{passive:true});card.addEventListener('pointercancel',reset,{passive:true});
+  })();
+
+  // Campo de estrellas vivo (galaxia) — decorativo, ligero.
+  (function(){
+    var cv=document.getElementById('stars');if(!cv||REDUCE)return;var ctx=cv.getContext('2d');
+    var DPR=Math.min(2,window.devicePixelRatio||1),W,H,P=[];
+    function size(){W=cv.width=innerWidth*DPR;H=cv.height=innerHeight*DPR;cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';
+      var n=Math.min(70,Math.floor(innerWidth*innerHeight/16000));P=[];for(var i=0;i<n;i++)P.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.09*DPR,vy:(Math.random()-0.5)*0.09*DPR,r:(Math.random()*1.2+0.3)*DPR,tw:Math.random()*6.28});}
+    size();addEventListener('resize',size);var t=0;
+    function loop(){if(document.hidden){requestAnimationFrame(loop);return;}ctx.clearRect(0,0,W,H);t+=0.016;
+      for(var i=0;i<P.length;i++){var p=P[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;}
+      for(var i=0;i<P.length;i++)for(var j=i+1;j<P.length;j++){var a=P[i],b=P[j],dx=a.x-b.x,dy=a.y-b.y,d=dx*dx+dy*dy,md=120*DPR;
+        if(d<md*md){ctx.strokeStyle='rgba(78,162,255,'+(0.08*(1-Math.sqrt(d)/md))+')';ctx.lineWidth=DPR*0.5;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}}
+      for(var i=0;i<P.length;i++){var p=P[i],tw=0.5+0.5*Math.sin(t*1.6+p.tw);ctx.fillStyle='rgba(150,195,255,'+(0.2+tw*0.5)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);ctx.fill();}
+      requestAnimationFrame(loop);}
+    requestAnimationFrame(loop);
   })();
 })();
 </script>
