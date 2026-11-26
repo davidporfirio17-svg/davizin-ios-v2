@@ -64,6 +64,10 @@ body{color:var(--ink);font-family:var(--f);-webkit-font-smoothing:antialiased;le
 .st .v{font-size:26px;font-weight:700;letter-spacing:-0.03em;margin-top:6px;font-variant-numeric:tabular-nums}
 .st .s{font-size:10px;color:var(--faint);margin-top:4px}
 .st.b .v{color:var(--blue)}.st.g .v{color:var(--green)}.st.o .v{color:#c9892a}.st.p .v{color:var(--purple)}
+.outfit{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.outfit::-webkit-scrollbar{display:none}
+.oit{flex:none;width:76px}
+.oit .sq{width:76px;height:76px;border-radius:17px;background:var(--glass2);background-repeat:no-repeat;background-position:center;background-size:72%;border:1px solid rgba(255,255,255,.6);box-shadow:0 10px 24px -16px rgba(60,70,100,.3)}
 .foot{text-align:center;color:var(--faint);font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-top:26px;font-weight:600}
 </style></head>
 <body>
@@ -110,6 +114,8 @@ body{color:var(--ink);font-family:var(--f);-webkit-font-smoothing:antialiased;le
     </div>
     <div class="sec rise d4" id="careerSec" style="display:none">Carrera</div>
     <div class="grid rise d4" id="career"></div>
+    <div class="sec rise d5" id="outfitSec" style="display:none">Outfit</div>
+    <div class="outfit rise d5" id="outfit"></div>
     <div class="foot rise d5">Rendimiento · Inteligencia · Sin límites</div>
   </div>
 </div>
@@ -155,6 +161,12 @@ body{color:var(--ink);font-family:var(--f);-webkit-font-smoothing:antialiased;le
     } else {document.getElementById('careerSec').style.display='none';}
     try{window.scrollTo({top:document.getElementById('profile').offsetTop-80,behavior:'smooth'});}catch(e){}
   };
+  window.NYXEL_setOutfitCount=function(n){
+    var o=document.getElementById('outfit');o.innerHTML='';
+    document.getElementById('outfitSec').style.display=n>0?'':'none';
+    for(var i=0;i<n;i++){var d=document.createElement('div');d.className='oit';d.id='oit'+i;d.innerHTML='<div class="sq"></div>';o.appendChild(d);}
+  };
+  window.NYXEL_setOutfitItem=function(i,uri){var el=document.getElementById('oit'+i);if(!el||!uri)return;el.querySelector('.sq').style.backgroundImage="url('"+uri+"')";};
 })();
 </script>
 </body></html>

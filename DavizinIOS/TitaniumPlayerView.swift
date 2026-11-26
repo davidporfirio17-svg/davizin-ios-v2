@@ -81,6 +81,23 @@ final class TitaniumPlayerView: UIView, WKScriptMessageHandler, WKNavigationDele
            let json = String(data: data, encoding: .utf8) {
             run("window.NYXEL_setProfile && window.NYXEL_setProfile(\(json));")
         }
+        loadOutfit(summary.clothesIDs)
+    }
+
+    /// Carga las imágenes reales de las prendas (las baja la app por itemID) y las inyecta como data URI.
+    private func loadOutfit(_ ids: [String]) {
+        let items = Array(ids.prefix(12))
+        run("window.NYXEL_setOutfitCount && window.NYXEL_setOutfitCount(\(items.count));")
+        guard let onAssetRequested else { return }
+        for (index, id) in items.enumerated() {
+            onAssetRequested(id) { [weak self] image in
+                guard let self, let image, let png = image.pngData() else { return }
+                let uri = "data:image/png;base64," + png.base64EncodedString()
+                DispatchQueue.main.async {
+                    self.run("window.NYXEL_setOutfitItem && window.NYXEL_setOutfitItem(\(index),'\(uri)');")
+                }
+            }
+        }
     }
 
     func setLookupLoading(_ loading: Bool, message: String) {
