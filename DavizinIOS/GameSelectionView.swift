@@ -1,287 +1,108 @@
 import UIKit
+import WebKit
 
 protocol GameSelectionViewDelegate: AnyObject {
     func gameSelectionView(_ view: GameSelectionView, didSelect game: DavizinGame)
 }
 
-final class GameSelectionView: UIView {
+/// Envoltura débil para el handler de mensajes (evita ciclo de retención).
+private final class GameSelectionWeakHandler: NSObject, WKScriptMessageHandler {
+    weak var target: WKScriptMessageHandler?
+    init(_ t: WKScriptMessageHandler) { target = t }
+    func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
+        target?.userContentController(u, didReceive: m)
+    }
+}
+
+/// Pantalla "Elige tu entorno" (Free Fire vs Free Fire MAX) estilo Liquid Glass
+/// renderizada con un WKWebView que carga `entorno.html`. Mantiene la misma
+/// interfaz pública que usa el ViewController para no cambiar el flujo.
+final class GameSelectionView: UIView, WKScriptMessageHandler, WKNavigationDelegate {
     weak var delegate: GameSelectionViewDelegate?
+
+    // Compatibilidad con el ViewController: estos callbacks ya no se disparan
+    // porque la nueva pantalla quitó los shortcuts, pero mantenemos las propiedades
+    // para no romper call sites existentes.
     var onOpenPlayer: (() -> Void)?
     var onOpenProfile: (() -> Void)?
     var onOpenHelp: (() -> Void)?
 
-    private let cardView = DavizinCardView()
-    private let categoryLabel = UILabel()
-    private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
-    private let freeFireButton = DavizinButton(title: "FREE FIRE", style: .secondary)
-    private let freeFireMaxButton = DavizinButton(title: "FREE FIRE MAX", style: .secondary)
-    private let freeFireSubtitle = UILabel()
-    private let freeFireMaxSubtitle = UILabel()
-    private let freeFireCompatibility = UILabel()
-    private let freeFireMaxCompatibility = UILabel()
-    private let stackView = UIStackView()
-    private let sessionIcon = UIImageView()
-    private let sessionStatusLabel = UILabel()
-    private let connectivityIcon = UIImageView()
-    private let connectivityStatusLabel = UILabel()
-    private var connectivityObserver: NSObjectProtocol?
-
     private(set) var selectedGame: DavizinGame?
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        configure()
-    }
+    private var webView: WKWebView!
+    private var ready = false
+    private var pendingJS: [String] = []
 
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        configure()
-    }
-
-    deinit {
-        if let connectivityObserver { NotificationCenter.default.removeObserver(connectivityObserver) }
-    }
-
-    func setSessionStatus(keyAuthorized: Bool, remainingSeconds: Int) {
-        let active = keyAuthorized && remainingSeconds > 0
-        sessionIcon.image = UIImage(systemName: active ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
-        sessionIcon.tintColor = active ? AppTheme.success : AppTheme.accentWarm
-        if active {
-            let days = remainingSeconds / 86400
-            let hours = (remainingSeconds % 86400) / 3600
-            let minutes = (remainingSeconds % 3600) / 60
-            let remaining: String
-            if days > 0 {
-                remaining = days == 1 ? "1 día \(hours) h" : "\(days) días \(hours) h"
-            } else {
-                remaining = "\(hours) h \(minutes) min"
-            }
-            sessionStatusLabel.text = "Acceso Nyxel activo · \(remaining) restantes"
-            sessionStatusLabel.textColor = AppTheme.primaryText
-        } else {
-            sessionStatusLabel.text = keyAuthorized ? "Tu acceso Nyxel expiró" : "Sesión Nyxel no disponible"
-            sessionStatusLabel.textColor = AppTheme.accentWarm
-        }
-    }
-
-    private func setConnectivityStatus(_ connected: Bool?) {
-        switch connected {
-        case .some(true):
-            connectivityIcon.image = UIImage(systemName: "wifi")
-            connectivityIcon.tintColor = AppTheme.success
-            connectivityStatusLabel.text = "Internet disponible"
-            connectivityStatusLabel.textColor = AppTheme.primaryText
-        case .some(false):
-            connectivityIcon.image = UIImage(systemName: "wifi.slash")
-            connectivityIcon.tintColor = AppTheme.failure
-            connectivityStatusLabel.text = "Sin internet · revisa Wi-Fi o datos móviles"
-            connectivityStatusLabel.textColor = AppTheme.accentWarm
-        case .none:
-            connectivityIcon.image = UIImage(systemName: "network")
-            connectivityIcon.tintColor = AppTheme.secondaryText
-            connectivityStatusLabel.text = "Comprobando conexión…"
-            connectivityStatusLabel.textColor = AppTheme.secondaryText
-        }
-    }
-
-    func setSelectedGame(_ game: DavizinGame?) {
-        selectedGame = game
-        freeFireButton.selectedVisual = game == .freeFire
-        freeFireMaxButton.selectedVisual = game == .freeFireMax
-        freeFireSubtitle.text = game == .freeFire ? "✓ SELECCIONADO · ESTÁNDAR" : "Entorno estándar"
-        freeFireMaxSubtitle.text = game == .freeFireMax ? "✓ SELECCIONADO · OPTIMIZADO" : "Entorno optimizado"
-        freeFireSubtitle.textColor = game == .freeFire ? AppTheme.accent : AppTheme.tertiaryText
-        freeFireMaxSubtitle.textColor = game == .freeFireMax ? AppTheme.accent : AppTheme.tertiaryText
-        refreshCompatibilityIndicators()
-    }
-
-    private func refreshCompatibilityIndicators() {
-        let systemOK = NyxelSupportPolicy.isCurrentSystemSupported
-        let freeFireOK = systemOK && InjectorService.isBundleAvailable(for: .freeFire)
-        let freeFireMaxOK = systemOK && InjectorService.isBundleAvailable(for: .freeFireMax)
-        freeFireCompatibility.text = freeFireOK ? "● Bundle compatible" : "● Bundle no compatible"
-        freeFireMaxCompatibility.text = freeFireMaxOK ? "● Bundle compatible" : "● Bundle no compatible"
-        freeFireCompatibility.textColor = freeFireOK ? AppTheme.success : AppTheme.failure
-        freeFireMaxCompatibility.textColor = freeFireMaxOK ? AppTheme.success : AppTheme.failure
-    }
+    override init(frame: CGRect) { super.init(frame: frame); configure() }
+    required init?(coder: NSCoder) { super.init(coder: coder); configure() }
 
     private func configure() {
-        backgroundColor = .clear
         translatesAutoresizingMaskIntoConstraints = false
+        backgroundColor = UIColor(red: 0.023, green: 0.027, blue: 0.039, alpha: 1)
 
-        categoryLabel.text = "INICIO · ESTADO GENERAL"
-        categoryLabel.textColor = AppTheme.tertiaryText
-        categoryLabel.font = AppTheme.captionFont()
-        categoryLabel.textAlignment = .center
-        categoryLabel.adjustsFontForContentSizeCategory = true
-        applyTitleTracking(categoryLabel, value: 1.2)
+        let cfg = WKWebViewConfiguration()
+        let ucc = WKUserContentController()
+        ucc.add(GameSelectionWeakHandler(self), name: "nyxel")
+        cfg.userContentController = ucc
 
-        titleLabel.text = "Elige tu entorno"
-        titleLabel.textColor = AppTheme.primaryText
-        titleLabel.font = AppTheme.titleFont()
-        titleLabel.textAlignment = .center
-        titleLabel.adjustsFontForContentSizeCategory = true
+        let wv = WKWebView(frame: .zero, configuration: cfg)
+        wv.navigationDelegate = self
+        wv.isOpaque = false
+        wv.backgroundColor = .clear
+        wv.scrollView.backgroundColor = .clear
+        wv.scrollView.contentInsetAdjustmentBehavior = .never
+        wv.scrollView.isScrollEnabled = false
+        wv.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(wv)
+        wv.davizinPinEdges(to: self)
+        webView = wv
 
-        subtitleLabel.text = "Selecciona la versión que quieres preparar."
-        subtitleLabel.textColor = AppTheme.secondaryText
-        subtitleLabel.font = AppTheme.bodyFont()
-        subtitleLabel.textAlignment = .center
-        subtitleLabel.numberOfLines = 0
-        subtitleLabel.adjustsFontForContentSizeCategory = true
-        subtitleLabel.textColor = AppTheme.secondaryText.withAlphaComponent(0.78)
-
-        freeFireButton.accessibilityIdentifier = "game.freeFire"
-        freeFireMaxButton.accessibilityIdentifier = "game.freeFireMax"
-        freeFireButton.accessibilityValue = "Entorno estándar"
-        freeFireButton.accessibilityHint = "Selecciona Free Fire como entorno."
-        freeFireMaxButton.accessibilityValue = "Entorno optimizado"
-        freeFireMaxButton.accessibilityHint = "Selecciona Free Fire MAX como entorno."
-        freeFireButton.setImage(UIImage(systemName: "flame.fill"), for: .normal)
-        freeFireMaxButton.setImage(UIImage(systemName: "flame.circle.fill"), for: .normal)
-        freeFireButton.tintColor = AppTheme.accent
-        freeFireMaxButton.tintColor = AppTheme.accent
-        freeFireButton.contentHorizontalAlignment = .left
-        freeFireMaxButton.contentHorizontalAlignment = .left
-        freeFireSubtitle.text = "Entorno estándar"
-        freeFireMaxSubtitle.text = "Entorno optimizado"
-        [freeFireSubtitle, freeFireMaxSubtitle].forEach {
-            $0.font = AppTheme.captionFont()
-            $0.textAlignment = .left
-            $0.translatesAutoresizingMaskIntoConstraints = false
+        if let url = Bundle.main.url(forResource: "entorno", withExtension: "html") {
+            wv.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         }
-        [freeFireCompatibility, freeFireMaxCompatibility].forEach {
-            $0.font = AppTheme.captionFont()
-            $0.textAlignment = .left
-            $0.translatesAutoresizingMaskIntoConstraints = false
-        }
-        refreshCompatibilityIndicators()
-        freeFireButton.addTarget(self, action: #selector(freeFireTapped), for: .touchUpInside)
-        freeFireMaxButton.addTarget(self, action: #selector(freeFireMaxTapped), for: .touchUpInside)
-
-        stackView.axis = .vertical
-        stackView.alignment = .fill
-        stackView.spacing = 12.0
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        stackView.addArrangedSubview(categoryLabel)
-        stackView.addArrangedSubview(titleLabel)
-        stackView.addArrangedSubview(subtitleLabel)
-
-        sessionIcon.image = UIImage(systemName: "checkmark.shield.fill")
-        sessionIcon.contentMode = .scaleAspectFit
-        sessionIcon.widthAnchor.constraint(equalToConstant: 18).isActive = true
-        sessionIcon.heightAnchor.constraint(equalToConstant: 18).isActive = true
-        connectivityIcon.image = UIImage(systemName: "network")
-        connectivityIcon.contentMode = .scaleAspectFit
-        connectivityIcon.widthAnchor.constraint(equalToConstant: 18).isActive = true
-        connectivityIcon.heightAnchor.constraint(equalToConstant: 18).isActive = true
-        [sessionStatusLabel, connectivityStatusLabel].forEach {
-            $0.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 13, weight: .semibold))
-            $0.adjustsFontForContentSizeCategory = true
-            $0.numberOfLines = 0
-        }
-        let sessionRow = UIStackView(arrangedSubviews: [sessionIcon, sessionStatusLabel])
-        let connectivityRow = UIStackView(arrangedSubviews: [connectivityIcon, connectivityStatusLabel])
-        [sessionRow, connectivityRow].forEach { $0.axis = .horizontal; $0.alignment = .center; $0.spacing = 9 }
-        let statusStack = UIStackView(arrangedSubviews: [sessionRow, connectivityRow])
-        statusStack.axis = .vertical
-        statusStack.spacing = 10
-        statusStack.translatesAutoresizingMaskIntoConstraints = false
-        let statusPanel = UIView()
-        statusPanel.backgroundColor = AppTheme.background.withAlphaComponent(0.55)
-        statusPanel.layer.cornerRadius = 13
-        statusPanel.layer.borderWidth = 1
-        statusPanel.layer.borderColor = AppTheme.hairlineStrong.cgColor
-        statusPanel.addSubview(statusStack)
-        NSLayoutConstraint.activate([
-            statusStack.leadingAnchor.constraint(equalTo: statusPanel.leadingAnchor, constant: 12),
-            statusStack.trailingAnchor.constraint(equalTo: statusPanel.trailingAnchor, constant: -12),
-            statusStack.topAnchor.constraint(equalTo: statusPanel.topAnchor, constant: 12),
-            statusStack.bottomAnchor.constraint(equalTo: statusPanel.bottomAnchor, constant: -12)
-        ])
-        stackView.addArrangedSubview(statusPanel)
-        setSessionStatus(keyAuthorized: false, remainingSeconds: 0)
-        setConnectivityStatus(NyxelConnectivity.isConnected)
-        connectivityObserver = NotificationCenter.default.addObserver(
-            forName: .nyxelConnectivityDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            self?.setConnectivityStatus(note.object as? Bool)
-        }
-
-        let freeFireChoice = UIStackView(arrangedSubviews: [freeFireButton, freeFireSubtitle, freeFireCompatibility])
-        let freeFireMaxChoice = UIStackView(arrangedSubviews: [freeFireMaxButton, freeFireMaxSubtitle, freeFireMaxCompatibility])
-        [freeFireChoice, freeFireMaxChoice].forEach {
-            $0.axis = .vertical
-            $0.alignment = .fill
-            $0.spacing = 3.0
-        }
-        stackView.addArrangedSubview(freeFireChoice)
-        stackView.addArrangedSubview(freeFireMaxChoice)
-
-        let shortcuts = UIStackView(arrangedSubviews: [
-            makeShortcut(title: "JUGADOR", symbol: "person.crop.square.fill", action: #selector(playerShortcutTapped)),
-            makeShortcut(title: "CUENTA", symbol: "person.crop.circle.fill", action: #selector(profileShortcutTapped)),
-            makeShortcut(title: "AYUDA", symbol: "questionmark.circle.fill", action: #selector(helpShortcutTapped))
-        ])
-        shortcuts.axis = .horizontal
-        shortcuts.distribution = .fillEqually
-        shortcuts.spacing = 8
-        stackView.addArrangedSubview(shortcuts)
-        setConnectivityStatus(NyxelConnectivity.isConnected)
-
-        cardView.translatesAutoresizingMaskIntoConstraints = false
-        cardView.useTransparentAppearance()
-        cardView.addContent(stackView)
-        addSubview(cardView)
-
-        NSLayoutConstraint.activate([
-            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 22.0),
-            cardView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -22.0),
-            cardView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            cardView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 560.0 : AppTheme.contentMaximumWidth),
-            stackView.widthAnchor.constraint(greaterThanOrEqualToConstant: UIDevice.current.userInterfaceIdiom == .pad ? 360.0 : 240.0),
-            freeFireButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
-            freeFireMaxButton.heightAnchor.constraint(equalToConstant: AppTheme.controlHeight),
-            freeFireSubtitle.heightAnchor.constraint(equalToConstant: 14.0),
-            freeFireMaxSubtitle.heightAnchor.constraint(equalToConstant: 14.0),
-            freeFireCompatibility.heightAnchor.constraint(equalToConstant: 14.0),
-            freeFireMaxCompatibility.heightAnchor.constraint(equalToConstant: 14.0)
-        ])
     }
 
-    @objc private func freeFireTapped() {
-        setSelectedGame(.freeFire)
-        delegate?.gameSelectionView(self, didSelect: .freeFire)
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        ready = true
+        for js in pendingJS { webView.evaluateJavaScript(js, completionHandler: nil) }
+        pendingJS.removeAll()
     }
 
-    @objc private func freeFireMaxTapped() {
-        setSelectedGame(.freeFireMax)
-        delegate?.gameSelectionView(self, didSelect: .freeFireMax)
+    private func run(_ js: String) {
+        if ready { webView.evaluateJavaScript(js, completionHandler: nil) }
+        else { pendingJS.append(js) }
     }
 
-    private func makeShortcut(title: String, symbol: String, action: Selector) -> UIButton {
-        let button = UIButton(type: .system)
-        button.setTitle(title, for: .normal)
-        button.setImage(UIImage(systemName: symbol), for: .normal)
-        button.tintColor = AppTheme.readableAccent
-        button.setTitleColor(AppTheme.primaryText, for: .normal)
-        button.titleLabel?.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(for: .systemFont(ofSize: 10, weight: .bold))
-        button.titleLabel?.adjustsFontForContentSizeCategory = true
-        button.backgroundColor = AppTheme.background.withAlphaComponent(0.48)
-        button.layer.cornerRadius = 10
-        button.layer.borderWidth = 1
-        button.layer.borderColor = AppTheme.hairline.cgColor
-        button.heightAnchor.constraint(equalToConstant: 42).isActive = true
-        button.accessibilityLabel = title.capitalized
-        button.accessibilityHint = "Abre la sección \(title.lowercased())."
-        button.addTarget(self, action: action, for: .touchUpInside)
-        return button
+    // MARK: - API pública (igual que la versión UIKit anterior)
+
+    /// Pre-selecciona visualmente un juego sin disparar el delegate.
+    func setSelectedGame(_ game: DavizinGame?) {
+        selectedGame = game
+        guard let game else { return }
+        let key = (game == .freeFireMax) ? "max" : "ff"
+        run("window.NYXEL_setGame && window.NYXEL_setGame('\(key)');")
     }
 
-    @objc private func playerShortcutTapped() { onOpenPlayer?() }
-    @objc private func profileShortcutTapped() { onOpenProfile?() }
-    @objc private func helpShortcutTapped() { onOpenHelp?() }
+    /// Mantenido por compatibilidad. La nueva pantalla ya no muestra el panel
+    /// de estado de sesión/conexión, así que este método es un no-op.
+    func setSessionStatus(keyAuthorized: Bool, remainingSeconds: Int) {
+        // intencionalmente vacío
+    }
+
+    // MARK: - Mensajes del WebView
+
+    func userContentController(_ u: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "nyxel", let body = message.body as? [String: Any] else { return }
+        let kind = (body["t"] as? String) ?? ""
+        let g = (body["g"] as? String) ?? ""
+        let game: DavizinGame = (g == "max") ? .freeFireMax : .freeFire
+        switch kind {
+        case "pick":
+            selectedGame = game
+            delegate?.gameSelectionView(self, didSelect: game)
+        case "preview":
+            selectedGame = game
+        default: break
+        }
+    }
 }
