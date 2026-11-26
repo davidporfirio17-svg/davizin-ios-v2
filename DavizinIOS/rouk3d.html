@@ -57,7 +57,7 @@
   .ret-x{position:absolute;left:-15px;top:-1px;width:30px;height:2px;background:linear-gradient(90deg,transparent,var(--mark),transparent)}
   .ret-x::before{content:"";position:absolute;left:14px;top:-14px;width:2px;height:30px;background:linear-gradient(180deg,transparent,var(--mark),transparent)}
   @keyframes retpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.16);opacity:.55}}
-  .scan{position:absolute;left:0;right:0;top:0;height:120px;z-index:3;pointer-events:none;opacity:.5;
+  .scan{position:absolute;left:0;right:0;top:0;height:120px;z-index:3;pointer-events:none;opacity:.26;
     background:linear-gradient(180deg,transparent,rgba(47,182,255,.12) 50%,transparent);animation:scanmove 5s linear infinite}
   @keyframes scanmove{0%{transform:translateY(-130px)}100%{transform:translateY(560px)}}
   @media (prefers-reduced-motion:reduce){.scan{display:none}}
@@ -69,8 +69,8 @@
     background:radial-gradient(circle, rgba(120,170,255,.17), rgba(80,120,255,.05) 46%, transparent 64%)}
   #moon::after{content:"";position:absolute;inset:4%;border-radius:50%;border:1px solid rgba(150,190,255,.14)}
   #lines{position:absolute;inset:0;z-index:4;pointer-events:none;overflow:visible}
-  #lines line{stroke:rgba(150,205,255,.55);stroke-width:1.4;filter:drop-shadow(0 0 4px rgba(80,160,255,.6))}
-  #lines circle{fill:rgba(150,205,255,.9)}
+  #lines line{stroke:rgba(150,205,255,.30);stroke-width:1;filter:none}
+  #lines circle{fill:rgba(170,215,255,.65)}
   #callouts{position:absolute;inset:0;z-index:5;pointer-events:none}
   .callout{position:absolute;pointer-events:auto;transition:opacity .2s}
   .cpill{display:inline-flex;align-items:center;gap:8px;font:inherit;font-weight:800;font-size:.72rem;letter-spacing:.07em;color:var(--ink);
@@ -214,11 +214,11 @@
   var markers={}, activeMarker=null, MARK=0xff2a3a;
   function makeMarker(y,rad){
     var g=new THREE.Group();
-    var core=new THREE.Mesh(new THREE.SphereGeometry(rad,24,24),
-      new THREE.MeshBasicMaterial({color:MARK,transparent:false,opacity:1,depthTest:false,depthWrite:false}));
+    var core=new THREE.Mesh(new THREE.SphereGeometry(rad*0.60,20,20),
+      new THREE.MeshBasicMaterial({color:MARK,transparent:true,opacity:.92,depthTest:false,depthWrite:false,blending:THREE.AdditiveBlending}));
     core.renderOrder=20;
-    var halo=new THREE.Mesh(new THREE.SphereGeometry(rad*1.45,24,24),
-      new THREE.MeshBasicMaterial({color:MARK,transparent:true,opacity:.34,depthTest:false,depthWrite:false}));
+    var halo=new THREE.Mesh(new THREE.SphereGeometry(rad*1.02,20,20),
+      new THREE.MeshBasicMaterial({color:MARK,transparent:true,opacity:.16,depthTest:false,depthWrite:false,blending:THREE.AdditiveBlending}));
     halo.renderOrder=19;
     g.add(halo); g.add(core); g.position.set(0,y,0); g.visible=false; g.userData.rad=rad;
     return g;
@@ -266,7 +266,7 @@
         pivot.scale.setScalar(s);
         root=pivot;scene.add(pivot);
         var hh=size.y/2;
-        Object.keys(ZSPEC).forEach(function(z){ var sp=ZSPEC[z]; var m=makeMarker(sp.zf*hh, sp.rad*hh*0.8); pivot.add(m); markers[z]=m; });
+        Object.keys(ZSPEC).forEach(function(z){ var sp=ZSPEC[z]; var m=makeMarker(sp.zf*hh, sp.rad*hh*0.52); pivot.add(m); markers[z]=m; });
         var ring=new THREE.Mesh(new THREE.RingGeometry(hh*0.30, hh*0.44, 56),
           new THREE.MeshBasicMaterial({color:0x2fb6ff,transparent:true,opacity:0.55,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
         ring.rotation.x=-Math.PI/2; ring.position.y=-hh*0.98; pivot.add(ring);
