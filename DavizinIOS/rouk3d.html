@@ -44,6 +44,13 @@
     background:linear-gradient(145deg,rgba(47,182,255,.2),rgba(47,182,255,.05));color:var(--accent);font-size:1.2rem;
     display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 20px -8px var(--glow)}
   .cube:active{transform:scale(.94)}
+  .navm{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:44px;height:44px;border-radius:14px;border:1px solid var(--stroke-2);background:rgba(10,16,30,.5);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:#cfe3ff;font-size:24px;line-height:1;display:none;place-items:center;cursor:pointer}
+  .navm:active{transform:translateY(-50%) scale(.9)}
+  .nleft{left:12px}.nright{right:12px}
+  .mname{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:5;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#bcd3f5;background:rgba(10,16,30,.5);padding:6px 14px;border-radius:999px;border:1px solid var(--stroke-2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);white-space:nowrap;max-width:70%;overflow:hidden;text-overflow:ellipsis}
+  .mdots{position:absolute;top:48px;left:50%;transform:translateX(-50%);z-index:5;display:flex;gap:6px}
+  .mdot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.28);transition:background .2s}
+  .mdot.on{background:#4ea2ff;box-shadow:0 0 8px #4ea2ff}
   #reticle{position:absolute;left:0;top:0;z-index:5;pointer-events:none;opacity:0;transition:opacity .22s;will-change:transform}
   .ret-ring{position:absolute;left:-27px;top:-27px;width:54px;height:54px;border:2px solid var(--mark);border-radius:50%;box-shadow:0 0 16px var(--mark-glow);animation:retpulse 1.5s ease-in-out infinite}
   .ret-ring::after{content:"";position:absolute;inset:7px;border:1px solid rgba(255,42,58,.5);border-radius:50%}
@@ -142,6 +149,10 @@
     <div id="callouts"></div>
     <div class="zone" id="zone">VIEW CHARACTER OPTIONS • 3D</div>
     <button class="cube" id="cube" title="Reencuadrar">▣</button>
+    <button id="prevM" class="navm nleft" title="Anterior">‹</button>
+    <button id="nextM" class="navm nright" title="Siguiente">›</button>
+    <div id="mname" class="mname">Modelo 1</div>
+    <div id="mdots" class="mdots"></div>
     <div class="scan"></div>
     <div id="loader"><div><div class="spin"></div>Cargando modelo…</div></div>
   </div>
@@ -213,36 +224,73 @@
     return g;
   }
   function b64buf(b){var s=atob(b),n=s.length,u=new Uint8Array(n);for(var i=0;i<n;i++)u[i]=s.charCodeAt(i);return u.buffer;}
-  try{
-    new THREE.GLTFLoader().parse(b64buf(window.ROUK_GLB),'',function(gltf){
-      var obj=gltf.scene;
-      obj.traverse(function(c){if(c.isMesh&&c.material){c.material.side=THREE.DoubleSide;if(c.material.map)c.material.map.anisotropy=4;}});
-      obj.updateMatrixWorld(true);
-      var box=new THREE.Box3().setFromObject(obj),size=box.getSize(new THREE.Vector3()),ctr=box.getCenter(new THREE.Vector3());
-      obj.position.x-=ctr.x;obj.position.y-=ctr.y;obj.position.z-=ctr.z;
-      var pivot=new THREE.Group();pivot.add(obj);
-      var maxDim=Math.max(size.x,size.y,size.z)||1,s=2.0/maxDim;
-      pivot.scale.setScalar(s);
-      root=pivot;scene.add(pivot);
-      // marcadores en coords locales (sin escalar): media-altura = size.y/2
-      var hh=size.y/2;
-      Object.keys(ZSPEC).forEach(function(z){ var sp=ZSPEC[z]; var m=makeMarker(sp.zf*hh, sp.rad*hh*0.8); pivot.add(m); markers[z]=m; });
-      // plataforma holografica azul bajo los pies (showcase)
-      var ring=new THREE.Mesh(new THREE.RingGeometry(hh*0.30, hh*0.44, 56),
-        new THREE.MeshBasicMaterial({color:0x2fb6ff,transparent:true,opacity:0.55,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
-      ring.rotation.x=-Math.PI/2; ring.position.y=-hh*0.98; pivot.add(ring);
-      var disc=new THREE.Mesh(new THREE.CircleGeometry(hh*0.42, 56),
-        new THREE.MeshBasicMaterial({color:0x1550ff,transparent:true,opacity:0.16,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
-      disc.rotation.x=-Math.PI/2; disc.position.y=-hh*0.99; pivot.add(disc);
-      pivot.updateMatrixWorld(true);
-      var bb=new THREE.Box3().setFromObject(obj); // SOLO el modelo (los marcadores cuelgan del pivot, no de obj)
-      modelCenter.copy(bb.getCenter(new THREE.Vector3()));
-      var bs=bb.getSize(new THREE.Vector3());
-      halfW=bs.x/2; halfH=bs.y/2;
-      resetView();
-      document.getElementById('loader').classList.add('hide');
-    },function(e){document.getElementById('loader').innerHTML='No se pudo cargar el modelo.';});
-  }catch(e){document.getElementById('loader').innerHTML='No se pudo cargar el modelo.';}
+  /* ============================================================
+     PERSONAJES INTERCAMBIABLES
+     Para agregar más personajes, edita este array. Cada entrada:
+       { name:'Nombre que se muestra', b64:'BASE64_DEL_.GLB' }
+     El b64 es el contenido del archivo .glb convertido a base64
+     (sin el prefijo "data:...;base64,"). El primero ya viene cargado.
+     También puedes definir window.NYXEL_MODELS antes de este script.
+     ============================================================ */
+  var MODELS = (window.NYXEL_MODELS && window.NYXEL_MODELS.length) ? window.NYXEL_MODELS : [
+    { name:'Modelo 1', b64: window.ROUK_GLB }
+    // ,{ name:'Mi personaje 2', b64:'PEGA_AQUI_EL_BASE64' }
+    // ,{ name:'Mi personaje 3', b64:'PEGA_AQUI_EL_BASE64' }
+  ];
+  var curModel=0;
+
+  function clearModel(){
+    if(root){ scene.remove(root);
+      root.traverse(function(o){ if(o.geometry&&o.geometry.dispose)o.geometry.dispose();
+        if(o.material){ if(Array.isArray(o.material))o.material.forEach(function(m){m&&m.dispose&&m.dispose();}); else o.material.dispose&&o.material.dispose(); } });
+      root=null; }
+    markers={}; activeMarker=null;
+  }
+
+  function loadModel(idx){
+    if(!MODELS.length)return;
+    curModel=((idx%MODELS.length)+MODELS.length)%MODELS.length;
+    updateSwapUI();
+    var ldr=document.getElementById('loader'); ldr.classList.remove('hide'); ldr.innerHTML='<div><div class="spin"></div>Cargando modelo…</div>';
+    var entry=MODELS[curModel]; if(!entry||!entry.b64){ ldr.innerHTML='Modelo vacío. Pega el base64 del .glb.'; return; }
+    try{
+      new THREE.GLTFLoader().parse(b64buf(entry.b64),'',function(gltf){
+        clearModel();
+        var obj=gltf.scene;
+        obj.traverse(function(c){if(c.isMesh&&c.material){c.material.side=THREE.DoubleSide;if(c.material.map)c.material.map.anisotropy=4;}});
+        obj.updateMatrixWorld(true);
+        var box=new THREE.Box3().setFromObject(obj),size=box.getSize(new THREE.Vector3()),ctr=box.getCenter(new THREE.Vector3());
+        obj.position.x-=ctr.x;obj.position.y-=ctr.y;obj.position.z-=ctr.z;
+        var pivot=new THREE.Group();pivot.add(obj);
+        var maxDim=Math.max(size.x,size.y,size.z)||1,s=2.0/maxDim;
+        pivot.scale.setScalar(s);
+        root=pivot;scene.add(pivot);
+        var hh=size.y/2;
+        Object.keys(ZSPEC).forEach(function(z){ var sp=ZSPEC[z]; var m=makeMarker(sp.zf*hh, sp.rad*hh*0.8); pivot.add(m); markers[z]=m; });
+        var ring=new THREE.Mesh(new THREE.RingGeometry(hh*0.30, hh*0.44, 56),
+          new THREE.MeshBasicMaterial({color:0x2fb6ff,transparent:true,opacity:0.55,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+        ring.rotation.x=-Math.PI/2; ring.position.y=-hh*0.98; pivot.add(ring);
+        var disc=new THREE.Mesh(new THREE.CircleGeometry(hh*0.42, 56),
+          new THREE.MeshBasicMaterial({color:0x1550ff,transparent:true,opacity:0.16,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+        disc.rotation.x=-Math.PI/2; disc.position.y=-hh*0.99; pivot.add(disc);
+        pivot.updateMatrixWorld(true);
+        var bb=new THREE.Box3().setFromObject(obj);
+        modelCenter.copy(bb.getCenter(new THREE.Vector3()));
+        var bs=bb.getSize(new THREE.Vector3());
+        halfW=bs.x/2; halfH=bs.y/2;
+        resetView();
+        ldr.classList.add('hide');
+      },function(e){document.getElementById('loader').innerHTML='No se pudo cargar el modelo.';});
+    }catch(e){document.getElementById('loader').innerHTML='No se pudo cargar el modelo.';}
+  }
+
+  function updateSwapUI(){
+    var nm=document.getElementById('mname'); if(nm)nm.textContent=(MODELS[curModel]&&MODELS[curModel].name)||('Modelo '+(curModel+1));
+    var nav=MODELS.length>1;
+    ['prevM','nextM'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=nav?'grid':'none';});
+    var dots=document.getElementById('mdots'); if(dots){dots.innerHTML=''; if(nav){for(var i=0;i<MODELS.length;i++){var d=document.createElement('span');d.className='mdot'+(i===curModel?' on':'');dots.appendChild(d);}}}
+  }
+  function nhapticTap(){try{window.webkit.messageHandlers.bridge.postMessage({t:'haptic',s:'light'});}catch(e){}}
 
   function resetView(){
     var vfov=camera.fov*Math.PI/180, t=Math.tan(vfov/2);
@@ -374,6 +422,9 @@
   renderOptions(OPTS.map(function(o){ return {id:o.n, name:o.n, sub:o.d, zone:o.zone}; }));
 
   document.getElementById('cube').onclick=function(){if(root)resetView();};
+  document.getElementById('prevM').onclick=function(){nhapticTap();loadModel(curModel-1);};
+  document.getElementById('nextM').onclick=function(){nhapticTap();loadModel(curModel+1);};
+  loadModel(0);
 })();
 </script>
 </body></html>
