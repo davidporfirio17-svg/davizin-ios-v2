@@ -48,6 +48,13 @@
   .vignette{position:absolute;inset:0;z-index:3;pointer-events:none;
     background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,5,14,.75) 72%, rgba(3,5,14,.98) 100%)}
 
+  /* Overlay de items equipados sobre el personaje */
+  #itemOverlays{position:absolute;inset:0;z-index:4;pointer-events:none}
+  .outfit-item{position:absolute;background-size:contain;background-position:center;background-repeat:no-repeat;
+    opacity:0;transform:scale(.85);transition:opacity .5s ease,transform .5s cubic-bezier(.22,1,.3,1);
+    filter:drop-shadow(0 0 14px rgba(90,200,250,.3)) drop-shadow(0 2px 6px rgba(0,0,0,.4))}
+  .outfit-item.on{opacity:.88;transform:scale(1)}
+
   /* Pills superiores tipo 3D LIVE · NOMBRE · CHARACTER */
   .topbar{position:absolute;top:14px;left:14px;right:14px;z-index:6;display:flex;gap:7px;justify-content:space-between}
   .tpill{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:.6rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.85);
@@ -175,6 +182,7 @@
     <div class="floor"></div>
     <div id="stage"></div>
     <div class="vignette"></div>
+    <div id="itemOverlays"></div>
     <div id="vload" class="vload"><div><div class="spin"></div><div>Ingresa un UID y pulsa Buscar</div></div></div>
 
     <div class="topbar">
@@ -216,6 +224,54 @@
   // ========== Config SiamBhau ==========
   var SIAM_KEY = (window.NYXEL_SIAM_KEY) || 'FFAPI-PREM-60-sjdonsl-X28';
   var SIAM_BASE = 'https://siambhau69.eu.cc';
+
+  // ========== Outfit item overlay system ==========
+  // Maps Free Fire item ID prefixes to body zones
+  var ICON_BASE = 'https://raw.githubusercontent.com/ashqking/FF-Items/main/ICONS/';
+  var ICON_FB   = 'https://raw.githubusercontent.com/I-SHOW-AKIRU200/AKIRU-ICONS/main/ICONS/';
+  // Position of each item type on the character body (% within viewer)
+  var ITEM_POS = {
+    head:   {top:'4%',   left:'28%', w:'44%', h:'22%'},
+    mask:   {top:'14%',  left:'30%', w:'40%', h:'16%'},
+    top:    {top:'26%',  left:'18%', w:'64%', h:'30%'},
+    bottom: {top:'50%',  left:'22%', w:'56%', h:'28%'},
+    shoes:  {top:'76%',  left:'26%', w:'48%', h:'18%'},
+    back:   {top:'28%',  left:'58%', w:'30%', h:'28%'}
+  };
+  function zoneFromId(id){
+    var p=String(id).substring(0,3);
+    switch(p){
+      case '203':case '202':case '201':case '912': return 'head';
+      case '205':case '204':case '904': return 'mask';
+      case '211':case '210':case '208':case '209':case '907': return 'top';
+      case '213':case '212': return 'bottom';
+      case '214': return 'shoes';
+      case '215':case '216': return 'back';
+      default: return null;
+    }
+  }
+  function showOutfitItems(ids){
+    var cont=document.getElementById('itemOverlays');
+    if(!cont)return; cont.innerHTML='';
+    var filled={};
+    (ids||[]).forEach(function(id){
+      var zone=zoneFromId(id);
+      if(!zone||filled[zone]||!ITEM_POS[zone])return;
+      filled[zone]=true;
+      var z=ITEM_POS[zone];
+      var el=document.createElement('div'); el.className='outfit-item';
+      el.style.top=z.top; el.style.left=z.left; el.style.width=z.w; el.style.height=z.h;
+      var url=ICON_BASE+id+'.png';
+      var img=new Image();
+      img.onload=function(){ el.style.backgroundImage='url("'+url+'")'; setTimeout(function(){el.classList.add('on');},80); };
+      img.onerror=function(){
+        var url2=ICON_FB+id+'.png';
+        var img2=new Image(); img2.onload=function(){ el.style.backgroundImage='url("'+url2+'")'; el.classList.add('on'); }; img2.src=url2;
+      };
+      img.src=url;
+      cont.appendChild(el);
+    });
+  }
 
   // Zonas / modos conocidos
   var ZLABEL = { cuello:'CUELLO', pecho:'PECHO', head:'CABEZA', drag:'DRAG · CABEZA' };
@@ -259,12 +315,22 @@
     _lastUrl = url;
     document.getElementById('renderImg').src = url;
 
-    // Opcional: pedir /freefireinfo/bhau para sacar nickname real
+    // Clear previous outfit overlays
+    var _ov = document.getElementById('itemOverlays'); if(_ov) _ov.innerHTML='';
+
+    // Pedir /freefireinfo/bhau para nickname + clothesIDs
     fetch(SIAM_BASE+'/freefireinfo/bhau?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(SIAM_KEY))
       .then(function(r){ return r.json(); })
       .then(function(j){
         var nick = (j && (j.nickname || (j.basic && j.basic.nickname) || (j.data && (j.data.nickname || (j.data.basic && j.data.basic.nickname))))) || null;
         if(nick) document.getElementById('charName').textContent = nick;
+        // Extract clothesIDs and overlay real items on character
+        var clothes = null;
+        try{
+          var pi = (j && j.profileInfo) || (j && j.data && j.data.profileInfo) || null;
+          clothes = (pi && pi.clothes) || (j && j.clothes) || (j && j.data && j.data.clothes) || null;
+        }catch(e){}
+        if(clothes && clothes.length) showOutfitItems(clothes);
       })
       .catch(function(){});
   };
