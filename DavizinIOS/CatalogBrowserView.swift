@@ -1,19 +1,24 @@
 import UIKit
 import WebKit
 
-/// Pantalla "Catálogo" — grid navegable de los 32,199 items del juego.
-/// Carga `items.json` desde el repo nyxel-ff-assets y los renderiza con
-/// filtros, buscador y preview fullscreen. Todo en WKWebView para mantener
-/// la estética Liquid Glass consistente con el resto de la app.
+/// Pantalla "Outfit Showcase" — muestra al jugador con todas sus prendas
+/// reales desplegadas como grid de loot. Avatar grande arriba, grid con
+/// cada pieza del clothesIDs/weaponSkinIDs/bannerID/petID resuelta al PNG
+/// real vía `items.json` del repo nyxel-ff-assets.
+///
+/// (El nombre de la clase queda por compatibilidad con el call-site anterior;
+///  el contenido es el Outfit Showcase, no el catálogo global.)
 final class CatalogBrowserView: UIView, WKNavigationDelegate {
     private var webView: WKWebView!
+    private var ready = false
+    private var pendingPayload: [String: Any]?
 
     override init(frame: CGRect) { super.init(frame: frame); configure() }
     required init?(coder: NSCoder) { super.init(coder: coder); configure() }
 
     private func configure() {
         translatesAutoresizingMaskIntoConstraints = false
-        backgroundColor = UIColor(red: 0.051, green: 0.063, blue: 0.082, alpha: 1)
+        backgroundColor = UIColor(red: 0.008, green: 0.016, blue: 0.039, alpha: 1)
 
         let wv = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
         wv.navigationDelegate = self
@@ -26,8 +31,53 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
         wv.davizinPinEdges(to: self)
         webView = wv
 
-        if let url = Bundle.main.url(forResource: "nyxel_catalog", withExtension: "html") {
+        if let url = Bundle.main.url(forResource: "nyxel_outfit", withExtension: "html") {
             wv.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         }
+    }
+
+    /// Carga el perfil del jugador en la pantalla de Outfit.
+    /// Puede llamarse antes o después de que el WebView termine de cargar;
+    /// se encola si aún no está listo.
+    func showOutfit(for summary: FreeFireLookupSummary) {
+        var avatarURL: String? = nil
+        var bannerURL: String? = nil
+        if let a = summary.avatarID, !a.isEmpty {
+            avatarURL = NyxelItemCatalog.shared.imageURL(for: a)?.absoluteString
+        }
+        if let b = summary.bannerID, !b.isEmpty {
+            bannerURL = NyxelItemCatalog.shared.imageURL(for: b)?.absoluteString
+        }
+        let payload: [String: Any] = [
+            "nickname": summary.nickname ?? "Jugador",
+            "uid": summary.uid,
+            "level": summary.level ?? "",
+            "likes": summary.likes ?? "",
+            "region": (summary.region ?? "").uppercased(),
+            "br": summary.brRankCode ?? "",
+            "cs": summary.csRankCode ?? "",
+            "season": summary.season ?? "",
+            "avatarURL": avatarURL ?? "",
+            "bannerURL": bannerURL ?? "",
+            "clothesIDs": summary.clothesIDs,
+            "weaponSkinIDs": summary.weaponSkinIDs,
+            "bannerID": summary.bannerID ?? "",
+            "headPicID": summary.headPicID ?? "",
+            "petID": summary.petID ?? ""
+        ]
+        pendingPayload = payload
+        if ready { flushPayload() }
+    }
+
+    private func flushPayload() {
+        guard let p = pendingPayload,
+              let data = try? JSONSerialization.data(withJSONObject: p),
+              let json = String(data: data, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("window.NYXEL_setOutfitData && window.NYXEL_setOutfitData(\(json));", completionHandler: nil)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        ready = true
+        flushPayload()
     }
 }

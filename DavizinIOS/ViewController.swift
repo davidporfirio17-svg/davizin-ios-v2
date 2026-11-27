@@ -680,8 +680,9 @@ final class ViewController: UIViewController {
         screen.onOpenShareRequested = { [weak self] summary in
             self?.presentShareCard(for: summary)
         }
-        screen.onOpenCatalogRequested = { [weak self] in
-            self?.presentCatalogBrowser()
+        screen.onOpenCatalogRequested = { [weak self, weak screen] in
+            guard let summary = screen?.lastSummary else { return }
+            self?.presentOutfitShowcase(for: summary)
         }
         playerView = screen
         display(screen, animated: animated)
@@ -947,13 +948,14 @@ final class ViewController: UIViewController {
         present(vc, animated: true)
     }
 
-    fileprivate func presentCatalogBrowser() {
+    fileprivate func presentOutfitShowcase(for summary: FreeFireLookupSummary) {
         let vc = UIViewController()
         vc.modalPresentationStyle = .fullScreen
-        vc.view.backgroundColor = UIColor(red: 0.051, green: 0.063, blue: 0.082, alpha: 1)
-        let catalog = CatalogBrowserView()
-        vc.view.addSubview(catalog)
-        catalog.davizinPinEdges(to: vc.view)
+        vc.view.backgroundColor = UIColor(red: 0.008, green: 0.016, blue: 0.039, alpha: 1)
+        let outfit = CatalogBrowserView()
+        vc.view.addSubview(outfit)
+        outfit.davizinPinEdges(to: vc.view)
+        outfit.showOutfit(for: summary)
         // Botón cerrar flotante
         let close = UIButton(type: .system)
         close.setTitle("×", for: .normal)
