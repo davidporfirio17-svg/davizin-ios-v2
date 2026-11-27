@@ -557,6 +557,7 @@ final class ViewController: UIViewController {
 
         let screen = Modes3DView()
         screen.delegate = self
+        screen.onFetchItemImage = onFreeFireAsset
         screen.setModes(modes)
         modes3DView = screen
         display(screen, animated: animated)

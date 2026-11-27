@@ -20,6 +20,7 @@ private final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
 final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
 
     weak var delegate: Modes3DViewDelegate?
+    var onFetchItemImage: ((String, @escaping (UIImage?) -> Void) -> Void)?
     private let webView: WKWebView
     private var pendingModes: [DavizinMode] = []
     private var loaded = false
@@ -27,10 +28,6 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
     private static var siamApiKey: String {
         if let k = UserDefaults.standard.string(forKey: "nyxel.siambhau.apikey"), !k.isEmpty { return k }
         return "FFAPI-PREM-60-sjdonsl-X28"
-    }
-
-    private static var nyxelKey: String {
-        AppState.shared.currentKey
     }
 
     override init(frame: CGRect) {
@@ -107,17 +104,17 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
     }
 
     private func fetchItemImage(itemId: String) {
-        let key = Self.nyxelKey
-        let hwid = KeyValidator.getDeviceHWID()
-        guard !key.isEmpty, !hwid.isEmpty, itemId.allSatisfy({ $0.isNumber }) else { return }
-        FreeFireStatsService.shared.loadAsset(itemID: itemId, key: key, hwid: hwid) { [weak self] image in
+        guard itemId.allSatisfy({ $0.isNumber }), let fetcher = onFetchItemImage else { return }
+        fetcher(itemId) { [weak self] image in
             guard let self, let image, let data = image.pngData() else { return }
             let b64 = data.base64EncodedString()
             let dataUrl = "data:image/png;base64,\(b64)"
-            self.webView.evaluateJavaScript(
-                "window.NYXEL_onItemImage && window.NYXEL_onItemImage('\(itemId)','\(dataUrl)');",
-                completionHandler: nil
-            )
+            DispatchQueue.main.async {
+                self.webView.evaluateJavaScript(
+                    "window.NYXEL_onItemImage && window.NYXEL_onItemImage('\(itemId)','\(dataUrl)');",
+                    completionHandler: nil
+                )
+            }
         }
     }
 
