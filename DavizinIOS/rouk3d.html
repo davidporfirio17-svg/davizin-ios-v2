@@ -45,6 +45,7 @@
     box-shadow:0 0 0 1px rgba(60,130,255,.05),0 30px 72px -28px rgba(20,60,200,.5),inset 0 1px 0 rgba(255,255,255,.22)}
   #stage{position:absolute;inset:0;background-size:260% auto;background-position:50% 42%;background-repeat:no-repeat;transition:opacity .45s;opacity:0}
   #stage.on{opacity:1;filter:drop-shadow(0 0 18px rgba(90,200,250,.18)) drop-shadow(0 0 36px rgba(90,200,250,.08))}
+  #stage.on.dimmed{opacity:.15;filter:none}
   .vignette{position:absolute;inset:0;z-index:3;pointer-events:none;
     background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,5,14,.75) 72%, rgba(3,5,14,.98) 100%)}
 
@@ -326,6 +327,9 @@
       }
     });
     var cc=document.getElementById('charComposite'); if(cc) cc.classList.add('on');
+    document.getElementById('vload').classList.add('hide');
+    document.getElementById('hint').innerHTML = '✓ Prendas cargadas. Toca una zona para preparar.';
+    var btn = document.getElementById('goBtn'); btn.classList.remove('busy'); btn.textContent='Buscar';
     _requestBetterImages(ids);
   }
   function _requestBetterImages(ids){
@@ -453,16 +457,24 @@
     } catch(e){}
     if(!cropped) stage.style.backgroundImage='url("'+img.src+'")';
     stage.classList.add('on');
+    var cc=document.getElementById('charComposite');
+    if(cc && cc.classList.contains('on')) stage.classList.add('dimmed');
     document.getElementById('vload').classList.add('hide');
     document.getElementById('hint').textContent = '✓ Personaje cargado. Toca una zona para preparar.';
     var btn = document.getElementById('goBtn'); btn.classList.remove('busy'); btn.textContent='Buscar';
   };
   window.onRenderFail = function(){
-    if(_retries < 2 && _lastUrl){
+    var cc=document.getElementById('charComposite');
+    var compositeShowing = cc && cc.classList.contains('on');
+    if(_retries < 2 && _lastUrl && !compositeShowing){
       _retries++;
       var delay = 2500 * _retries;
       document.getElementById('vload').innerHTML = '<div style="color:#ffd27a"><div class="spin"></div>⏱ Rate-limit · reintentando '+_retries+'/2 en '+(delay/1000)+'s…</div>';
       setTimeout(function(){ document.getElementById('renderImg').src = _lastUrl+'&retry='+_retries; }, delay);
+      return;
+    }
+    if(compositeShowing){
+      document.getElementById('vload').classList.add('hide');
       return;
     }
     document.getElementById('vload').innerHTML = '<div style="color:#ff948b"><div style="font-size:1.6rem;margin-bottom:6px">⚠</div>No se pudo cargar el personaje<br><span style="color:#ffd27a;font-size:.72rem">API con rate-limit prolongado o UID sin outfit</span></div>';
