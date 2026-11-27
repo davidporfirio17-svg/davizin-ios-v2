@@ -136,7 +136,7 @@ jobs:
           end
 
           # Add 3D viewer resources (html + glb) to the resources build phase
-          ["rouk3d.html", "rouk.glb", "opcion_desactivada.m4a", "nyxel_intro.html", "nyxel_profile.html", "entorno.html", "nyxel_catalog.html", "nyxel_share.html", "nyxel_outfit.html"].each do |res|
+          ["rouk3d.html", "rouk.glb", "opcion_desactivada.m4a", "nyxel_intro.html", "nyxel_profile.html", "entorno.html", "nyxel_catalog.html", "nyxel_share.html", "nyxel_outfit.html", "nyxel_siambhau.html"].each do |res|
             next if davizin_group.files.any? { |f| f.path.end_with?(res) }
             ref = davizin_group.new_file(res)
             target.resources_build_phase.add_file_reference(ref)

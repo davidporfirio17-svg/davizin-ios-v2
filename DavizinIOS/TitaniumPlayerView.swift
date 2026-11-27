@@ -20,6 +20,8 @@ final class TitaniumPlayerView: UIView, WKScriptMessageHandler, WKNavigationDele
     /// Callbacks para los nuevos botones premium del perfil.
     var onOpenShareRequested: ((FreeFireLookupSummary) -> Void)?
     var onOpenCatalogRequested: (() -> Void)?
+    /// Callback para la pantalla de test aislada de SiamBhau (debug).
+    var onOpenSiamTestRequested: (() -> Void)?
 
     /// Último perfil cargado — guardado para alimentar la pantalla "Compartir".
     private(set) var lastSummary: FreeFireLookupSummary?
@@ -178,6 +180,8 @@ final class TitaniumPlayerView: UIView, WKScriptMessageHandler, WKNavigationDele
             if let s = lastSummary { onOpenShareRequested?(s) }
         case "openCatalog":
             onOpenCatalogRequested?()
+        case "openSiam":
+            onOpenSiamTestRequested?()
         default: break
         }
     }

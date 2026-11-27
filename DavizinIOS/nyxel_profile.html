@@ -229,13 +229,17 @@ body{color:var(--fg);font-family:var(--f);-webkit-font-smoothing:antialiased;let
   bar.style.cssText = 'position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;display:flex;gap:10px;pointer-events:auto';
   bar.innerHTML =
     '<button id="nyxBShare" style="padding:11px 18px;border-radius:999px;border:0.5px solid rgba(255,255,255,.22);background:linear-gradient(180deg,rgba(10,132,255,.95),rgba(10,100,230,.95));color:#fff;font:inherit;font-weight:800;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 10px 28px -10px rgba(10,132,255,.6),inset 0 1px 0 rgba(255,255,255,.4)">Compartir</button>' +
-    '<button id="nyxBCat" style="padding:11px 18px;border-radius:999px;border:0.5px solid rgba(255,255,255,.18);background:rgba(10,14,22,.65);color:#fff;font:inherit;font-weight:800;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 10px 24px -12px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.2)">Ver outfit</button>';
+    '<button id="nyxBCat" style="padding:11px 18px;border-radius:999px;border:0.5px solid rgba(255,255,255,.18);background:rgba(10,14,22,.65);color:#fff;font:inherit;font-weight:800;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 10px 24px -12px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.2)">Ver outfit</button>' +
+    '<button id="nyxBSiam" style="padding:11px 14px;border-radius:999px;border:0.5px solid rgba(255,159,10,.45);background:rgba(50,30,5,.75);color:#ffcf7a;font:inherit;font-weight:900;font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 10px 24px -12px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.15)">SIAM</button>';
   document.body.appendChild(bar);
   document.getElementById('nyxBShare').onclick = function(){
     try{window.webkit.messageHandlers.nyxel.postMessage({t:'openShare'});if(navigator.vibrate)navigator.vibrate(10);}catch(e){}
   };
   document.getElementById('nyxBCat').onclick = function(){
     try{window.webkit.messageHandlers.nyxel.postMessage({t:'openCatalog'});if(navigator.vibrate)navigator.vibrate(10);}catch(e){}
+  };
+  document.getElementById('nyxBSiam').onclick = function(){
+    try{window.webkit.messageHandlers.nyxel.postMessage({t:'openSiam'});if(navigator.vibrate)navigator.vibrate(10);}catch(e){}
   };
 })();
 </script>
