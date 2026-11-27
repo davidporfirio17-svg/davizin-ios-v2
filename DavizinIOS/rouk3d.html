@@ -51,9 +51,14 @@
   /* Overlay de items equipados sobre el personaje */
   #itemOverlays{position:absolute;inset:0;z-index:4;pointer-events:none}
   .outfit-item{position:absolute;background-size:contain;background-position:center;background-repeat:no-repeat;
-    opacity:0;transform:scale(.85);transition:opacity .5s ease,transform .5s cubic-bezier(.22,1,.3,1);
-    filter:drop-shadow(0 0 14px rgba(90,200,250,.3)) drop-shadow(0 2px 6px rgba(0,0,0,.4))}
-  .outfit-item.on{opacity:.88;transform:scale(1)}
+    opacity:0;transform:scale(.88);transition:opacity .6s ease,transform .6s cubic-bezier(.22,1,.3,1);
+    mix-blend-mode:screen;
+    -webkit-mask-image:radial-gradient(ellipse at center, black 50%, transparent 95%);
+    mask-image:radial-gradient(ellipse at center, black 50%, transparent 95%);
+    filter:drop-shadow(0 2px 10px rgba(0,0,0,.4)) brightness(1.1) saturate(1.2)}
+  .outfit-item.on{opacity:.92;transform:scale(1)}
+  /* Cuando hay items, bajar opacidad del personaje base para que resalten los items */
+  #stage.on.dimmed{opacity:.4;filter:brightness(.45) saturate(.25) drop-shadow(0 0 18px rgba(90,200,250,.12))}
 
   /* Pills superiores tipo 3D LIVE · NOMBRE · CHARACTER */
   .topbar{position:absolute;top:14px;left:14px;right:14px;z-index:6;display:flex;gap:7px;justify-content:space-between}
@@ -267,12 +272,12 @@
   var ICON_FB   = 'https://raw.githubusercontent.com/I-SHOW-AKIRU200/AKIRU-ICONS/main/ICONS/';
   // Position of each item type on the character body (% within viewer)
   var ITEM_POS = {
-    head:   {top:'4%',   left:'28%', w:'44%', h:'22%'},
-    mask:   {top:'14%',  left:'30%', w:'40%', h:'16%'},
-    top:    {top:'26%',  left:'18%', w:'64%', h:'30%'},
-    bottom: {top:'50%',  left:'22%', w:'56%', h:'28%'},
-    shoes:  {top:'76%',  left:'26%', w:'48%', h:'18%'},
-    back:   {top:'28%',  left:'58%', w:'30%', h:'28%'}
+    head:   {top:'6%',   left:'26%', w:'48%', h:'20%'},
+    mask:   {top:'15%',  left:'28%', w:'44%', h:'14%'},
+    top:    {top:'24%',  left:'14%', w:'72%', h:'32%'},
+    bottom: {top:'50%',  left:'18%', w:'64%', h:'30%'},
+    shoes:  {top:'78%',  left:'24%', w:'52%', h:'18%'},
+    back:   {top:'26%',  left:'52%', w:'34%', h:'30%'}
   };
   function zoneFromId(id){
     var p=String(id).substring(0,3);
@@ -290,6 +295,8 @@
     var cont=document.getElementById('itemOverlays');
     if(!cont)return; cont.innerHTML='';
     var filled={};
+    var stage=document.getElementById('stage');
+    if(stage) stage.classList.add('dimmed');
     (ids||[]).forEach(function(id){
       var zone=zoneFromId(id);
       if(!zone||filled[zone]||!ITEM_POS[zone])return;
@@ -343,7 +350,7 @@
     var btn = document.getElementById('goBtn'); btn.classList.add('busy'); btn.textContent='Buscando…';
     document.getElementById('charName').textContent = 'UID ' + uid;
     document.getElementById('hint').innerHTML = 'Pidiendo render del personaje con outfit real…';
-    var stage = document.getElementById('stage'); stage.classList.remove('on'); stage.style.backgroundImage='';
+    var stage = document.getElementById('stage'); stage.classList.remove('on','dimmed'); stage.style.backgroundImage='';
     var vload = document.getElementById('vload'); vload.classList.remove('hide');
     vload.innerHTML = '<div><div class="spin"></div>Pidiendo render a SiamBhau…</div>';
     _retries = 0;
@@ -360,38 +367,44 @@
     document.getElementById('statusBadge').className = 'offline-badge';
     document.getElementById('statusBadge').textContent = 'BUSCANDO…';
 
-    // Pedir /freefireinfo/bhau para nickname + clothesIDs + info
-    fetch(SIAM_BASE+'/freefireinfo/bhau?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(SIAM_KEY))
-      .then(function(r){ return r.json(); })
-      .then(function(j){
-        var d = (j && j.data) || j || {};
-        var basic = d.basic || d.basicInfo || d || {};
-        var nick = basic.nickname || basic.name || d.nickname || null;
-        if(nick){
-          document.getElementById('charName').textContent = nick;
-          document.getElementById('infoNick').textContent = nick;
-        }
-        // Level
-        var lv = basic.level || basic.accountLevel || d.level || null;
-        if(lv) document.getElementById('infoLevel').textContent = 'NV.' + lv;
-        // Online status
-        var sb = document.getElementById('statusBadge');
-        var lastLogin = basic.lastLogin || d.lastLogin || null;
-        var isOnline = basic.isOnline || d.isOnline || false;
-        if(isOnline){ sb.className='online-badge'; sb.textContent='EN LÍNEA'; }
-        else if(nick){ sb.className='offline-badge'; sb.textContent='FUERA DE LÍNEA'; }
-        // Extract clothesIDs and overlay real items on character
-        var clothes = null;
-        try{
-          var pi = d.profileInfo || (j && j.profileInfo) || null;
-          clothes = (pi && pi.clothes) || d.clothes || null;
-        }catch(e){}
-        if(clothes && clothes.length) showOutfitItems(clothes);
-      })
-      .catch(function(){
-        var sb = document.getElementById('statusBadge');
-        sb.className='offline-badge'; sb.textContent='SIN DATOS';
-      });
+    // Pedir info del jugador via Swift bridge (evita CORS) o fetch directo como fallback
+    var _bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nyxel;
+    if(_bridge){
+      _bridge.postMessage({t:'fetchInfo', uid:uid, region:reg});
+    } else {
+      // Fallback: fetch directo (funciona en navegador, falla en WKWebView por CORS)
+      fetch(SIAM_BASE+'/freefireinfo/bhau?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(SIAM_KEY))
+        .then(function(r){ return r.json(); })
+        .then(function(j){ window.NYXEL_onInfoData(j); })
+        .catch(function(){
+          var sb = document.getElementById('statusBadge');
+          sb.className='offline-badge'; sb.textContent='SIN DATOS';
+        });
+    }
+  };
+
+  // Callback: recibe JSON del jugador (vía Swift bridge o fetch directo)
+  window.NYXEL_onInfoData = function(j){
+    var d = (j && j.data) || j || {};
+    var basic = d.basic || d.basicInfo || d || {};
+    var nick = basic.nickname || basic.name || d.nickname || null;
+    if(nick){
+      document.getElementById('charName').textContent = nick;
+      document.getElementById('infoNick').textContent = nick;
+    }
+    var lv = basic.level || basic.accountLevel || d.level || null;
+    if(lv) document.getElementById('infoLevel').textContent = 'NV.' + lv;
+    var sb = document.getElementById('statusBadge');
+    var isOnline = basic.isOnline || d.isOnline || false;
+    if(isOnline){ sb.className='online-badge'; sb.textContent='EN LÍNEA'; }
+    else if(nick){ sb.className='offline-badge'; sb.textContent='FUERA DE LÍNEA'; }
+    // Extract clothesIDs and overlay real items on character
+    var clothes = null;
+    try{
+      var pi = d.profileInfo || (j && j.profileInfo) || null;
+      clothes = (pi && pi.clothes) || d.clothes || null;
+    }catch(e){}
+    if(clothes && clothes.length) showOutfitItems(clothes);
   };
 
   var _retries = 0, _lastUrl = '';

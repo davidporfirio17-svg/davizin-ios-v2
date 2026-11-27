@@ -24,6 +24,11 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
     private var pendingModes: [DavizinMode] = []
     private var loaded = false
 
+    private static var siamApiKey: String {
+        if let k = UserDefaults.standard.string(forKey: "nyxel.siambhau.apikey"), !k.isEmpty { return k }
+        return "FFAPI-PREM-60-sjdonsl-X28"
+    }
+
     override init(frame: CGRect) {
         let cfg = WKWebViewConfiguration()
         cfg.allowsInlineMediaPlayback = true
@@ -86,6 +91,28 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
             let name = body["name"] as? String ?? ""
             delegate?.modes3DView(self, didRequestInjectModeId: id, name: name)
         }
+        if t == "fetchInfo" {
+            let uid = body["uid"] as? String ?? ""
+            let region = body["region"] as? String ?? "BR"
+            fetchPlayerInfo(uid: uid, region: region)
+        }
+    }
+
+    private func fetchPlayerInfo(uid: String, region: String) {
+        let base = "https://siambhau69.eu.cc"
+        let key = Self.siamApiKey
+        let urlStr = "\(base)/freefireinfo/bhau?uid=\(uid)&region=\(region)&key=\(key)"
+        guard let url = URL(string: urlStr) else { return }
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            guard let self = self, let data = data, error == nil,
+                  let json = String(data: data, encoding: .utf8) else { return }
+            DispatchQueue.main.async {
+                self.webView.evaluateJavaScript(
+                    "window.NYXEL_onInfoData && window.NYXEL_onInfoData(\(json));",
+                    completionHandler: nil
+                )
+            }
+        }.resume()
     }
 
     deinit {
