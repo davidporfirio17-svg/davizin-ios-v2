@@ -44,7 +44,7 @@
     border:1px solid rgba(255,255,255,.14);border-top-color:rgba(255,255,255,.34);
     box-shadow:0 0 0 1px rgba(60,130,255,.05),0 30px 72px -28px rgba(20,60,200,.5),inset 0 1px 0 rgba(255,255,255,.22)}
   #stage{position:absolute;inset:0;background-size:260% auto;background-position:50% 42%;background-repeat:no-repeat;transition:opacity .45s;opacity:0}
-  #stage.on{opacity:1}
+  #stage.on{opacity:1;filter:drop-shadow(0 0 18px rgba(90,200,250,.18)) drop-shadow(0 0 36px rgba(90,200,250,.08))}
   .vignette{position:absolute;inset:0;z-index:3;pointer-events:none;
     background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,5,14,.75) 72%, rgba(3,5,14,.98) 100%)}
 
@@ -86,11 +86,17 @@
   .zchip:active{transform:scale(.94)}
   .zchip .dot{color:#5ac8fa;font-size:.6rem}
   .zchip .ar{color:rgba(255,255,255,.4);margin-left:2px;font-size:.9rem}
-  .zchip.cTL{top:38%;left:4%}
-  .zchip.cTR{top:30%;right:4%}
-  .zchip.cMR{top:48%;right:4%}
-  .zchip.cBL{bottom:28%;left:4%}
-  .zchip.sel{border-color:#ff5a6e;box-shadow:0 0 0 1px rgba(255,90,110,.5),0 0 22px -4px rgba(255,90,110,.7)}
+  .zchip.cTL{top:28%;left:3%}
+  .zchip.cTR{top:18%;right:3%}
+  .zchip.cMR{top:42%;right:3%}
+  .zchip.cBL{top:58%;left:3%}
+  .zchip.sel{border-color:rgba(90,200,250,.7);box-shadow:0 0 0 1px rgba(90,200,250,.4),0 0 18px -6px rgba(90,200,250,.6)}
+  .zchip.sel .dot{color:#5ac8fa}
+  .zchip.sel .ar{content:'✓';color:#5ac8fa}
+  /* Connecting lines from chips to character body */
+  .zchip::after{content:'';position:absolute;top:50%;height:1px;width:22px}
+  .zchip.cTL::after,.zchip.cBL::after{left:100%;margin-left:4px;background:linear-gradient(90deg,rgba(180,210,255,.35),transparent)}
+  .zchip.cTR::after,.zchip.cMR::after{right:100%;margin-right:4px;background:linear-gradient(270deg,rgba(180,210,255,.35),transparent)}
 
   /* Barra inferior */
   .fbar{position:absolute;bottom:12px;left:0;right:0;z-index:5;text-align:center;font-size:.58rem;font-weight:800;letter-spacing:.3em;color:rgba(200,215,245,.5);text-transform:uppercase}
@@ -144,6 +150,23 @@
   .hold.armed{border-color:var(--accent);box-shadow:0 0 0 1px rgba(47,182,255,.3),0 10px 26px -14px var(--glow)}
   .hold.done{border-color:#2fe08a}
   .actnote{text-align:center;color:var(--ink-3);font-size:.66rem;margin-top:10px}
+
+  /* Panel de info del jugador */
+  .infopanel{margin-top:14px;padding:14px 16px;border-radius:22px;
+    background:linear-gradient(170deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
+    border:0.5px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 10px 24px -14px rgba(0,0,0,.5)}
+  .info-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .info-head .tit{font-size:.64rem;font-weight:800;letter-spacing:.22em;color:rgba(200,215,245,.5);text-transform:uppercase}
+  .info-head .tit b{color:var(--accent)}
+  .online-badge{font-size:.56rem;font-weight:800;letter-spacing:.12em;padding:4px 10px;border-radius:999px;text-transform:uppercase;
+    color:#30d158;background:rgba(48,209,88,.1);border:0.5px solid rgba(48,209,88,.28)}
+  .offline-badge{font-size:.56rem;font-weight:800;letter-spacing:.12em;padding:4px 10px;border-radius:999px;text-transform:uppercase;
+    color:rgba(200,215,245,.4);background:rgba(200,215,245,.06);border:0.5px solid rgba(200,215,245,.12)}
+  .info-row{display:flex;gap:8px}
+  .info-cell{flex:1;padding:10px 8px;border-radius:14px;background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.08);text-align:center;overflow:hidden}
+  .info-cell small{display:block;font-size:.54rem;font-weight:800;letter-spacing:.18em;color:rgba(200,215,245,.45);text-transform:uppercase;margin-bottom:4px}
+  .info-cell b{display:block;font-size:.84rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   .credits{text-align:center;font-size:.62rem;letter-spacing:.06em;color:rgba(160,185,235,.30);margin:18px 2px 2px}
   .credits b{font-weight:700;color:rgba(170,195,240,.46)}
@@ -199,6 +222,19 @@
 
     <div class="zone" id="zone">ZONA DE MIRA · <b>—</b></div>
     <div class="fbar"><b>View Character Options</b> · UID</div>
+  </div>
+
+  <!-- Panel de info del jugador -->
+  <div id="infoPanel" class="infopanel" style="display:none">
+    <div class="info-head">
+      <span class="tit">◆ <b>FREE FIRE</b> · INFO DEL JUEGO</span>
+      <span class="offline-badge" id="statusBadge">BUSCANDO</span>
+    </div>
+    <div class="info-row">
+      <div class="info-cell"><small>Jugador</small><b id="infoNick">—</b></div>
+      <div class="info-cell"><small>Nivel</small><b id="infoLevel">—</b></div>
+      <div class="info-cell"><small>Región</small><b id="infoRegion">—</b></div>
+    </div>
   </div>
 
   <!-- Img oculta para detectar load/error del PNG -->
@@ -318,21 +354,44 @@
     // Clear previous outfit overlays
     var _ov = document.getElementById('itemOverlays'); if(_ov) _ov.innerHTML='';
 
-    // Pedir /freefireinfo/bhau para nickname + clothesIDs
+    // Show info panel immediately in loading state
+    var ip = document.getElementById('infoPanel'); if(ip) ip.style.display='';
+    document.getElementById('infoRegion').textContent = reg.toUpperCase();
+    document.getElementById('statusBadge').className = 'offline-badge';
+    document.getElementById('statusBadge').textContent = 'BUSCANDO…';
+
+    // Pedir /freefireinfo/bhau para nickname + clothesIDs + info
     fetch(SIAM_BASE+'/freefireinfo/bhau?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(SIAM_KEY))
       .then(function(r){ return r.json(); })
       .then(function(j){
-        var nick = (j && (j.nickname || (j.basic && j.basic.nickname) || (j.data && (j.data.nickname || (j.data.basic && j.data.basic.nickname))))) || null;
-        if(nick) document.getElementById('charName').textContent = nick;
+        var d = (j && j.data) || j || {};
+        var basic = d.basic || d.basicInfo || d || {};
+        var nick = basic.nickname || basic.name || d.nickname || null;
+        if(nick){
+          document.getElementById('charName').textContent = nick;
+          document.getElementById('infoNick').textContent = nick;
+        }
+        // Level
+        var lv = basic.level || basic.accountLevel || d.level || null;
+        if(lv) document.getElementById('infoLevel').textContent = 'NV.' + lv;
+        // Online status
+        var sb = document.getElementById('statusBadge');
+        var lastLogin = basic.lastLogin || d.lastLogin || null;
+        var isOnline = basic.isOnline || d.isOnline || false;
+        if(isOnline){ sb.className='online-badge'; sb.textContent='EN LÍNEA'; }
+        else if(nick){ sb.className='offline-badge'; sb.textContent='FUERA DE LÍNEA'; }
         // Extract clothesIDs and overlay real items on character
         var clothes = null;
         try{
-          var pi = (j && j.profileInfo) || (j && j.data && j.data.profileInfo) || null;
-          clothes = (pi && pi.clothes) || (j && j.clothes) || (j && j.data && j.data.clothes) || null;
+          var pi = d.profileInfo || (j && j.profileInfo) || null;
+          clothes = (pi && pi.clothes) || d.clothes || null;
         }catch(e){}
         if(clothes && clothes.length) showOutfitItems(clothes);
       })
-      .catch(function(){});
+      .catch(function(){
+        var sb = document.getElementById('statusBadge');
+        sb.className='offline-badge'; sb.textContent='SIN DATOS';
+      });
   };
 
   var _retries = 0, _lastUrl = '';

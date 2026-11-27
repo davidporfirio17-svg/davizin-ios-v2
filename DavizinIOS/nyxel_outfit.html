@@ -138,7 +138,13 @@
 
   /* Imagen con crop al centro */
   .charv .charImg{position:absolute;inset:0;z-index:2;background-size:260% auto;background-position:50% 42%;background-repeat:no-repeat;transition:opacity .5s;opacity:0}
-  .charv .charImg.on{opacity:1}
+  .charv .charImg.on{opacity:1;filter:drop-shadow(0 0 18px rgba(90,200,250,.18)) drop-shadow(0 0 36px rgba(90,200,250,.08))}
+  /* Overlay de items equipados sobre el personaje */
+  #charOverlays{position:absolute;inset:0;z-index:4;pointer-events:none}
+  .outfit-item{position:absolute;background-size:contain;background-position:center;background-repeat:no-repeat;
+    opacity:0;transform:scale(.85);transition:opacity .5s ease,transform .5s cubic-bezier(.22,1,.3,1);
+    filter:drop-shadow(0 0 14px rgba(90,200,250,.3)) drop-shadow(0 2px 6px rgba(0,0,0,.4))}
+  .outfit-item.on{opacity:.88;transform:scale(1)}
   .charv .charVig{position:absolute;inset:0;z-index:3;pointer-events:none;
     background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,6,17,.75) 72%, rgba(3,6,17,.98) 100%)}
   .charv .charLoad{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.55);font-size:.82rem;z-index:4;text-align:center;padding:40px 24px}
@@ -153,11 +159,14 @@
   .charv .zchip:active{transform:scale(.94)}
   .charv .zchip .dot{color:#5ac8fa;font-size:.6rem}
   .charv .zchip .ar{color:rgba(255,255,255,.4);margin-left:2px;font-size:.9rem}
-  .charv .zchip.cTL{top:38%;left:4%}
-  .charv .zchip.cTR{top:30%;right:4%}
-  .charv .zchip.cMR{top:48%;right:4%}
-  .charv .zchip.cBL{bottom:28%;left:4%}
-  .charv .zchip.pulse{border-color:#ff5a6e;box-shadow:0 0 0 1px rgba(255,90,110,.5),0 0 22px -4px rgba(255,90,110,.7);animation:zpulse .5s ease}
+  .charv .zchip.cTL{top:28%;left:3%}
+  .charv .zchip.cTR{top:18%;right:3%}
+  .charv .zchip.cMR{top:42%;right:3%}
+  .charv .zchip.cBL{top:58%;left:3%}
+  .charv .zchip.pulse{border-color:rgba(90,200,250,.7);box-shadow:0 0 0 1px rgba(90,200,250,.4),0 0 18px -6px rgba(90,200,250,.6);animation:zpulse .5s ease}
+  .charv .zchip::after{content:'';position:absolute;top:50%;height:1px;width:22px}
+  .charv .zchip.cTL::after,.charv .zchip.cBL::after{left:100%;margin-left:4px;background:linear-gradient(90deg,rgba(180,210,255,.35),transparent)}
+  .charv .zchip.cTR::after,.charv .zchip.cMR::after{right:100%;margin-right:4px;background:linear-gradient(270deg,rgba(180,210,255,.35),transparent)}
   @keyframes zpulse{50%{transform:scale(1.06)}}
 
   /* Flechas decorativas ‹ › (estilo Rouk) */
@@ -226,6 +235,7 @@
         <div class="charLoad" id="charLoad"><div class="spin"></div><div style="margin-top:8px;font-size:.78rem">Renderizando…</div></div>
       </div>
       <div class="charVig"></div>
+      <div id="charOverlays"></div>
       <!-- Chips flotantes de zona (4 posiciones estilo Rouk) -->
       <button class="zchip cTL" onclick="pulseZone(this)"><span class="dot">⌖</span>Cabeza<span class="ar">›</span></button>
       <button class="zchip cTR" onclick="pulseZone(this)"><span class="dot">⌖</span>Drag · Cabeza<span class="ar">›</span></button>
@@ -236,10 +246,10 @@
       <button class="narr rig" aria-label="Siguiente">›</button>
       <!-- Líneas sutiles de conexión -->
       <svg class="vlines" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <line x1="22" y1="40" x2="48" y2="34" />
-        <line x1="78" y1="32" x2="54" y2="30" />
-        <line x1="78" y1="50" x2="56" y2="42" />
-        <line x1="22" y1="72" x2="48" y2="62" />
+        <line x1="22" y1="30" x2="48" y2="28" />
+        <line x1="78" y1="20" x2="54" y2="22" />
+        <line x1="78" y1="44" x2="56" y2="40" />
+        <line x1="22" y1="60" x2="48" y2="55" />
       </svg>
       <!-- Bar inferior -->
       <div class="fbar"><b>View Character Options</b> · 3D</div>
@@ -275,6 +285,52 @@
   var CATALOG = null;
   var PENDING_SUMMARY = null;
   var CATALOG_URL = 'https://raw.githubusercontent.com/davidporfirio17-svg/nyxel-ff-assets/main/items.json';
+
+  // ========== Outfit item overlay system ==========
+  var ICON_BASE = 'https://raw.githubusercontent.com/ashqking/FF-Items/main/ICONS/';
+  var ICON_FB   = 'https://raw.githubusercontent.com/I-SHOW-AKIRU200/AKIRU-ICONS/main/ICONS/';
+  var ITEM_POS = {
+    head:   {top:'4%',   left:'28%', w:'44%', h:'22%'},
+    mask:   {top:'14%',  left:'30%', w:'40%', h:'16%'},
+    top:    {top:'26%',  left:'18%', w:'64%', h:'30%'},
+    bottom: {top:'50%',  left:'22%', w:'56%', h:'28%'},
+    shoes:  {top:'76%',  left:'26%', w:'48%', h:'18%'},
+    back:   {top:'28%',  left:'58%', w:'30%', h:'28%'}
+  };
+  function zoneFromId(id){
+    var p=String(id).substring(0,3);
+    switch(p){
+      case '203':case '202':case '201':case '912': return 'head';
+      case '205':case '204':case '904': return 'mask';
+      case '211':case '210':case '208':case '209':case '907': return 'top';
+      case '213':case '212': return 'bottom';
+      case '214': return 'shoes';
+      case '215':case '216': return 'back';
+      default: return null;
+    }
+  }
+  function showOutfitItems(ids){
+    var cont=document.getElementById('charOverlays');
+    if(!cont)return; cont.innerHTML='';
+    var filled={};
+    (ids||[]).forEach(function(id){
+      var zone=zoneFromId(id);
+      if(!zone||filled[zone]||!ITEM_POS[zone])return;
+      filled[zone]=true;
+      var z=ITEM_POS[zone];
+      var el=document.createElement('div'); el.className='outfit-item';
+      el.style.top=z.top; el.style.left=z.left; el.style.width=z.w; el.style.height=z.h;
+      var url=ICON_BASE+id+'.png';
+      var img=new Image();
+      img.onload=function(){ el.style.backgroundImage='url("'+url+'")'; setTimeout(function(){el.classList.add('on');},80); };
+      img.onerror=function(){
+        var url2=ICON_FB+id+'.png';
+        var img2=new Image(); img2.onload=function(){ el.style.backgroundImage='url("'+url2+'")'; el.classList.add('on'); }; img2.src=url2;
+      };
+      img.src=url;
+      cont.appendChild(el);
+    });
+  }
 
   // Mapping de "tipo de slot" por heurística del nombre del icon
   function slotOf(icon){
@@ -342,6 +398,9 @@
     if(nameEl && d.nickname) nameEl.textContent = d.nickname;
     var metaEl = document.getElementById('charMeta');
     if(metaEl && d.uid) metaEl.innerHTML = 'UID <b style="color:#fff">'+d.uid+'</b>';
+    // Overlay items equipados sobre el personaje
+    var cids = d.clothesIDs || [];
+    if(cids.length) showOutfitItems(cids);
   };
   // Si el PNG falla: reintentar 2 veces con backoff antes de rendirse
   var _renderRetries = 0;
