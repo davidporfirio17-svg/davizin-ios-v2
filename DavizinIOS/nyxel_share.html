@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Share Card</title>
+<style>
+  :root{ --ink:#f3f6ff; --accent:#5ac8fa; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;min-height:100%;overflow:hidden}
+  body{background:#02040a;color:var(--ink);font-family:-apple-system,'SF Pro Display','Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+  .wall{position:fixed;inset:0;z-index:0;overflow:hidden}
+  .blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.75;will-change:transform}
+  .b1{width:70vw;height:70vw;left:-20vw;top:-10vh;background:#2fb6ff;animation:d1 22s ease-in-out infinite alternate}
+  .b2{width:80vw;height:80vw;right:-30vw;top:10vh;background:#7a5cff;animation:d2 26s ease-in-out infinite alternate}
+  .b3{width:70vw;height:70vw;left:-15vw;bottom:-20vh;background:#0a84ff;animation:d3 30s ease-in-out infinite alternate}
+  @keyframes d1{to{transform:translate(12vw,6vh) scale(1.1)}}
+  @keyframes d2{to{transform:translate(-10vw,-4vh) scale(.95)}}
+  @keyframes d3{to{transform:translate(6vw,-6vh) scale(1.08)}}
+  .tint{position:fixed;inset:0;z-index:1;background:radial-gradient(70% 55% at 50% 30%,transparent,rgba(0,0,0,.45) 90%)}
+
+  .scr{position:relative;z-index:3;min-height:100vh;display:flex;flex-direction:column;padding:max(14px,env(safe-area-inset-top)) 16px max(14px,env(safe-area-inset-bottom))}
+  .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .top h1{margin:0;font-size:1.3rem;font-weight:700;letter-spacing:-.015em}
+  .close{width:36px;height:36px;border:0;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;font-size:20px;cursor:pointer;display:grid;place-items:center}
+
+  /* THE CARD (lo que vamos a exportar como imagen) */
+  .card{position:relative;width:100%;max-width:400px;aspect-ratio:9/16;margin:0 auto;border-radius:32px;overflow:hidden;
+    background:linear-gradient(170deg,#1a1240,#0a0820 50%,#000208);
+    border:0.5px solid rgba(255,255,255,.18);
+    box-shadow:0 30px 80px -20px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.3)}
+  .card .cb{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center;filter:blur(0px) saturate(1.2);opacity:.45}
+  .card::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(2,4,10,0) 0%,rgba(2,4,10,.4) 55%,rgba(2,4,10,.92) 100%)}
+  .card .glow{position:absolute;top:-30%;left:-20%;right:-20%;height:60%;z-index:1;background:radial-gradient(50% 50% at 50% 50%,rgba(90,200,250,.28),transparent 70%);filter:blur(30px)}
+  .card .inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;padding:22px;color:#fff}
+  .card .brand{display:flex;align-items:center;gap:8px;font-size:.6rem;font-weight:900;letter-spacing:.3em;color:rgba(255,255,255,.65);text-transform:uppercase}
+  .card .brand .dot{width:7px;height:7px;border-radius:50%;background:#30d158;box-shadow:0 0 8px #30d158}
+
+  .hero{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .ava{width:108px;height:108px;border-radius:50%;background:#0a0f1e center/cover no-repeat;border:2.5px solid rgba(255,255,255,.4);box-shadow:0 10px 30px -5px rgba(0,0,0,.6),0 0 40px rgba(90,200,250,.25)}
+  .ava.fallback{display:grid;place-items:center;font-size:2.4rem;color:rgba(255,255,255,.3);font-weight:800}
+  .name{font-size:1.75rem;font-weight:800;letter-spacing:-.02em;line-height:1;text-align:center;text-shadow:0 2px 12px rgba(0,0,0,.6);background:linear-gradient(90deg,#fff,#cfe3ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .uid{font-family:'SF Mono',ui-monospace,monospace;font-size:.72rem;letter-spacing:.14em;color:rgba(255,255,255,.55)}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:22px}
+  .stat{text-align:center;padding:12px 6px;border-radius:14px;background:rgba(255,255,255,.08);border:0.5px solid rgba(255,255,255,.1);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .stat .k{font-size:.5rem;font-weight:800;letter-spacing:.18em;color:rgba(255,255,255,.55);text-transform:uppercase;margin-bottom:4px}
+  .stat .v{font-size:1.15rem;font-weight:700;color:#fff;line-height:1}
+  .stat .vs{font-size:.56rem;font-weight:700;color:rgba(255,255,255,.55);margin-top:1px}
+
+  .rank{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .rank .r{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.1)}
+  .rank .r .k{font-size:.5rem;font-weight:900;letter-spacing:.22em;color:#8ab4ff;text-transform:uppercase;margin-bottom:4px}
+  .rank .r .v{font-size:.92rem;font-weight:700;color:#fff}
+
+  .foot{margin-top:18px;display:flex;align-items:center;justify-content:space-between;font-size:.56rem;font-weight:800;letter-spacing:.2em;color:rgba(255,255,255,.4);text-transform:uppercase}
+  .foot .l{display:flex;align-items:center;gap:7px}
+  .foot .mk{width:22px;height:22px;border-radius:7px;background:linear-gradient(145deg,#5ac8fa,#0a84ff);display:grid;place-items:center;font-size:.8rem;font-weight:900;color:#031320}
+
+  /* Action buttons under the card */
+  .acts{margin:22px auto 8px;display:flex;flex-direction:column;gap:10px;max-width:400px;width:100%}
+  .btn{width:100%;height:52px;border-radius:16px;border:0;cursor:pointer;font:inherit;font-weight:700;font-size:.98rem;color:#fff;background:linear-gradient(180deg,rgba(10,132,255,.95),rgba(10,100,230,.95));box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 12px 30px -10px rgba(10,132,255,.6);display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn:active{transform:scale(.985)}
+  .btn.ghost{background:rgba(255,255,255,.1);border:0.5px solid rgba(255,255,255,.18);box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+  .busy{opacity:.6;pointer-events:none}
+
+  @media (prefers-reduced-motion:reduce){.blob{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="wall">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+</div>
+<div class="tint"></div>
+
+<div class="scr">
+  <div class="top">
+    <h1>Compartir perfil</h1>
+    <button class="close" onclick="closeMe()">×</button>
+  </div>
+
+  <div class="card" id="card">
+    <div class="cb" id="cb"></div>
+    <div class="glow"></div>
+    <div class="inner">
+      <div class="brand"><span class="dot"></span><span>Nyxel · Player Card</span></div>
+      <div class="hero">
+        <div class="ava fallback" id="ava">?</div>
+        <div class="name" id="name">—</div>
+        <div class="uid" id="uid">UID —</div>
+        <div class="stats">
+          <div class="stat"><div class="k">Nivel</div><div class="v" id="lv">—</div></div>
+          <div class="stat"><div class="k">Likes</div><div class="v" id="lk">—</div></div>
+          <div class="stat"><div class="k">Región</div><div class="v" id="rg">—</div></div>
+        </div>
+        <div class="rank">
+          <div class="r"><div class="k">BR</div><div class="v" id="br">—</div></div>
+          <div class="r"><div class="k">CS</div><div class="v" id="cs">—</div></div>
+        </div>
+      </div>
+      <div class="foot">
+        <div class="l"><div class="mk">N</div><span>Nyxel External</span></div>
+        <div>#<span id="season">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acts">
+    <button class="btn" id="shareBtn" onclick="doShare()">Compartir imagen</button>
+    <button class="btn ghost" onclick="closeMe()">Cancelar</button>
+  </div>
+</div>
+
+<script>
+  // API de Swift: NYXEL_setShareData({ nickname, uid, level, likes, region, br, cs, season, avatarURL, bannerURL })
+  window.NYXEL_setShareData = function(d){
+    try{
+      document.getElementById('name').textContent = d.nickname || 'Jugador';
+      document.getElementById('uid').textContent  = 'UID ' + (d.uid || '—');
+      document.getElementById('lv').textContent   = d.level || '—';
+      document.getElementById('lk').textContent   = d.likes || '—';
+      document.getElementById('rg').textContent   = (d.region || '').toUpperCase() || '—';
+      document.getElementById('br').textContent   = d.br || '—';
+      document.getElementById('cs').textContent   = d.cs || '—';
+      document.getElementById('season').textContent = d.season || '—';
+      if(d.avatarURL){
+        var a = document.getElementById('ava');
+        a.classList.remove('fallback'); a.textContent='';
+        a.style.backgroundImage = 'url("'+d.avatarURL+'")';
+      }
+      if(d.bannerURL){
+        document.getElementById('cb').style.backgroundImage = 'url("'+d.bannerURL+'")';
+      }
+    }catch(e){}
+  };
+
+  function closeMe(){
+    try{ window.webkit.messageHandlers.nyxel.postMessage({t:'close'}); }catch(e){}
+  }
+  function doShare(){
+    var btn = document.getElementById('shareBtn');
+    btn.classList.add('busy'); btn.textContent = 'Generando…';
+    // Swift se encarga del snapshot + UIActivityViewController
+    try{ window.webkit.messageHandlers.nyxel.postMessage({t:'share'}); }catch(e){}
+    setTimeout(function(){ btn.classList.remove('busy'); btn.textContent='Compartir imagen'; }, 2500);
+  }
+</script>
+</body></html>

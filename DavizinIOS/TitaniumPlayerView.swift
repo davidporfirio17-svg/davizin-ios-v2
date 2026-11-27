@@ -17,6 +17,12 @@ final class TitaniumPlayerView: UIView, WKScriptMessageHandler, WKNavigationDele
     var onLookupRequested: ((String, String) -> Void)?
     var onAssetRequested: ((String, @escaping (UIImage?) -> Void) -> Void)?
     var onBanCheckRequested: ((String, @escaping (Result<FreeFireBanCheck, Error>) -> Void) -> Void)?
+    /// Callbacks para los nuevos botones premium del perfil.
+    var onOpenShareRequested: ((FreeFireLookupSummary) -> Void)?
+    var onOpenCatalogRequested: (() -> Void)?
+
+    /// Último perfil cargado — guardado para alimentar la pantalla "Compartir".
+    private(set) var lastSummary: FreeFireLookupSummary?
 
     private var webView: WKWebView!
     private var ready = false
@@ -64,6 +70,7 @@ final class TitaniumPlayerView: UIView, WKScriptMessageHandler, WKNavigationDele
     // MARK: - API que usa el ViewController (misma que PlayerView)
 
     func showSummary(_ summary: FreeFireLookupSummary) {
+        self.lastSummary = summary
         var dict: [String: Any] = [
             "uid": summary.uid,
             "nickname": summary.nickname ?? "",
@@ -161,10 +168,17 @@ final class TitaniumPlayerView: UIView, WKScriptMessageHandler, WKNavigationDele
 
     func userContentController(_ u: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == "nyxel", let body = message.body as? [String: Any] else { return }
-        if (body["t"] as? String) == "lookup" {
+        let t = (body["t"] as? String) ?? ""
+        switch t {
+        case "lookup":
             let uid = (body["uid"] as? String) ?? ""
             let region = (body["region"] as? String) ?? "br"
             onLookupRequested?(uid, region)
+        case "openShare":
+            if let s = lastSummary { onOpenShareRequested?(s) }
+        case "openCatalog":
+            onOpenCatalogRequested?()
+        default: break
         }
     }
 }

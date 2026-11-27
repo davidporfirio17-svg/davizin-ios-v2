@@ -125,8 +125,18 @@ jobs:
             puts "Added NyxelItemCatalog.swift"
           end
 
+          # Add CatalogBrowserView.swift + ShareCardController.swift (pantallas premium)
+          ["CatalogBrowserView.swift", "ShareCardController.swift"].each do |fname|
+            ref = davizin_group.files.find { |f| f.path.end_with?(fname) }
+            if ref.nil?
+              ref = davizin_group.new_file(fname)
+              target.add_file_references([ref])
+              puts "Added #{fname}"
+            end
+          end
+
           # Add 3D viewer resources (html + glb) to the resources build phase
-          ["rouk3d.html", "rouk.glb", "opcion_desactivada.m4a", "nyxel_intro.html", "nyxel_profile.html", "entorno.html"].each do |res|
+          ["rouk3d.html", "rouk.glb", "opcion_desactivada.m4a", "nyxel_intro.html", "nyxel_profile.html", "entorno.html", "nyxel_catalog.html", "nyxel_share.html"].each do |res|
             next if davizin_group.files.any? { |f| f.path.end_with?(res) }
             ref = davizin_group.new_file(res)
             target.resources_build_phase.add_file_reference(ref)

@@ -677,6 +677,12 @@ final class ViewController: UIViewController {
             }
             onFreeFireBanCheck(uid, completion)
         }
+        screen.onOpenShareRequested = { [weak self] summary in
+            self?.presentShareCard(for: summary)
+        }
+        screen.onOpenCatalogRequested = { [weak self] in
+            self?.presentCatalogBrowser()
+        }
         playerView = screen
         display(screen, animated: animated)
     }
@@ -912,6 +918,59 @@ final class ViewController: UIViewController {
             default: showModeSelection(animated: true)
             }
         }
+    }
+
+    // MARK: - Pantallas premium (Share Card + Catálogo)
+
+    fileprivate func presentShareCard(for summary: FreeFireLookupSummary) {
+        var avatarURL: URL? = nil
+        var bannerURL: URL? = nil
+        if let avatar = summary.avatarID, !avatar.isEmpty {
+            avatarURL = NyxelItemCatalog.shared.imageURL(for: avatar)
+        }
+        if let banner = summary.bannerID, !banner.isEmpty {
+            bannerURL = NyxelItemCatalog.shared.imageURL(for: banner)
+        }
+        let data = ShareCardController.Data(
+            nickname: summary.nickname ?? "Jugador",
+            uid: summary.uid,
+            level: summary.level ?? "—",
+            likes: summary.likes ?? "—",
+            region: (summary.region ?? "").uppercased(),
+            br: summary.brRankCode ?? "—",
+            cs: summary.csRankCode ?? "—",
+            season: summary.season ?? "—",
+            avatarURL: avatarURL,
+            bannerURL: bannerURL
+        )
+        let vc = ShareCardController(data: data)
+        present(vc, animated: true)
+    }
+
+    fileprivate func presentCatalogBrowser() {
+        let vc = UIViewController()
+        vc.modalPresentationStyle = .fullScreen
+        vc.view.backgroundColor = UIColor(red: 0.051, green: 0.063, blue: 0.082, alpha: 1)
+        let catalog = CatalogBrowserView()
+        vc.view.addSubview(catalog)
+        catalog.davizinPinEdges(to: vc.view)
+        // Botón cerrar flotante
+        let close = UIButton(type: .system)
+        close.setTitle("×", for: .normal)
+        close.titleLabel?.font = .systemFont(ofSize: 30, weight: .regular)
+        close.setTitleColor(.white, for: .normal)
+        close.backgroundColor = UIColor(white: 0, alpha: 0.5)
+        close.layer.cornerRadius = 20
+        close.translatesAutoresizingMaskIntoConstraints = false
+        vc.view.addSubview(close)
+        NSLayoutConstraint.activate([
+            close.widthAnchor.constraint(equalToConstant: 40),
+            close.heightAnchor.constraint(equalToConstant: 40),
+            close.trailingAnchor.constraint(equalTo: vc.view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            close.topAnchor.constraint(equalTo: vc.view.safeAreaLayoutGuide.topAnchor, constant: 12)
+        ])
+        close.addAction(UIAction { [weak vc] _ in vc?.dismiss(animated: true) }, for: .touchUpInside)
+        present(vc, animated: true)
     }
 }
 
