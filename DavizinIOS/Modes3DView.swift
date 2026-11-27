@@ -29,9 +29,8 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
         return "FFAPI-PREM-60-sjdonsl-X28"
     }
 
-    private static var ffApiHubKey: String? {
-        if let k = UserDefaults.standard.string(forKey: "nyxel.ffapihub.apikey"), !k.isEmpty { return k }
-        return nil
+    private static var nyxelKey: String {
+        AppState.shared.currentKey
     }
 
     override init(frame: CGRect) {
@@ -108,26 +107,18 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
     }
 
     private func fetchItemImage(itemId: String) {
-        guard let key = Self.ffApiHubKey,
-              itemId.allSatisfy({ $0.isNumber }),
-              let url = URL(string: "https://developers.freefirecommunity.com/api/v1/image?itemID=\(itemId)") else { return }
-        var req = URLRequest(url: url)
-        req.setValue(key, forHTTPHeaderField: "x-api-key")
-        req.setValue("FreeFireAPILab/1.0", forHTTPHeaderField: "User-Agent")
-        URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
-            guard let self = self, let data = data, error == nil,
-                  let http = response as? HTTPURLResponse, http.statusCode == 200,
-                  !data.isEmpty else { return }
-            let mime = http.mimeType ?? "image/png"
+        let key = Self.nyxelKey
+        let hwid = KeyValidator.getDeviceHWID()
+        guard !key.isEmpty, !hwid.isEmpty, itemId.allSatisfy({ $0.isNumber }) else { return }
+        FreeFireStatsService.shared.loadAsset(itemID: itemId, key: key, hwid: hwid) { [weak self] image in
+            guard let self, let image, let data = image.pngData() else { return }
             let b64 = data.base64EncodedString()
-            let dataUrl = "data:\(mime);base64,\(b64)"
-            DispatchQueue.main.async {
-                self.webView.evaluateJavaScript(
-                    "window.NYXEL_onItemImage && window.NYXEL_onItemImage('\(itemId)','\(dataUrl)');",
-                    completionHandler: nil
-                )
-            }
-        }.resume()
+            let dataUrl = "data:image/png;base64,\(b64)"
+            self.webView.evaluateJavaScript(
+                "window.NYXEL_onItemImage && window.NYXEL_onItemImage('\(itemId)','\(dataUrl)');",
+                completionHandler: nil
+            )
+        }
     }
 
     private func fetchPlayerInfo(uid: String, region: String) {
