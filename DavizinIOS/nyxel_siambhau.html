@@ -80,7 +80,7 @@
   <div class="result" id="result">
     <!-- 1. Info basica -->
     <div class="sec">
-      <div class="lbl">Endpoint 1 · GET /freefireinfo/bhau2</div>
+      <div class="lbl">Endpoint 1 · GET /freefireinfo/bhau</div>
       <h2>Info del jugador</h2>
     </div>
     <div class="urlc" id="url1"></div>
@@ -88,7 +88,7 @@
 
     <!-- 2. Banner -->
     <div class="sec">
-      <div class="lbl">Endpoint 2 · GET /banner</div>
+      <div class="lbl">Endpoint 2 · GET /banner/profile</div>
       <h2>Banner oficial</h2>
     </div>
     <div class="urlc" id="url2"></div>
@@ -149,8 +149,8 @@
     document.getElementById('bimg').classList.remove('lo');
     document.getElementById('oimg').classList.remove('lo');
 
-    // 1. /freefireinfo/bhau2 (recomendado por el dev para mejores resultados)
-    var u1 = BASE+'/freefireinfo/bhau2?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(key);
+    // 1. /freefireinfo/bhau
+    var u1 = BASE+'/freefireinfo/bhau?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(key);
     document.getElementById('url1').textContent = u1;
     fetch(u1).then(function(r){
       return r.text().then(function(t){ return {status:r.status, body:t}; });
@@ -165,8 +165,8 @@
       setStatus('Peticiones enviadas. Mira los 3 bloques abajo.', 'ok');
     });
 
-    // 2. /banner (devuelve PNG directo)
-    var u2 = BASE+'/banner?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(key)+'&t='+Date.now();
+    // 2. /banner/profile (devuelve PNG directo)
+    var u2 = BASE+'/banner/profile?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(key)+'&t='+Date.now();
     document.getElementById('url2').textContent = u2;
     document.getElementById('bimg').src = u2;
 

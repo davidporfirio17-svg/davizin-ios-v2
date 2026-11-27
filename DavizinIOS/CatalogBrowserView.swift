@@ -75,9 +75,16 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
         if let b = summary.bannerID, !b.isEmpty {
             bannerURL = NyxelItemCatalog.shared.imageURL(for: b)?.absoluteString
         }
-        // URL del render oficial del personaje (API SiamBhau)
+        // URLs oficiales de la API SiamBhau (premium)
         let siamRegion = Self.siamRegion(from: summary.region)
-        let renderURL = "https://siambhau69.eu.cc/outfits/outfit?uid=\(summary.uid)&region=\(siamRegion)&key=\(Self.siamApiKey)&t=\(Int(Date().timeIntervalSince1970))"
+        let base = "https://siambhau69.eu.cc"
+        let keyParams = "uid=\(summary.uid)&region=\(siamRegion)&key=\(Self.siamApiKey)"
+        let cacheBreak = "&t=\(Int(Date().timeIntervalSince1970))"
+        let renderURL = "\(base)/outfits/outfit?\(keyParams)\(cacheBreak)"
+        let bannerSiamURL = "\(base)/banner/profile?\(keyParams)\(cacheBreak)"
+        let banCheckURL = "\(base)/bancheck/bancheck?\(keyParams)"
+        let loginHistoryURL = "\(base)/loginhistory/history?\(keyParams)"
+        let infoURL = "\(base)/freefireinfo/bhau?\(keyParams)"
 
         let payload: [String: Any] = [
             "nickname": summary.nickname ?? "Jugador",
@@ -91,6 +98,10 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
             "avatarURL": avatarURL ?? "",
             "bannerURL": bannerURL ?? "",
             "renderURL": renderURL,
+            "bannerSiamURL": bannerSiamURL,
+            "banCheckURL": banCheckURL,
+            "loginHistoryURL": loginHistoryURL,
+            "infoURL": infoURL,
             "clothesIDs": summary.clothesIDs,
             "weaponSkinIDs": summary.weaponSkinIDs,
             "bannerID": summary.bannerID ?? "",

@@ -130,6 +130,14 @@
     <div class="ranks" id="ranks"></div>
   </div>
 
+  <!-- Banner oficial del perfil (API SiamBhau /banner/profile) -->
+  <div class="sec" id="bannerWrap" style="display:none">
+    <div class="sh"><div class="l"><span class="lb">Banner oficial</span><h2>Perfil del jugador</h2></div></div>
+    <div style="border-radius:18px;overflow:hidden;background:rgba(0,0,0,.4);border:0.5px solid rgba(255,255,255,.1);box-shadow:0 14px 38px -18px rgba(0,0,0,.6)">
+      <img id="bannerImg" style="width:100%;height:auto;display:block;opacity:0;transition:opacity .4s" onload="this.style.opacity=1" onerror="document.getElementById('bannerWrap').style.display='none'">
+    </div>
+  </div>
+
   <!-- Render oficial del personaje vestido (API SiamBhau /outfits/outfit) -->
   <div class="sec" id="renderWrap" style="display:none">
     <div class="sh">
@@ -143,6 +151,12 @@
       <div id="renderLoad" style="position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.5);font-size:.85rem;z-index:1"><div><div class="spin"></div><div style="margin-top:10px">Renderizando personaje…</div></div></div>
       <img id="renderImg" style="width:100%;height:auto;display:block;position:relative;z-index:2;opacity:0;transition:opacity .4s" onload="this.style.opacity=1;document.getElementById('renderLoad').style.display='none'" onerror="document.getElementById('renderWrap').style.display='none'">
     </div>
+  </div>
+
+  <!-- Insights: ban check + login history -->
+  <div class="sec" id="insightsWrap" style="display:none">
+    <div class="sh"><div class="l"><span class="lb">Intel</span><h2>Estado de la cuenta</h2></div></div>
+    <div id="insightsBody" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 
   <div class="sec">
@@ -190,13 +204,73 @@
   // Swift llama esto: NYXEL_setOutfitData({ nickname, uid, level, likes, region, br, cs, avatarURL, bannerURL, renderURL, clothesIDs: [...], weaponSkinIDs:[...], ... })
   window.NYXEL_setOutfitData = function(d){
     PENDING_SUMMARY = d;
+    // Banner oficial via SiamBhau
+    if(d.bannerSiamURL){
+      document.getElementById('bannerWrap').style.display = 'block';
+      document.getElementById('bannerImg').src = d.bannerSiamURL;
+    }
     // Render oficial del personaje via API SiamBhau
     if(d.renderURL){
       document.getElementById('renderWrap').style.display = 'block';
       document.getElementById('renderImg').src = d.renderURL;
     }
+    // Insights: ban check + login history (JSON endpoints)
+    if(d.banCheckURL || d.loginHistoryURL){ loadInsights(d); }
     renderAll();
   };
+
+  // ============ INSIGHTS (ban check + login history) ============
+  function pill(label, val, color){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.06);border:0.5px solid '+color+';-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)">'+
+      '<div style="font-size:.66rem;font-weight:800;letter-spacing:.2em;color:rgba(255,255,255,.6);text-transform:uppercase">'+label+'</div>'+
+      '<div style="font-size:.9rem;font-weight:700;color:#fff;text-align:right">'+val+'</div>'+
+    '</div>';
+  }
+
+  function loadInsights(d){
+    var body = document.getElementById('insightsBody');
+    var wrap = document.getElementById('insightsWrap');
+    wrap.style.display = 'block';
+    body.innerHTML = '<div class="loading"><div class="spin"></div>Consultando estado…</div>';
+    var results = {ban:null, login:null};
+    var done = 0, total = 0;
+    function render(){
+      var html = '';
+      if(results.ban){
+        var b = results.ban;
+        if(b.err){ html += pill('Ban Check', '<span style="color:#ff948b">'+b.err+'</span>', 'rgba(255,255,255,.1)'); }
+        else {
+          var banned = (b.is_banned===true || b.isBanned===true || b.banned===true || (typeof b.status==='string' && b.status.toLowerCase().indexOf('ban')>=0));
+          html += pill('Ban Check',
+            banned ? '<span style="color:#ff948b">⚠ BANEADO</span>' : '<span style="color:#86f5a3">✓ Cuenta limpia</span>',
+            banned ? 'rgba(255,69,58,.35)' : 'rgba(48,209,88,.3)');
+          if(b.period) html += pill('Periodo del ban', b.period, 'rgba(255,69,58,.3)');
+        }
+      }
+      if(results.login){
+        var l = results.login;
+        if(l.err){ html += pill('Última conexión', '<span style="color:#ff948b">'+l.err+'</span>', 'rgba(255,255,255,.1)'); }
+        else {
+          var last = l.last_login || l.lastLogin || l.last_online || l.lastOnline || (l.history && l.history[0] && (l.history[0].time||l.history[0].date||l.history[0].ts)) || (l.data && l.data.last_login) || null;
+          html += pill('Última conexión', last ? '<span style="color:#86f5a3">'+last+'</span>' : '—', 'rgba(255,255,255,.1)');
+          var cnt = (l.history && l.history.length) || (l.data && l.data.history && l.data.history.length) || null;
+          if(cnt) html += pill('Logins registrados', cnt, 'rgba(255,255,255,.1)');
+        }
+      }
+      body.innerHTML = html || '<div class="empty">Sin datos disponibles</div>';
+    }
+    function fetchJson(url, slot){
+      total++;
+      fetch(url).then(function(r){ return r.text().then(function(t){
+        try{ results[slot] = JSON.parse(t); }
+        catch(e){ results[slot] = {err:'Respuesta inválida (HTTP '+r.status+')'}; }
+      }); }).catch(function(e){
+        results[slot] = {err:'Sin conexión'};
+      }).finally(function(){ done++; if(done===total) render(); });
+    }
+    if(d.banCheckURL) fetchJson(d.banCheckURL, 'ban');
+    if(d.loginHistoryURL) fetchJson(d.loginHistoryURL, 'login');
+  }
 
   function renderAll(){
     if(!PENDING_SUMMARY) return;
