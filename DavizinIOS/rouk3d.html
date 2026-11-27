@@ -280,12 +280,12 @@
   function zoneFromId(id){
     var p=String(id).substring(0,3);
     switch(p){
-      case '203':case '202':case '201':case '912': return 'head';
-      case '205':case '204':case '904': return 'mask';
-      case '211':case '210':case '208':case '209':case '907': return 'top';
-      case '213':case '212': return 'bottom';
-      case '214': return 'shoes';
-      case '215':case '216': return 'back';
+      case '201':case '214':case '912': return 'head';
+      case '202':case '904': return 'mask';
+      case '203':case '907': return 'top';
+      case '204':case '213': return 'bottom';
+      case '205': return 'shoes';
+      case '210':case '215':case '216': return 'back';
       default: return null;
     }
   }
