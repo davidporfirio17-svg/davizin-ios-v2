@@ -130,6 +130,21 @@
     <div class="ranks" id="ranks"></div>
   </div>
 
+  <!-- Render oficial del personaje vestido (API SiamBhau /outfits/outfit) -->
+  <div class="sec" id="renderWrap" style="display:none">
+    <div class="sh">
+      <div class="l">
+        <span class="lb">Personaje 3D</span>
+        <h2>Outfit en vivo</h2>
+      </div>
+      <div class="count">1024×1024</div>
+    </div>
+    <div style="position:relative;border-radius:22px;overflow:hidden;background:linear-gradient(170deg,rgba(255,255,255,.08),rgba(255,255,255,.02));border:0.5px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 20px 50px -20px rgba(0,0,0,.6)">
+      <div id="renderLoad" style="position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.5);font-size:.85rem;z-index:1"><div><div class="spin"></div><div style="margin-top:10px">Renderizando personaje…</div></div></div>
+      <img id="renderImg" style="width:100%;height:auto;display:block;position:relative;z-index:2;opacity:0;transition:opacity .4s" onload="this.style.opacity=1;document.getElementById('renderLoad').style.display='none'" onerror="document.getElementById('renderWrap').style.display='none'">
+    </div>
+  </div>
+
   <div class="sec">
     <div class="sh">
       <div class="l">
@@ -172,9 +187,14 @@
     return icon.replace(/^(Icon_|cloth_|icon_|avatar_)/i,'').replace(/_/g,' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
   }
 
-  // Swift llama esto: NYXEL_setOutfitData({ nickname, uid, level, likes, region, br, cs, avatarURL, bannerURL, clothesIDs: [...], weaponSkinIDs:[...], ... })
+  // Swift llama esto: NYXEL_setOutfitData({ nickname, uid, level, likes, region, br, cs, avatarURL, bannerURL, renderURL, clothesIDs: [...], weaponSkinIDs:[...], ... })
   window.NYXEL_setOutfitData = function(d){
     PENDING_SUMMARY = d;
+    // Render oficial del personaje via API SiamBhau
+    if(d.renderURL){
+      document.getElementById('renderWrap').style.display = 'block';
+      document.getElementById('renderImg').src = d.renderURL;
+    }
     renderAll();
   };
 

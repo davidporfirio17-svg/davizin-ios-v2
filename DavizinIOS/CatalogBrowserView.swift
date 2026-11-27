@@ -36,6 +36,35 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
         }
     }
 
+    /// API key para el endpoint /outfits/outfit de siambhau69.eu.cc.
+    /// Por defecto usa la key de TryAllApi (temporal). El usuario puede
+    /// sobreescribirla guardando una key premium en UserDefaults bajo
+    /// "nyxel.siambhau.apikey".
+    private static var siamApiKey: String {
+        if let k = UserDefaults.standard.string(forKey: "nyxel.siambhau.apikey"), !k.isEmpty {
+            return k
+        }
+        // Key temporal TryAllApi — reemplazar por premium cuando esté
+        return "BHAU_D3CEXB2C7FC00JW6"
+    }
+
+    /// Mapea el código de región del lookup a los códigos aceptados por la API
+    /// de SiamBhau (BD, IND, BR, SG, SAC, NA, EU, ME, ...).
+    private static func siamRegion(from region: String?) -> String {
+        guard let r = region?.lowercased(), !r.isEmpty else { return "BD" }
+        switch r {
+        case "br": return "BR"
+        case "sg": return "SG"
+        case "ind", "in": return "IND"
+        case "us", "na": return "NA"
+        case "eu": return "EU"
+        case "sac": return "SAC"
+        case "me": return "ME"
+        case "bd": return "BD"
+        default: return r.uppercased()
+        }
+    }
+
     /// Carga el perfil del jugador en la pantalla de Outfit.
     /// Puede llamarse antes o después de que el WebView termine de cargar;
     /// se encola si aún no está listo.
@@ -48,6 +77,10 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
         if let b = summary.bannerID, !b.isEmpty {
             bannerURL = NyxelItemCatalog.shared.imageURL(for: b)?.absoluteString
         }
+        // URL del render oficial del personaje (API SiamBhau)
+        let siamRegion = Self.siamRegion(from: summary.region)
+        let renderURL = "http://siambhau69.eu.cc/outfits/outfit?uid=\(summary.uid)&region=\(siamRegion)&key=\(Self.siamApiKey)&t=\(Int(Date().timeIntervalSince1970))"
+
         let payload: [String: Any] = [
             "nickname": summary.nickname ?? "Jugador",
             "uid": summary.uid,
@@ -59,6 +92,7 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
             "season": summary.season ?? "",
             "avatarURL": avatarURL ?? "",
             "bannerURL": bannerURL ?? "",
+            "renderURL": renderURL,
             "clothesIDs": summary.clothesIDs,
             "weaponSkinIDs": summary.weaponSkinIDs,
             "bannerID": summary.bannerID ?? "",
