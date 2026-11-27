@@ -137,9 +137,11 @@
   @keyframes mglow{0%,100%{opacity:1}50%{opacity:.78}}
 
   /* Imagen con crop al centro */
-  .charv .charImg{position:absolute;inset:0;z-index:2;background-size:220% auto;background-position:center 58%;background-repeat:no-repeat;transition:opacity .5s;opacity:0}
+  .charv .charImg{position:absolute;inset:0;z-index:2;background-size:360% auto;background-position:50% 48%;background-repeat:no-repeat;transition:opacity .5s;opacity:0}
   .charv .charImg.on{opacity:1}
-  .charv .charLoad{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.55);font-size:.82rem;z-index:3;text-align:center;padding:40px 24px}
+  .charv .charVig{position:absolute;inset:0;z-index:3;pointer-events:none;
+    background:radial-gradient(ellipse 72% 80% at 50% 46%, transparent 50%, rgba(3,6,17,.85) 100%)}
+  .charv .charLoad{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.55);font-size:.82rem;z-index:4;text-align:center;padding:40px 24px}
   .charv .charLoad.hide{display:none}
 
   /* Chips flotantes en 4 esquinas estilo Rouk */
@@ -223,6 +225,7 @@
       <div class="charImg" id="charImgBox">
         <div class="charLoad" id="charLoad"><div class="spin"></div><div style="margin-top:8px;font-size:.78rem">Renderizando…</div></div>
       </div>
+      <div class="charVig"></div>
       <!-- Chips flotantes de zona (4 posiciones estilo Rouk) -->
       <button class="zchip cTL" onclick="pulseZone(this)"><span class="dot">⌖</span>Cabeza<span class="ar">›</span></button>
       <button class="zchip cTR" onclick="pulseZone(this)"><span class="dot">⌖</span>Drag · Cabeza<span class="ar">›</span></button>

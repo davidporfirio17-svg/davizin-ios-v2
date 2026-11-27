@@ -43,8 +43,10 @@
     -webkit-backdrop-filter:blur(26px) saturate(1.7);backdrop-filter:blur(26px) saturate(1.7);
     border:1px solid rgba(255,255,255,.14);border-top-color:rgba(255,255,255,.34);
     box-shadow:0 0 0 1px rgba(60,130,255,.05),0 30px 72px -28px rgba(20,60,200,.5),inset 0 1px 0 rgba(255,255,255,.22)}
-  #stage{position:absolute;inset:0;background-size:220% auto;background-position:center 56%;background-repeat:no-repeat;transition:opacity .45s;opacity:0}
+  #stage{position:absolute;inset:0;background-size:360% auto;background-position:50% 48%;background-repeat:no-repeat;transition:opacity .45s;opacity:0}
   #stage.on{opacity:1}
+  .vignette{position:absolute;inset:0;z-index:3;pointer-events:none;
+    background:radial-gradient(ellipse 72% 80% at 50% 46%, transparent 50%, rgba(3,5,14,.85) 100%)}
 
   /* Pills superiores tipo 3D LIVE · NOMBRE · CHARACTER */
   .topbar{position:absolute;top:14px;left:14px;right:14px;z-index:6;display:flex;gap:7px;justify-content:space-between}
@@ -172,6 +174,7 @@
     <div class="moon"></div>
     <div class="floor"></div>
     <div id="stage"></div>
+    <div class="vignette"></div>
     <div id="vload" class="vload"><div><div class="spin"></div><div>Ingresa un UID y pulsa Buscar</div></div></div>
 
     <div class="topbar">
