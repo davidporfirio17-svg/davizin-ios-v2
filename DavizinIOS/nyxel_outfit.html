@@ -141,13 +141,11 @@
   .charv .charImg.on{opacity:1;filter:drop-shadow(0 0 18px rgba(90,200,250,.18)) drop-shadow(0 0 36px rgba(90,200,250,.08))}
   /* Overlay de items equipados sobre el personaje */
   #charOverlays{position:absolute;inset:0;z-index:4;pointer-events:none}
-  .outfit-item{position:absolute;background-size:contain;background-position:center;background-repeat:no-repeat;
-    opacity:0;transform:scale(.85);transition:opacity .5s ease,transform .5s cubic-bezier(.22,1,.3,1);
-    -webkit-mask-image:radial-gradient(ellipse at center, black 65%, transparent 100%);
-    mask-image:radial-gradient(ellipse at center, black 65%, transparent 100%);
-    filter:drop-shadow(0 4px 18px rgba(0,0,0,.8)) brightness(1.08) saturate(1.35) contrast(1.05)}
+  .outfit-item{position:absolute;background-size:contain;background-position:center bottom;background-repeat:no-repeat;
+    opacity:0;transform:scale(.97);transition:opacity .4s ease,transform .4s cubic-bezier(.22,1,.3,1);
+    filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
   .outfit-item.on{opacity:1;transform:scale(1)}
-  .charv .charImg.on.dimmed{opacity:.45;filter:brightness(.5) saturate(.3)}
+  .charv .charImg.on.dimmed{opacity:.10;filter:brightness(.2) saturate(.05)}
   .charv .charVig{position:absolute;inset:0;z-index:3;pointer-events:none;
     background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,6,17,.75) 72%, rgba(3,6,17,.98) 100%)}
   .charv .charLoad{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.55);font-size:.82rem;z-index:4;text-align:center;padding:40px 24px}
@@ -293,12 +291,12 @@
   var ICON_BASE = 'https://raw.githubusercontent.com/ashqking/FF-Items/main/ICONS/';
   var ICON_FB   = 'https://raw.githubusercontent.com/I-SHOW-AKIRU200/AKIRU-ICONS/main/ICONS/';
   var ITEM_POS = {
-    head:   {top:'0%',   left:'15%', w:'70%', h:'30%'},
-    mask:   {top:'8%',   left:'18%', w:'64%', h:'24%'},
-    top:    {top:'16%',  left:'5%',  w:'90%', h:'42%'},
-    bottom: {top:'42%',  left:'10%', w:'80%', h:'38%'},
-    shoes:  {top:'70%',  left:'14%', w:'72%', h:'28%'},
-    back:   {top:'18%',  left:'48%', w:'48%', h:'38%'}
+    head:   {top:'0%',   left:'22%', w:'56%', h:'24%'},
+    mask:   {top:'4%',   left:'24%', w:'52%', h:'20%'},
+    top:    {top:'15%',  left:'14%', w:'72%', h:'40%'},
+    bottom: {top:'43%',  left:'16%', w:'68%', h:'38%'},
+    shoes:  {top:'74%',  left:'22%', w:'56%', h:'24%'},
+    back:   {top:'16%',  left:'46%', w:'38%', h:'36%'}
   };
   function zoneFromId(id){
     var p=String(id).substring(0,3);
