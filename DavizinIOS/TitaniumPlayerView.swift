@@ -90,26 +90,38 @@ final class TitaniumPlayerView: UIView, WKScriptMessageHandler, WKNavigationDele
         }
     }
 
-    /// Resuelve un itemID al URL público de su imagen vía NyxelItemCatalog.
-    /// Fallback: si no está en el catálogo, usa el callback legado `onAssetRequested`
-    /// (que intenta descargar la imagen via la lógica propia de la app).
+    /// Resuelve un itemID a su imagen. Intenta primero el servicio nativo
+    /// (`onAssetRequested`, que es el comportamiento original y cubre casi todo);
+    /// si no devuelve imagen, cae al catálogo público (NyxelItemCatalog) que
+    /// complementa con URLs del CDN de Garena.
     private func pushImage(id: String, jsSetter: String, index: Int? = nil) {
-        if let url = NyxelItemCatalog.shared.imageURL(for: id) {
+        let applyCatalogFallback: () -> Void = { [weak self] in
+            guard let self, let url = NyxelItemCatalog.shared.imageURL(for: id) else { return }
             let safe = url.absoluteString
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "'", with: "\\'")
             let indexArg = index.map { "\($0)," } ?? ""
-            run("\(jsSetter) && \(jsSetter)(\(indexArg)'\(safe)');")
+            DispatchQueue.main.async {
+                self.run("\(jsSetter) && \(jsSetter)(\(indexArg)'\(safe)');")
+            }
+        }
+        guard let onAssetRequested else {
+            // Si la app no conectó el servicio nativo, usar solo el catálogo
+            applyCatalogFallback()
             return
         }
-        // fallback legado (por si algún itemID no está en el catálogo)
-        guard let onAssetRequested else { return }
         onAssetRequested(id) { [weak self] image in
-            guard let self, let image, let png = image.pngData() else { return }
-            let uri = "data:image/png;base64," + png.base64EncodedString()
-            let indexArg = index.map { "\($0)," } ?? ""
-            DispatchQueue.main.async {
-                self.run("\(jsSetter) && \(jsSetter)(\(indexArg)'\(uri)');")
+            guard let self else { return }
+            if let image, let png = image.pngData() {
+                // Servicio nativo sí tiene la imagen → usarla (comportamiento original)
+                let uri = "data:image/png;base64," + png.base64EncodedString()
+                let indexArg = index.map { "\($0)," } ?? ""
+                DispatchQueue.main.async {
+                    self.run("\(jsSetter) && \(jsSetter)(\(indexArg)'\(uri)');")
+                }
+            } else {
+                // Servicio nativo no devolvió imagen → usar el catálogo público
+                applyCatalogFallback()
             }
         }
     }
