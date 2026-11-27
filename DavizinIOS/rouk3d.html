@@ -43,10 +43,10 @@
     -webkit-backdrop-filter:blur(26px) saturate(1.7);backdrop-filter:blur(26px) saturate(1.7);
     border:1px solid rgba(255,255,255,.14);border-top-color:rgba(255,255,255,.34);
     box-shadow:0 0 0 1px rgba(60,130,255,.05),0 30px 72px -28px rgba(20,60,200,.5),inset 0 1px 0 rgba(255,255,255,.22)}
-  #stage{position:absolute;inset:0;background-size:360% auto;background-position:50% 48%;background-repeat:no-repeat;transition:opacity .45s;opacity:0}
+  #stage{position:absolute;inset:0;background-size:260% auto;background-position:50% 42%;background-repeat:no-repeat;transition:opacity .45s;opacity:0}
   #stage.on{opacity:1}
   .vignette{position:absolute;inset:0;z-index:3;pointer-events:none;
-    background:radial-gradient(ellipse 72% 80% at 50% 46%, transparent 50%, rgba(3,5,14,.85) 100%)}
+    background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,5,14,.75) 72%, rgba(3,5,14,.98) 100%)}
 
   /* Pills superiores tipo 3D LIVE · NOMBRE · CHARACTER */
   .topbar{position:absolute;top:14px;left:14px;right:14px;z-index:6;display:flex;gap:7px;justify-content:space-between}
@@ -273,10 +273,25 @@
   window.onRenderOk = function(){
     var img = document.getElementById('renderImg');
     var stage = document.getElementById('stage');
-    stage.style.backgroundImage = 'url("'+img.src+'")';
+    var cropped = false;
+    // Canvas crop: extract JUST the center character (no hexagons/text)
+    try {
+      var c = document.createElement('canvas'), ctx = c.getContext('2d');
+      var W = img.naturalWidth||1024, H = img.naturalHeight||1024;
+      // Crop region: center character excluding hexagonal items and "YOUR OUTFITS" text
+      var sx=Math.round(W*.28), sy=Math.round(H*.07), sw=Math.round(W*.44), sh=Math.round(H*.86);
+      c.width=sw; c.height=sh;
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      ctx.getImageData(0,0,1,1); // throws SecurityError if cross-origin tainted
+      stage.style.backgroundImage='url("'+c.toDataURL()+'")';
+      stage.style.backgroundSize='contain';
+      stage.style.backgroundPosition='center bottom';
+      cropped=true;
+    } catch(e){}
+    if(!cropped) stage.style.backgroundImage='url("'+img.src+'")';
     stage.classList.add('on');
     document.getElementById('vload').classList.add('hide');
-    document.getElementById('hint').textContent = '✓ Personaje cargado. Toca una zona arriba para preparar.';
+    document.getElementById('hint').textContent = '✓ Personaje cargado. Toca una zona para preparar.';
     var btn = document.getElementById('goBtn'); btn.classList.remove('busy'); btn.textContent='Buscar';
   };
   window.onRenderFail = function(){

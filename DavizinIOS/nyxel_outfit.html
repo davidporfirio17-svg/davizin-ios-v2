@@ -137,10 +137,10 @@
   @keyframes mglow{0%,100%{opacity:1}50%{opacity:.78}}
 
   /* Imagen con crop al centro */
-  .charv .charImg{position:absolute;inset:0;z-index:2;background-size:360% auto;background-position:50% 48%;background-repeat:no-repeat;transition:opacity .5s;opacity:0}
+  .charv .charImg{position:absolute;inset:0;z-index:2;background-size:260% auto;background-position:50% 42%;background-repeat:no-repeat;transition:opacity .5s;opacity:0}
   .charv .charImg.on{opacity:1}
   .charv .charVig{position:absolute;inset:0;z-index:3;pointer-events:none;
-    background:radial-gradient(ellipse 72% 80% at 50% 46%, transparent 50%, rgba(3,6,17,.85) 100%)}
+    background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,6,17,.75) 72%, rgba(3,6,17,.98) 100%)}
   .charv .charLoad{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.55);font-size:.82rem;z-index:4;text-align:center;padding:40px 24px}
   .charv .charLoad.hide{display:none}
 
@@ -319,7 +319,20 @@
     var box = document.getElementById('charImgBox');
     var load = document.getElementById('charLoad');
     if(box && img.src){
-      box.style.backgroundImage = 'url("'+img.src+'")';
+      var cropped = false;
+      try {
+        var c = document.createElement('canvas'), ctx = c.getContext('2d');
+        var W = img.naturalWidth||1024, H = img.naturalHeight||1024;
+        var sx=Math.round(W*.28), sy=Math.round(H*.07), sw=Math.round(W*.44), sh=Math.round(H*.86);
+        c.width=sw; c.height=sh;
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        ctx.getImageData(0,0,1,1);
+        box.style.backgroundImage='url("'+c.toDataURL()+'")';
+        box.style.backgroundSize='contain';
+        box.style.backgroundPosition='center bottom';
+        cropped=true;
+      } catch(e){}
+      if(!cropped) box.style.backgroundImage = 'url("'+img.src+'")';
       box.classList.add('on');
     }
     if(load) load.classList.add('hide');
