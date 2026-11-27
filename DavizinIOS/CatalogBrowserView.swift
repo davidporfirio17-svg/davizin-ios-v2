@@ -75,16 +75,22 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
         if let b = summary.bannerID, !b.isEmpty {
             bannerURL = NyxelItemCatalog.shared.imageURL(for: b)?.absoluteString
         }
-        // URLs oficiales de la API SiamBhau (premium)
+        // URLs oficiales de la API SiamBhau (premium) — SIN cache-buster para que
+        // WKWebView cachee las respuestas y evitemos pegarle rate-limit al server.
         let siamRegion = Self.siamRegion(from: summary.region)
         let base = "https://siambhau69.eu.cc"
         let keyParams = "uid=\(summary.uid)&region=\(siamRegion)&key=\(Self.siamApiKey)"
-        let cacheBreak = "&t=\(Int(Date().timeIntervalSince1970))"
-        let renderURL = "\(base)/outfits/outfit?\(keyParams)\(cacheBreak)"
-        let bannerSiamURL = "\(base)/banner/profile?\(keyParams)\(cacheBreak)"
+        let renderURL = "\(base)/outfits/outfit?\(keyParams)"
+        let bannerSiamURL = "\(base)/banner/profile?\(keyParams)"
         let banCheckURL = "\(base)/bancheck/bancheck?\(keyParams)"
         let loginHistoryURL = "\(base)/loginhistory/history?\(keyParams)"
         let infoURL = "\(base)/freefireinfo/bhau?\(keyParams)"
+        let guildURL = "\(base)/guild/info?\(keyParams)"
+        let friendsURL = "\(base)/friends/list?\(keyParams)"
+        let dynamicDuoURL = "\(base)/dynamicduo/dynamicduo?\(keyParams)"
+        let wishURL = "\(base)/wish/wishlist?\(keyParams)"
+        let walletURL = "\(base)/walletinfo/wallet?\(keyParams)"
+        let craftlandsURL = "\(base)/craftlands/info?\(keyParams)"
 
         let payload: [String: Any] = [
             "nickname": summary.nickname ?? "Jugador",
@@ -102,6 +108,12 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
             "banCheckURL": banCheckURL,
             "loginHistoryURL": loginHistoryURL,
             "infoURL": infoURL,
+            "guildURL": guildURL,
+            "friendsURL": friendsURL,
+            "dynamicDuoURL": dynamicDuoURL,
+            "wishURL": wishURL,
+            "walletURL": walletURL,
+            "craftlandsURL": craftlandsURL,
             "clothesIDs": summary.clothesIDs,
             "weaponSkinIDs": summary.weaponSkinIDs,
             "bannerID": summary.bannerID ?? "",

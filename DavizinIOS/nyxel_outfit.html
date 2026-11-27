@@ -245,9 +245,9 @@
     <img id="renderImg" style="display:none" onload="onRenderOk(this)" onerror="onRenderFail()">
   </div>
 
-  <!-- Insights: ban check + login history -->
+  <!-- Insights: ban check + login history + guild + friends + duo + wallet + wishlist + craftlands -->
   <div class="sec" id="insightsWrap" style="display:none">
-    <div class="sh"><div class="l"><span class="lb">Intel</span><h2>Estado de la cuenta</h2></div></div>
+    <div class="sh"><div class="l"><span class="lb">Intel</span><h2>Datos completos</h2></div></div>
     <div id="insightsBody" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 
@@ -306,8 +306,8 @@
       document.getElementById('renderWrap').style.display = 'block';
       document.getElementById('renderImg').src = d.renderURL;
     }
-    // Insights: ban check + login history (JSON endpoints)
-    if(d.banCheckURL || d.loginHistoryURL){ loadInsights(d); }
+    // Insights: ban + login + guild + friends + duo + wallet + wish + craftlands
+    if(d.banCheckURL || d.loginHistoryURL || d.guildURL || d.friendsURL){ loadInsights(d); }
     renderAll();
   };
 
@@ -327,12 +327,23 @@
     var metaEl = document.getElementById('charMeta');
     if(metaEl && d.uid) metaEl.innerHTML = 'UID <b style="color:#fff">'+d.uid+'</b>';
   };
-  // Si el PNG falla (típico: rate limit del API o UID sin outfit)
+  // Si el PNG falla: reintentar 2 veces con backoff antes de rendirse
+  var _renderRetries = 0;
   window.onRenderFail = function(){
     var load = document.getElementById('charLoad');
     if(!load) return;
+    if(_renderRetries < 2 && PENDING_SUMMARY && PENDING_SUMMARY.renderURL){
+      _renderRetries++;
+      var delay = 2500 * _renderRetries; // 2.5s, 5s
+      load.innerHTML = '<div style="color:#ffd27a;line-height:1.4"><div class="spin"></div>⏱ Reintentando ('+_renderRetries+'/2)…<br><span style="opacity:.6;font-size:.72rem">API con rate-limit, reintentando en '+(delay/1000)+'s</span></div>';
+      setTimeout(function(){
+        var img = document.getElementById('renderImg');
+        img.src = PENDING_SUMMARY.renderURL + '&retry=' + _renderRetries;
+      }, delay);
+      return;
+    }
     load.classList.remove('hide');
-    load.innerHTML = '<div style="color:#ffd27a;line-height:1.4">⏱ API con rate-limit o UID sin outfit.<br><span style="opacity:.6;font-size:.72rem">Espera unos segundos y vuelve a entrar a "Ver outfit".</span></div>';
+    load.innerHTML = '<div style="color:#ffd27a;line-height:1.4">⏱ API con rate-limit prolongado.<br><span style="opacity:.6;font-size:.72rem">Espera 30s y vuelve a entrar a "Ver outfit".</span></div>';
   };
 
   // Pulse rojo tipo "zona de mira" al tap de un chip
@@ -350,49 +361,178 @@
     '</div>';
   }
 
+  // Extrae un campo de un objeto buscando varios alias posibles (soporta rutas .data.X)
+  function pick(obj, keys){
+    if(!obj) return null;
+    for(var i=0;i<keys.length;i++){
+      var parts = keys[i].split('.');
+      var v = obj;
+      for(var j=0;j<parts.length;j++){ if(v==null) break; v = v[parts[j]]; }
+      if(v!=null && v!=='' && v!=='NONE') return v;
+    }
+    return null;
+  }
+
+  function section(title){
+    return '<div style="font-size:.6rem;font-weight:800;letter-spacing:.3em;color:rgba(200,215,245,.55);text-transform:uppercase;margin:12px 2px 4px">'+title+'</div>';
+  }
+
   function loadInsights(d){
     var body = document.getElementById('insightsBody');
     var wrap = document.getElementById('insightsWrap');
     wrap.style.display = 'block';
-    body.innerHTML = '<div class="loading"><div class="spin"></div>Consultando estado…</div>';
-    var results = {ban:null, login:null};
-    var done = 0, total = 0;
+    body.innerHTML = '<div class="loading"><div class="spin"></div>Consultando datos completos…</div>';
+    var results = {};
+    var done = 0, total = 0, rateLimited = 0;
+
     function render(){
       var html = '';
+
+      // Ban Check
       if(results.ban){
+        html += section('Estado de la cuenta');
         var b = results.ban;
         if(b.err){ html += pill('Ban Check', '<span style="color:#ff948b">'+b.err+'</span>', 'rgba(255,255,255,.1)'); }
         else {
-          var banned = (b.is_banned===true || b.isBanned===true || b.banned===true || (typeof b.status==='string' && b.status.toLowerCase().indexOf('ban')>=0));
+          var banned = (b.is_banned===true || b.isBanned===true || b.banned===true || pick(b,['data.is_banned','data.isBanned'])===true || (typeof b.status==='string' && b.status.toLowerCase().indexOf('ban')>=0));
           html += pill('Ban Check',
             banned ? '<span style="color:#ff948b">⚠ BANEADO</span>' : '<span style="color:#86f5a3">✓ Cuenta limpia</span>',
             banned ? 'rgba(255,69,58,.35)' : 'rgba(48,209,88,.3)');
-          if(b.period) html += pill('Periodo del ban', b.period, 'rgba(255,69,58,.3)');
+          var period = pick(b, ['period','ban_period','data.period']);
+          if(period) html += pill('Periodo del ban', period, 'rgba(255,69,58,.3)');
         }
       }
+
+      // Login history
       if(results.login){
         var l = results.login;
-        if(l.err){ html += pill('Última conexión', '<span style="color:#ff948b">'+l.err+'</span>', 'rgba(255,255,255,.1)'); }
-        else {
-          var last = l.last_login || l.lastLogin || l.last_online || l.lastOnline || (l.history && l.history[0] && (l.history[0].time||l.history[0].date||l.history[0].ts)) || (l.data && l.data.last_login) || null;
-          html += pill('Última conexión', last ? '<span style="color:#86f5a3">'+last+'</span>' : '—', 'rgba(255,255,255,.1)');
-          var cnt = (l.history && l.history.length) || (l.data && l.data.history && l.data.history.length) || null;
+        if(!l.err){
+          var last = pick(l, ['last_login','lastLogin','last_online','lastOnline','data.last_login']) ||
+                     (l.history && l.history[0] && (l.history[0].time||l.history[0].date||l.history[0].ts));
+          if(last) html += pill('Última conexión', '<span style="color:#86f5a3">'+last+'</span>', 'rgba(255,255,255,.1)');
+          var cnt = (l.history && l.history.length) || pick(l, ['data.history_count','count','total']);
           if(cnt) html += pill('Logins registrados', cnt, 'rgba(255,255,255,.1)');
         }
       }
-      body.innerHTML = html || '<div class="empty">Sin datos disponibles</div>';
+
+      // Guild
+      if(results.guild){
+        var g = results.guild;
+        if(!g.err){
+          var gName = pick(g, ['name','clan_name','clanName','data.name','data.clan_name','guild_name']);
+          var gLv   = pick(g, ['level','clan_level','data.level']);
+          var gMem  = pick(g, ['members','members_count','membersCount','member_count','data.members']);
+          var gLead = pick(g, ['leader','leader_name','owner','data.leader']);
+          if(gName || gLv || gMem){
+            html += section('Clan');
+            if(gName) html += pill('Nombre', gName, 'rgba(90,200,250,.3)');
+            if(gLv)   html += pill('Nivel',  gLv,   'rgba(255,255,255,.1)');
+            if(gMem)  html += pill('Miembros', gMem, 'rgba(255,255,255,.1)');
+            if(gLead) html += pill('Líder',  gLead, 'rgba(255,255,255,.1)');
+          }
+        }
+      }
+
+      // Friends
+      if(results.friends){
+        var f = results.friends;
+        if(!f.err){
+          var fList = f.friends || f.list || (f.data && f.data.friends) || (f.data && f.data.list) || null;
+          var fCount = pick(f, ['count','total','friends_count','data.count']) || (fList && fList.length);
+          if(fCount){
+            html += section('Amigos');
+            html += pill('Total de amigos', fCount, 'rgba(255,255,255,.1)');
+          }
+        }
+      }
+
+      // Dynamic Duo
+      if(results.duo){
+        var du = results.duo;
+        if(!du.err){
+          var duoName = pick(du, ['duo_name','partner','name','data.partner']);
+          var duoMatches = pick(du, ['matches','games_played','data.matches']);
+          if(duoName || duoMatches){
+            html += section('Dynamic Duo');
+            if(duoName) html += pill('Compañero', duoName, 'rgba(255,255,255,.1)');
+            if(duoMatches) html += pill('Partidas juntos', duoMatches, 'rgba(255,255,255,.1)');
+          }
+        }
+      }
+
+      // Wallet
+      if(results.wallet){
+        var w = results.wallet;
+        if(!w.err){
+          var diamonds = pick(w, ['diamond','diamonds','data.diamond','data.diamonds']);
+          var gold = pick(w, ['gold','coins','data.gold']);
+          if(diamonds!=null || gold!=null){
+            html += section('Wallet');
+            if(diamonds!=null) html += pill('Diamantes', '💎 '+diamonds, 'rgba(255,255,255,.1)');
+            if(gold!=null) html += pill('Gold', '🪙 '+gold, 'rgba(255,255,255,.1)');
+          }
+        }
+      }
+
+      // Wish list
+      if(results.wish){
+        var wi = results.wish;
+        if(!wi.err){
+          var wishItems = wi.wishlist || wi.items || (wi.data && wi.data.wishlist) || null;
+          if(wishItems && wishItems.length){
+            html += section('Wish list');
+            html += pill('Items en lista', wishItems.length, 'rgba(255,255,255,.1)');
+          }
+        }
+      }
+
+      // Craftlands
+      if(results.craft){
+        var c = results.craft;
+        if(!c.err){
+          var maps = c.maps || c.craftlands || (c.data && c.data.maps) || null;
+          if(maps && maps.length){
+            html += section('Craftlands');
+            html += pill('Mapas creados', maps.length, 'rgba(255,255,255,.1)');
+          }
+        }
+      }
+
+      if(rateLimited > 0){
+        html += '<div style="padding:10px 14px;border-radius:12px;background:rgba(255,159,10,.14);color:#ffd27a;font-size:.75rem;text-align:center;border:0.5px solid rgba(255,159,10,.3);margin-top:8px">⏱ '+rateLimited+' endpoints tienen rate-limit activo. Espera unos segundos y reintenta.</div>';
+      }
+
+      body.innerHTML = html || '<div class="empty" style="padding:20px;color:rgba(255,255,255,.4);text-align:center">Sin datos adicionales del jugador</div>';
     }
+
     function fetchJson(url, slot){
       total++;
       fetch(url).then(function(r){ return r.text().then(function(t){
-        try{ results[slot] = JSON.parse(t); }
-        catch(e){ results[slot] = {err:'Respuesta inválida (HTTP '+r.status+')'}; }
+        try{
+          var j = JSON.parse(t);
+          // Detectar rate limit
+          if(j && typeof j === 'object' && JSON.stringify(j).toLowerCase().indexOf('rate limit') >= 0){
+            results[slot] = {err:'Rate-limit'}; rateLimited++;
+          } else if(r.status >= 400){
+            results[slot] = {err:'HTTP '+r.status};
+          } else {
+            results[slot] = j;
+          }
+        }
+        catch(e){ results[slot] = {err:'Respuesta no-JSON'}; }
       }); }).catch(function(e){
         results[slot] = {err:'Sin conexión'};
       }).finally(function(){ done++; if(done===total) render(); });
     }
-    if(d.banCheckURL) fetchJson(d.banCheckURL, 'ban');
+
+    if(d.banCheckURL)     fetchJson(d.banCheckURL, 'ban');
     if(d.loginHistoryURL) fetchJson(d.loginHistoryURL, 'login');
+    if(d.guildURL)        fetchJson(d.guildURL, 'guild');
+    if(d.friendsURL)      fetchJson(d.friendsURL, 'friends');
+    if(d.dynamicDuoURL)   fetchJson(d.dynamicDuoURL, 'duo');
+    if(d.walletURL)       fetchJson(d.walletURL, 'wallet');
+    if(d.wishURL)         fetchJson(d.wishURL, 'wish');
+    if(d.craftlandsURL)   fetchJson(d.craftlandsURL, 'craft');
   }
 
   function renderAll(){
