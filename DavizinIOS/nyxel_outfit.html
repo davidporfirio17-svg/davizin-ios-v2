@@ -139,13 +139,12 @@
   /* Imagen con crop al centro */
   .charv .charImg{position:absolute;inset:0;z-index:2;background-size:260% auto;background-position:50% 42%;background-repeat:no-repeat;transition:opacity .5s;opacity:0}
   .charv .charImg.on{opacity:1;filter:drop-shadow(0 0 18px rgba(90,200,250,.18)) drop-shadow(0 0 36px rgba(90,200,250,.08))}
-  /* Overlay de items equipados sobre el personaje */
-  #charOverlays{position:absolute;inset:0;z-index:4;pointer-events:none}
-  .outfit-item{position:absolute;background-size:contain;background-position:center bottom;background-repeat:no-repeat;
-    opacity:0;transform:scale(.97);transition:opacity .4s ease,transform .4s cubic-bezier(.22,1,.3,1);
-    filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
-  .outfit-item.on{opacity:1;transform:scale(1)}
-  .charv .charImg.on.dimmed{opacity:.10;filter:brightness(.2) saturate(.05)}
+  /* Tira de items equipados al pie del visor */
+  #equipStrip{position:absolute;bottom:28px;left:0;right:0;z-index:5;display:flex;gap:6px;justify-content:center;padding:0 16px;pointer-events:none}
+  .equip-icon{flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:#0a0e1e center/cover no-repeat;
+    border:1.5px solid rgba(255,255,255,.18);box-shadow:0 2px 8px rgba(0,0,0,.5);
+    opacity:0;transform:scale(.9);transition:opacity .4s ease,transform .4s cubic-bezier(.22,1,.3,1)}
+  .equip-icon.on{opacity:1;transform:scale(1)}
   .charv .charVig{position:absolute;inset:0;z-index:3;pointer-events:none;
     background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,6,17,.75) 72%, rgba(3,6,17,.98) 100%)}
   .charv .charLoad{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.55);font-size:.82rem;z-index:4;text-align:center;padding:40px 24px}
@@ -236,7 +235,7 @@
         <div class="charLoad" id="charLoad"><div class="spin"></div><div style="margin-top:8px;font-size:.78rem">Renderizando…</div></div>
       </div>
       <div class="charVig"></div>
-      <div id="charOverlays"></div>
+      <div id="equipStrip"></div>
       <!-- Chips flotantes de zona (4 posiciones estilo Rouk) -->
       <button class="zchip cTL" onclick="pulseZone(this)"><span class="dot">⌖</span>Cabeza<span class="ar">›</span></button>
       <button class="zchip cTR" onclick="pulseZone(this)"><span class="dot">⌖</span>Drag · Cabeza<span class="ar">›</span></button>
@@ -290,14 +289,6 @@
   // ========== Outfit item overlay system ==========
   var ICON_BASE = 'https://raw.githubusercontent.com/ashqking/FF-Items/main/ICONS/';
   var ICON_FB   = 'https://raw.githubusercontent.com/I-SHOW-AKIRU200/AKIRU-ICONS/main/ICONS/';
-  var ITEM_POS = {
-    head:   {top:'0%',   left:'22%', w:'56%', h:'24%'},
-    mask:   {top:'4%',   left:'24%', w:'52%', h:'20%'},
-    top:    {top:'15%',  left:'14%', w:'72%', h:'40%'},
-    bottom: {top:'43%',  left:'16%', w:'68%', h:'38%'},
-    shoes:  {top:'74%',  left:'22%', w:'56%', h:'24%'},
-    back:   {top:'16%',  left:'46%', w:'38%', h:'36%'}
-  };
   function zoneFromId(id){
     var p=String(id).substring(0,3);
     switch(p){
@@ -310,25 +301,16 @@
       default: return null;
     }
   }
-  var ZONE_ZINDEX={back:1,shoes:2,bottom:3,top:4,mask:5,head:6};
   function showOutfitItems(ids){
-    var cont=document.getElementById('charOverlays');
-    if(!cont)return; cont.innerHTML='';
-    var filled={};
-    var cbox=document.getElementById('charImgBox');
-    if(cbox) cbox.classList.add('dimmed');
-    var sorted=(ids||[]).slice().sort(function(a,b){
-      return (ZONE_ZINDEX[zoneFromId(a)]||0)-(ZONE_ZINDEX[zoneFromId(b)]||0);
-    });
-    sorted.forEach(function(id){
+    var strip=document.getElementById('equipStrip');
+    if(!strip)return; strip.innerHTML='';
+    var seen={};
+    (ids||[]).forEach(function(id){
       var zone=zoneFromId(id);
-      if(!zone||filled[zone]||!ITEM_POS[zone])return;
-      filled[zone]=true;
-      var z=ITEM_POS[zone];
-      var el=document.createElement('div'); el.className='outfit-item';
-      el.dataset.itemId=String(id); el.dataset.zone=zone;
-      el.style.top=z.top; el.style.left=z.left; el.style.width=z.w; el.style.height=z.h;
-      el.style.zIndex=ZONE_ZINDEX[zone]||0;
+      if(!zone||seen[zone])return;
+      seen[zone]=true;
+      var el=document.createElement('div'); el.className='equip-icon';
+      el.dataset.itemId=String(id);
       var url=ICON_BASE+id+'.png';
       var img=new Image();
       img.onload=function(){ el.style.backgroundImage='url("'+url+'")'; setTimeout(function(){el.classList.add('on');},80); };
@@ -337,7 +319,7 @@
         var img2=new Image(); img2.onload=function(){ el.style.backgroundImage='url("'+url2+'")'; el.classList.add('on'); }; img2.src=url2;
       };
       img.src=url;
-      cont.appendChild(el);
+      strip.appendChild(el);
     });
   }
 
@@ -364,11 +346,7 @@
   // Swift llama esto: NYXEL_setOutfitData({ nickname, uid, level, likes, region, br, cs, avatarURL, bannerURL, renderURL, clothesIDs: [...], weaponSkinIDs:[...], ... })
   window.NYXEL_setOutfitData = function(d){
     PENDING_SUMMARY = d;
-    // Banner oficial via SiamBhau
-    if(d.bannerSiamURL){
-      document.getElementById('bannerWrap').style.display = 'block';
-      document.getElementById('bannerImg').src = d.bannerSiamURL;
-    }
+    // Banner de SiamBhau desactivado: /banner/profile devuelve datos de otro jugador
     // Render oficial del personaje via API SiamBhau (se recorta al centro en CSS)
     if(d.renderURL){
       document.getElementById('renderWrap').style.display = 'block';
