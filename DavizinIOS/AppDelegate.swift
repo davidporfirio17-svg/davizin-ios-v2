@@ -24,6 +24,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationC
         UNUserNotificationCenter.current().delegate = self
         clearLegacyInjectionNotifications()
         application.logNyxelLaunchInfo()
+        // Precarga el catálogo de items (ropa/banners/pets/...) en background
+        // para que la primera búsqueda de UID resuelva URLs al instante.
+        NyxelItemCatalog.shared.preload()
         return true
     }
 

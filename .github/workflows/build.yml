@@ -117,6 +117,14 @@ jobs:
             puts "Added TitaniumPlayerView.swift"
           end
 
+          # Add NyxelItemCatalog.swift (resuelve itemID → URL pública del catálogo)
+          nic = davizin_group.files.find { |f| f.path.end_with?("NyxelItemCatalog.swift") }
+          if nic.nil?
+            nic = davizin_group.new_file("NyxelItemCatalog.swift")
+            target.add_file_references([nic])
+            puts "Added NyxelItemCatalog.swift"
+          end
+
           # Add 3D viewer resources (html + glb) to the resources build phase
           ["rouk3d.html", "rouk.glb", "opcion_desactivada.m4a", "nyxel_intro.html", "nyxel_profile.html", "entorno.html"].each do |res|
             next if davizin_group.files.any? { |f| f.path.end_with?(res) }

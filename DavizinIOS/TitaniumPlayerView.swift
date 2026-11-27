@@ -81,46 +81,57 @@ final class TitaniumPlayerView: UIView, WKScriptMessageHandler, WKNavigationDele
            let json = String(data: data, encoding: .utf8) {
             run("window.NYXEL_setProfile && window.NYXEL_setProfile(\(json));")
         }
-        loadBanner(summary.bannerID)
-        loadArsenal(summary.weaponSkinIDs)
-        loadOutfit(summary.clothesIDs)
+        // Precarga el catálogo si no está (asegura URLs frescas para esta búsqueda)
+        NyxelItemCatalog.shared.preload { [weak self] _ in
+            guard let self else { return }
+            self.loadBanner(summary.bannerID)
+            self.loadArsenal(summary.weaponSkinIDs)
+            self.loadOutfit(summary.clothesIDs)
+        }
     }
 
-    private func loadBanner(_ id: String?) {
-        guard let id, !id.isEmpty, let onAssetRequested else { return }
+    /// Resuelve un itemID al URL público de su imagen vía NyxelItemCatalog.
+    /// Fallback: si no está en el catálogo, usa el callback legado `onAssetRequested`
+    /// (que intenta descargar la imagen via la lógica propia de la app).
+    private func pushImage(id: String, jsSetter: String, index: Int? = nil) {
+        if let url = NyxelItemCatalog.shared.imageURL(for: id) {
+            let safe = url.absoluteString
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+            let indexArg = index.map { "\($0)," } ?? ""
+            run("\(jsSetter) && \(jsSetter)(\(indexArg)'\(safe)');")
+            return
+        }
+        // fallback legado (por si algún itemID no está en el catálogo)
+        guard let onAssetRequested else { return }
         onAssetRequested(id) { [weak self] image in
             guard let self, let image, let png = image.pngData() else { return }
             let uri = "data:image/png;base64," + png.base64EncodedString()
-            DispatchQueue.main.async { self.run("window.NYXEL_setBanner && window.NYXEL_setBanner('\(uri)');") }
+            let indexArg = index.map { "\($0)," } ?? ""
+            DispatchQueue.main.async {
+                self.run("\(jsSetter) && \(jsSetter)(\(indexArg)'\(uri)');")
+            }
         }
+    }
+
+    private func loadBanner(_ id: String?) {
+        guard let id, !id.isEmpty else { return }
+        pushImage(id: id, jsSetter: "window.NYXEL_setBanner")
     }
 
     private func loadArsenal(_ ids: [String]) {
         let items = Array(ids.prefix(12))
         run("window.NYXEL_setArsenalCount && window.NYXEL_setArsenalCount(\(items.count));")
-        guard let onAssetRequested else { return }
         for (index, id) in items.enumerated() {
-            onAssetRequested(id) { [weak self] image in
-                guard let self, let image, let png = image.pngData() else { return }
-                let uri = "data:image/png;base64," + png.base64EncodedString()
-                DispatchQueue.main.async { self.run("window.NYXEL_setArsenalItem && window.NYXEL_setArsenalItem(\(index),'\(uri)');") }
-            }
+            pushImage(id: id, jsSetter: "window.NYXEL_setArsenalItem", index: index)
         }
     }
 
-    /// Carga las imágenes reales de las prendas (las baja la app por itemID) y las inyecta como data URI.
     private func loadOutfit(_ ids: [String]) {
         let items = Array(ids.prefix(12))
         run("window.NYXEL_setOutfitCount && window.NYXEL_setOutfitCount(\(items.count));")
-        guard let onAssetRequested else { return }
         for (index, id) in items.enumerated() {
-            onAssetRequested(id) { [weak self] image in
-                guard let self, let image, let png = image.pngData() else { return }
-                let uri = "data:image/png;base64," + png.base64EncodedString()
-                DispatchQueue.main.async {
-                    self.run("window.NYXEL_setOutfitItem && window.NYXEL_setOutfitItem(\(index),'\(uri)');")
-                }
-            }
+            pushImage(id: id, jsSetter: "window.NYXEL_setOutfitItem", index: index)
         }
     }
 
