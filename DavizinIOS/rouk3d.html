@@ -51,14 +51,12 @@
   /* Overlay de items equipados sobre el personaje */
   #itemOverlays{position:absolute;inset:0;z-index:4;pointer-events:none}
   .outfit-item{position:absolute;background-size:contain;background-position:center;background-repeat:no-repeat;
-    opacity:0;transform:scale(.88);transition:opacity .6s ease,transform .6s cubic-bezier(.22,1,.3,1);
-    mix-blend-mode:screen;
-    -webkit-mask-image:radial-gradient(ellipse at center, black 50%, transparent 95%);
-    mask-image:radial-gradient(ellipse at center, black 50%, transparent 95%);
-    filter:drop-shadow(0 2px 10px rgba(0,0,0,.4)) brightness(1.1) saturate(1.2)}
-  .outfit-item.on{opacity:.92;transform:scale(1)}
-  /* Cuando hay items, bajar opacidad del personaje base para que resalten los items */
-  #stage.on.dimmed{opacity:.4;filter:brightness(.45) saturate(.25) drop-shadow(0 0 18px rgba(90,200,250,.12))}
+    opacity:0;transform:scale(.85);transition:opacity .5s ease,transform .5s cubic-bezier(.22,1,.3,1);
+    -webkit-mask-image:radial-gradient(ellipse at center, black 65%, transparent 100%);
+    mask-image:radial-gradient(ellipse at center, black 65%, transparent 100%);
+    filter:drop-shadow(0 4px 18px rgba(0,0,0,.8)) brightness(1.08) saturate(1.35) contrast(1.05)}
+  .outfit-item.on{opacity:1;transform:scale(1)}
+  #stage.on.dimmed{opacity:.45;filter:brightness(.5) saturate(.3) drop-shadow(0 0 18px rgba(90,200,250,.12))}
 
   /* Pills superiores tipo 3D LIVE · NOMBRE · CHARACTER */
   .topbar{position:absolute;top:14px;left:14px;right:14px;z-index:6;display:flex;gap:7px;justify-content:space-between}
@@ -291,19 +289,25 @@
       default: return null;
     }
   }
+  var ZONE_ZINDEX={back:1,shoes:2,bottom:3,top:4,mask:5,head:6};
   function showOutfitItems(ids){
     var cont=document.getElementById('itemOverlays');
     if(!cont)return; cont.innerHTML='';
     var filled={};
     var stage=document.getElementById('stage');
     if(stage) stage.classList.add('dimmed');
-    (ids||[]).forEach(function(id){
+    var sorted=(ids||[]).slice().sort(function(a,b){
+      return (ZONE_ZINDEX[zoneFromId(a)]||0)-(ZONE_ZINDEX[zoneFromId(b)]||0);
+    });
+    sorted.forEach(function(id){
       var zone=zoneFromId(id);
       if(!zone||filled[zone]||!ITEM_POS[zone])return;
       filled[zone]=true;
       var z=ITEM_POS[zone];
       var el=document.createElement('div'); el.className='outfit-item';
+      el.dataset.itemId=String(id); el.dataset.zone=zone;
       el.style.top=z.top; el.style.left=z.left; el.style.width=z.w; el.style.height=z.h;
+      el.style.zIndex=ZONE_ZINDEX[zone]||0;
       var url=ICON_BASE+id+'.png';
       var img=new Image();
       img.onload=function(){ el.style.backgroundImage='url("'+url+'")'; setTimeout(function(){el.classList.add('on');},80); };
@@ -314,7 +318,19 @@
       img.src=url;
       cont.appendChild(el);
     });
+    _requestBetterImages(ids);
   }
+  function _requestBetterImages(ids){
+    var br=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nyxel;
+    if(!br)return;
+    (ids||[]).forEach(function(id){ br.postMessage({t:'fetchItemImage',itemId:String(id)}); });
+  }
+  window.NYXEL_onItemImage=function(itemId,dataUrl){
+    var el=document.querySelector('.outfit-item[data-item-id="'+itemId+'"]');
+    if(!el||!dataUrl)return;
+    el.style.backgroundImage='url("'+dataUrl+'")';
+    if(!el.classList.contains('on'))el.classList.add('on');
+  };
 
   // Zonas / modos conocidos
   var ZLABEL = { cuello:'CUELLO', pecho:'PECHO', head:'CABEZA', drag:'DRAG · CABEZA' };
