@@ -112,24 +112,37 @@
 
   @media (prefers-reduced-motion:reduce){.blob,.ava,.pcard,.slot,.moon{animation:none}}
 
-  /* ============ Visor del personaje (crop del PNG SiamBhau + chips) ============ */
-  .charv{position:relative;width:100%;aspect-ratio:3/4;max-height:66vh;border-radius:26px;overflow:hidden;
-    background:radial-gradient(60% 50% at 50% 55%, rgba(70,110,180,.14), transparent 62%), linear-gradient(170deg,#040914 0%,#0a0f1e 55%,#030610);
+  /* ============ Visor del personaje · estilo Rouk 3D viewer ============ */
+  .charv{position:relative;width:100%;aspect-ratio:3/4;max-height:72vh;border-radius:28px;overflow:hidden;
+    background:
+      radial-gradient(60% 45% at 50% 50%, rgba(78,162,255,.10), transparent 62%),
+      radial-gradient(80% 50% at 50% 100%, rgba(122,92,255,.08), transparent 60%),
+      linear-gradient(170deg,#030611 0%,#07091a 55%,#020410);
     border:0.5px solid rgba(255,255,255,.1);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 20px 50px -20px rgba(0,0,0,.6)}
-  .charv .moon{position:absolute;left:50%;top:14%;transform:translateX(-50%);width:72%;aspect-ratio:1;border-radius:50%;z-index:1;pointer-events:none;
-    background:radial-gradient(circle, rgba(170,200,255,.16),rgba(80,120,255,.04) 48%, transparent 66%);animation:mglow 7s ease-in-out infinite}
-  .charv .moon::after{content:"";position:absolute;inset:2%;border-radius:50%;border:1px solid rgba(150,190,255,.14)}
-  @keyframes mglow{0%,100%{opacity:1}50%{opacity:.75}}
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 20px 50px -20px rgba(0,0,0,.65)}
+  /* Pills superiores tipo 3D LIVE · ROUK · CHARACTER */
+  .charv .topbar{position:absolute;top:14px;left:14px;right:14px;z-index:6;display:flex;gap:7px;justify-content:space-between}
+  .charv .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:.6rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.85);
+    background:rgba(10,14,22,.55);border:0.5px solid rgba(160,190,255,.22);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .charv .pill b{color:#5ac8fa;font-weight:900}
+  .charv .pill .ld{width:7px;height:7px;border-radius:50%;background:#30d158;box-shadow:0 0 8px #30d158;animation:bl 1.4s ease-in-out infinite}
+  @keyframes bl{50%{opacity:.4}}
+  .charv .pill.mid{color:#fff;letter-spacing:.2em}
 
-  /* Imagen con crop al centro — el PNG de SiamBhau viene 1024x1024 con hexágonos en bordes;
-     con background-size 230% y position centrada mostramos SOLO el personaje */
-  .charv .charImg{position:absolute;inset:0;z-index:2;background-size:230% auto;background-position:center 56%;background-repeat:no-repeat;transition:opacity .5s;opacity:0}
+  /* Luna + constelaciones */
+  .charv .moon{position:absolute;left:50%;top:18%;transform:translateX(-50%);width:68%;aspect-ratio:1;border-radius:50%;z-index:1;pointer-events:none;
+    background:radial-gradient(circle, rgba(170,200,255,.18),rgba(80,120,255,.05) 48%, transparent 68%);animation:mglow 7s ease-in-out infinite}
+  .charv .moon::after{content:"";position:absolute;inset:2%;border-radius:50%;border:1px solid rgba(150,190,255,.14)}
+  @keyframes mglow{0%,100%{opacity:1}50%{opacity:.78}}
+
+  /* Imagen con crop al centro */
+  .charv .charImg{position:absolute;inset:0;z-index:2;background-size:220% auto;background-position:center 58%;background-repeat:no-repeat;transition:opacity .5s;opacity:0}
   .charv .charImg.on{opacity:1}
-  .charv .charLoad{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.5);font-size:.85rem;z-index:3;text-align:center}
+  .charv .charLoad{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.55);font-size:.82rem;z-index:3;text-align:center;padding:40px 24px}
   .charv .charLoad.hide{display:none}
 
-  /* Chips flotantes de zona (CABEZA / CUELLO / PECHO) */
+  /* Chips flotantes en 4 esquinas estilo Rouk */
   .charv .zchip{position:absolute;z-index:5;display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;cursor:pointer;
     font:inherit;font-weight:800;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:#eaf0ff;
     background:rgba(10,14,22,.65);border:0.5px solid rgba(160,190,255,.28);
@@ -138,11 +151,27 @@
   .charv .zchip:active{transform:scale(.94)}
   .charv .zchip .dot{color:#5ac8fa;font-size:.6rem}
   .charv .zchip .ar{color:rgba(255,255,255,.4);margin-left:2px;font-size:.9rem}
-  .charv .zchip.tl{top:14%;left:4%}
-  .charv .zchip.tr{top:24%;right:4%}
-  .charv .zchip.bl{bottom:22%;left:4%}
+  .charv .zchip.cTL{top:38%;left:4%}
+  .charv .zchip.cTR{top:30%;right:4%}
+  .charv .zchip.cMR{top:48%;right:4%}
+  .charv .zchip.cBL{bottom:28%;left:4%}
   .charv .zchip.pulse{border-color:#ff5a6e;box-shadow:0 0 0 1px rgba(255,90,110,.5),0 0 22px -4px rgba(255,90,110,.7);animation:zpulse .5s ease}
   @keyframes zpulse{50%{transform:scale(1.06)}}
+
+  /* Flechas decorativas ‹ › (estilo Rouk) */
+  .charv .narr{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:#cfe3ff;font-size:22px;
+    background:rgba(10,14,22,.55);border:0.5px solid rgba(160,190,255,.22);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);cursor:pointer}
+  .charv .narr.lef{left:6px}
+  .charv .narr.rig{right:6px}
+  .charv .narr:active{transform:translateY(-50%) scale(.9)}
+
+  /* Barra inferior "VIEW CHARACTER OPTIONS · 3D" */
+  .charv .fbar{position:absolute;bottom:12px;left:0;right:0;z-index:5;text-align:center;font-size:.58rem;font-weight:800;letter-spacing:.3em;color:rgba(200,215,245,.5);text-transform:uppercase}
+  .charv .fbar b{color:#fff}
+
+  /* Piso brillante circular tipo Rouk */
+  .charv .floor{position:absolute;left:50%;bottom:11%;transform:translateX(-50%);width:50%;height:4%;border-radius:50%;z-index:2;pointer-events:none;
+    background:radial-gradient(circle, rgba(78,162,255,.35), transparent 70%);filter:blur(3px)}
 
   /* Líneas sutiles de conexión */
   .vlines{position:absolute;inset:0;z-index:4;width:100%;height:100%;pointer-events:none;overflow:visible}
@@ -174,28 +203,46 @@
     </div>
   </div>
 
-  <!-- Visor del personaje: PNG de SiamBhau RECORTADO al centro + chips flotantes tipo zona de mira -->
+  <!-- Visor del personaje · estilo Rouk 3D viewer -->
   <div class="sec" id="renderWrap" style="display:none">
     <div class="sh">
-      <div class="l"><span class="lb">Personaje</span><h2>Equipamiento actual</h2></div>
-      <div class="count">· En línea</div>
+      <div class="l"><span class="lb">Visual Loadout</span><h2>View Character Options</h2></div>
+      <div class="count" id="charMeta">—</div>
     </div>
     <div class="charv" id="charv">
+      <!-- Pills superiores -->
+      <div class="topbar">
+        <span class="pill"><span class="ld"></span><b>LIVE</b></span>
+        <span class="pill mid" id="charName">—</span>
+        <span class="pill"><b>CHARACTER</b></span>
+      </div>
       <!-- Luna + fondo -->
       <div class="moon"></div>
-      <!-- Imagen croppeada -->
+      <div class="floor"></div>
+      <!-- Imagen croppeada del personaje -->
       <div class="charImg" id="charImgBox">
         <div class="charLoad" id="charLoad"><div class="spin"></div><div style="margin-top:8px;font-size:.78rem">Renderizando…</div></div>
       </div>
-      <!-- Chips flotantes -->
-      <button class="zchip tl" onclick="pulseZone(this)"><span class="dot">◉</span>Cabeza<span class="ar">›</span></button>
-      <button class="zchip tr" onclick="pulseZone(this)"><span class="dot">◉</span>Cuello<span class="ar">›</span></button>
-      <button class="zchip bl" onclick="pulseZone(this)"><span class="dot">◉</span>Pecho<span class="ar">›</span></button>
-      <!-- Línea sutil de conexión (SVG) -->
-      <svg class="vlines" viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="20" y1="18" x2="48" y2="22" /><line x1="80" y1="30" x2="54" y2="34" /><line x1="20" y1="72" x2="46" y2="60" /></svg>
+      <!-- Chips flotantes de zona (4 posiciones estilo Rouk) -->
+      <button class="zchip cTL" onclick="pulseZone(this)"><span class="dot">⌖</span>Cabeza<span class="ar">›</span></button>
+      <button class="zchip cTR" onclick="pulseZone(this)"><span class="dot">⌖</span>Drag · Cabeza<span class="ar">›</span></button>
+      <button class="zchip cMR" onclick="pulseZone(this)"><span class="dot">⌖</span>Cuello<span class="ar">›</span></button>
+      <button class="zchip cBL" onclick="pulseZone(this)"><span class="dot">⌖</span>Pecho<span class="ar">›</span></button>
+      <!-- Flechas decorativas -->
+      <button class="narr lef" aria-label="Anterior">‹</button>
+      <button class="narr rig" aria-label="Siguiente">›</button>
+      <!-- Líneas sutiles de conexión -->
+      <svg class="vlines" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <line x1="22" y1="40" x2="48" y2="34" />
+        <line x1="78" y1="32" x2="54" y2="30" />
+        <line x1="78" y1="50" x2="56" y2="42" />
+        <line x1="22" y1="72" x2="48" y2="62" />
+      </svg>
+      <!-- Bar inferior -->
+      <div class="fbar"><b>View Character Options</b> · 3D</div>
     </div>
-    <!-- Img oculta sirve para detectar carga/error (no se muestra directamente) -->
-    <img id="renderImg" style="display:none" onload="onRenderOk(this)" onerror="document.getElementById('renderWrap').style.display='none'">
+    <!-- Img oculta sirve para detectar carga/error -->
+    <img id="renderImg" style="display:none" onload="onRenderOk(this)" onerror="onRenderFail()">
   </div>
 
   <!-- Insights: ban check + login history -->
@@ -273,6 +320,19 @@
       box.classList.add('on');
     }
     if(load) load.classList.add('hide');
+    // Actualiza pill central con el nombre del jugador
+    var nameEl = document.getElementById('charName');
+    var d = PENDING_SUMMARY || {};
+    if(nameEl && d.nickname) nameEl.textContent = d.nickname;
+    var metaEl = document.getElementById('charMeta');
+    if(metaEl && d.uid) metaEl.innerHTML = 'UID <b style="color:#fff">'+d.uid+'</b>';
+  };
+  // Si el PNG falla (típico: rate limit del API o UID sin outfit)
+  window.onRenderFail = function(){
+    var load = document.getElementById('charLoad');
+    if(!load) return;
+    load.classList.remove('hide');
+    load.innerHTML = '<div style="color:#ffd27a;line-height:1.4">⏱ API con rate-limit o UID sin outfit.<br><span style="opacity:.6;font-size:.72rem">Espera unos segundos y vuelve a entrar a "Ver outfit".</span></div>';
   };
 
   // Pulse rojo tipo "zona de mira" al tap de un chip
