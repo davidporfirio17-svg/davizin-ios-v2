@@ -36,16 +36,14 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
         }
     }
 
-    /// API key para el endpoint /outfits/outfit de siambhau69.eu.cc.
-    /// Por defecto usa la key de TryAllApi (temporal). El usuario puede
-    /// sobreescribirla guardando una key premium en UserDefaults bajo
-    /// "nyxel.siambhau.apikey".
+    /// API key para los endpoints de siambhau69.eu.cc (plan Premium).
+    /// Expira 2027-01-27. Se puede sobreescribir en UserDefaults bajo
+    /// "nyxel.siambhau.apikey" sin recompilar.
     private static var siamApiKey: String {
         if let k = UserDefaults.standard.string(forKey: "nyxel.siambhau.apikey"), !k.isEmpty {
             return k
         }
-        // Key temporal TryAllApi — reemplazar por premium cuando esté
-        return "BHAU_D3CEXB2C7FC00JW6"
+        return "FFAPI-PREM-60-sjdonsl-X28"
     }
 
     /// Mapea el código de región del lookup a los códigos aceptados por la API
@@ -79,7 +77,7 @@ final class CatalogBrowserView: UIView, WKNavigationDelegate {
         }
         // URL del render oficial del personaje (API SiamBhau)
         let siamRegion = Self.siamRegion(from: summary.region)
-        let renderURL = "http://siambhau69.eu.cc/outfits/outfit?uid=\(summary.uid)&region=\(siamRegion)&key=\(Self.siamApiKey)&t=\(Int(Date().timeIntervalSince1970))"
+        let renderURL = "https://siambhau69.eu.cc/outfits/outfit?uid=\(summary.uid)&region=\(siamRegion)&key=\(Self.siamApiKey)&t=\(Int(Date().timeIntervalSince1970))"
 
         let payload: [String: Any] = [
             "nickname": summary.nickname ?? "Jugador",

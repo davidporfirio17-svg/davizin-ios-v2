@@ -69,8 +69,8 @@
       <option value="ME">ME · Medio Oriente</option>
     </select>
 
-    <label style="margin-top:10px">API Key</label>
-    <input id="key" type="text" value="BHAU_D3CEXB2C7FC00JW6">
+    <label style="margin-top:10px">API Key (Premium hasta 2027-01-27)</label>
+    <input id="key" type="text" value="FFAPI-PREM-60-sjdonsl-X28">
 
     <button class="go" id="goBtn" onclick="go()">🚀 Probar los 3 endpoints</button>
 
@@ -80,7 +80,7 @@
   <div class="result" id="result">
     <!-- 1. Info basica -->
     <div class="sec">
-      <div class="lbl">Endpoint 1 · GET /freefireinfo/info</div>
+      <div class="lbl">Endpoint 1 · GET /freefireinfo/bhau2</div>
       <h2>Info del jugador</h2>
     </div>
     <div class="urlc" id="url1"></div>
@@ -111,7 +111,7 @@
 </div>
 
 <script>
-  var BASE = 'http://siambhau69.eu.cc';
+  var BASE = 'https://siambhau69.eu.cc';
 
   function setStatus(msg, cls){
     var s = document.getElementById('status');
@@ -149,8 +149,8 @@
     document.getElementById('bimg').classList.remove('lo');
     document.getElementById('oimg').classList.remove('lo');
 
-    // 1. /freefireinfo/info
-    var u1 = BASE+'/freefireinfo/info?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(key);
+    // 1. /freefireinfo/bhau2 (recomendado por el dev para mejores resultados)
+    var u1 = BASE+'/freefireinfo/bhau2?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(key);
     document.getElementById('url1').textContent = u1;
     fetch(u1).then(function(r){
       return r.text().then(function(t){ return {status:r.status, body:t}; });
