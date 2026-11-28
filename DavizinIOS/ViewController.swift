@@ -1038,7 +1038,7 @@ extension ViewController: GameSelectionViewDelegate {
 }
 
 extension ViewController: Modes3DViewDelegate {
-    func modes3DView(_ view: Modes3DView, didRequestInjectModeId id: String, name: String) {
+    func modes3DView(_ view: Modes3DView, didRequestInjectModeId id: String, name: String, holo: String) {
         let modes = DavizinModeCatalog.regularEnabledModes(for: selectedGame)
         guard let mode = modes.first(where: { $0.id == id }) ?? modes.first(where: { $0.displayName == name }) else { return }
         selectedMode = mode

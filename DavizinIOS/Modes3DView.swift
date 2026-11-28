@@ -2,8 +2,7 @@ import UIKit
 import WebKit
 
 protocol Modes3DViewDelegate: AnyObject {
-    /// El usuario mantuvo el botón de inyectar sobre un modo real.
-    func modes3DView(_ view: Modes3DView, didRequestInjectModeId id: String, name: String)
+    func modes3DView(_ view: Modes3DView, didRequestInjectModeId id: String, name: String, holo: String)
 }
 
 /// Evita el ciclo de retención: WKUserContentController retiene al handler.
@@ -84,7 +83,8 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
         if t == "inject" {
             let id = body["id"] as? String ?? ""
             let name = body["name"] as? String ?? ""
-            delegate?.modes3DView(self, didRequestInjectModeId: id, name: name)
+            let holo = body["holo"] as? String ?? ""
+            delegate?.modes3DView(self, didRequestInjectModeId: id, name: name, holo: holo)
         }
         if t == "loadModel" {
             let name = body["name"] as? String ?? "rouk"
