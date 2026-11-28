@@ -292,6 +292,11 @@
     var _bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nyxel;
     if(_bridge){
       _bridge.postMessage({t:'fetchInfo', uid:uid, region:reg});
+      window._fetchTimeout = setTimeout(function(){
+        if(!document.getElementById('vload').classList.contains('hide')){
+          window.NYXEL_onInfoError('Tiempo de espera agotado');
+        }
+      }, 15000);
     } else {
       document.getElementById('vload').classList.add('hide');
       var sb = document.getElementById('statusBadge');
@@ -299,8 +304,19 @@
     }
   };
 
+  // Callback de error: la consulta falló o expiró
+  window.NYXEL_onInfoError = function(msg){
+    if(window._fetchTimeout) clearTimeout(window._fetchTimeout);
+    document.getElementById('vload').classList.add('hide');
+    document.getElementById('hint').innerHTML = '<span style="color:#ff948b">✗ ' + (msg||'Error al consultar') + '</span>';
+    var btn = document.getElementById('goBtn'); btn.classList.remove('busy'); btn.textContent='Reintentar';
+    var sb = document.getElementById('statusBadge');
+    sb.className='offline-badge'; sb.textContent='ERROR';
+  };
+
   // Callback: recibe JSON del jugador (vía Swift bridge → Worker → Free Fire API Hub)
   window.NYXEL_onInfoData = function(j){
+    if(window._fetchTimeout) clearTimeout(window._fetchTimeout);
     var d = (j && j.data) || j || {};
     var basic = d.basic || d.basicInfo || d || {};
     var nick = basic.nickname || basic.name || d.nickname || null;

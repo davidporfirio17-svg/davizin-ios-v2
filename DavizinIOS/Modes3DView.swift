@@ -95,16 +95,31 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
     }
 
     private func fetchPlayerInfo(uid: String, region: String) {
-        guard let fetcher = onFetchPlayerInfo else { return }
-        fetcher(uid, region) { [weak self] info in
-            guard let self, let info,
-                  let data = try? JSONSerialization.data(withJSONObject: info),
-                  let json = String(data: data, encoding: .utf8) else { return }
-            DispatchQueue.main.async {
-                self.webView.evaluateJavaScript(
-                    "window.NYXEL_onInfoData && window.NYXEL_onInfoData(\(json));",
+        guard let fetcher = onFetchPlayerInfo else {
+            DispatchQueue.main.async { [weak self] in
+                self?.webView.evaluateJavaScript(
+                    "window.NYXEL_onInfoError && window.NYXEL_onInfoError('Bridge no conectado');",
                     completionHandler: nil
                 )
+            }
+            return
+        }
+        fetcher(uid, region) { [weak self] info in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let info,
+                   let data = try? JSONSerialization.data(withJSONObject: info),
+                   let json = String(data: data, encoding: .utf8) {
+                    self.webView.evaluateJavaScript(
+                        "window.NYXEL_onInfoData && window.NYXEL_onInfoData(\(json));",
+                        completionHandler: nil
+                    )
+                } else {
+                    self.webView.evaluateJavaScript(
+                        "window.NYXEL_onInfoError && window.NYXEL_onInfoError('No se pudo consultar el perfil');",
+                        completionHandler: nil
+                    )
+                }
             }
         }
     }
