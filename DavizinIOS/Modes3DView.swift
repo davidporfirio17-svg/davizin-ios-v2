@@ -98,12 +98,13 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
             if !itemId.isEmpty { fetchItemImage(itemId: itemId) }
         }
         if t == "loadModel" {
-            loadModel()
+            let name = body["name"] as? String ?? "rouk"
+            loadModel(name: name)
         }
     }
 
-    private func loadModel() {
-        guard let url = Bundle.main.url(forResource: "rouk", withExtension: "glb"),
+    private func loadModel(name: String) {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "glb"),
               let data = try? Data(contentsOf: url) else { return }
         let b64 = data.base64EncodedString()
         DispatchQueue.main.async { [weak self] in

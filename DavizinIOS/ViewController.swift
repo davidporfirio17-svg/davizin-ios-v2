@@ -382,9 +382,6 @@ final class ViewController: UIViewController {
         bottomNavView.onPlayer = { [weak self] in
             self?.showPlayer(animated: true)
         }
-        bottomNavView.onProfile = { [weak self] in
-            self?.showProfile(animated: true)
-        }
         bottomNavView.onHelp = { [weak self] in
             self?.showHelp(animated: true)
         }

@@ -3,23 +3,19 @@ import UIKit
 final class DavizinBottomNavView: UIView {
     var onModes: (() -> Void)?
     var onPlayer: (() -> Void)?
-    var onProfile: (() -> Void)?
     var onHelp: (() -> Void)?
     var onExtras: (() -> Void)?
 
     private let modesButton = UIButton(type: .system)
     private let playerButton = UIButton(type: .system)
-    private let profileButton = UIButton(type: .system)
     private let helpButton = UIButton(type: .system)
     private let extrasButton = UIButton(type: .system)
     private let modesLabel = UILabel()
     private let playerLabel = UILabel()
-    private let profileLabel = UILabel()
     private let helpLabel = UILabel()
     private let extrasLabel = UILabel()
     private let modesIndicator = UIView()
     private let playerIndicator = UIView()
-    private let profileIndicator = UIView()
     private let helpIndicator = UIView()
     private let extrasIndicator = UIView()
 
@@ -38,18 +34,18 @@ final class DavizinBottomNavView: UIView {
         let normalColor = AppTheme.secondaryText
         modesButton.tintColor = item == .modes ? selectedColor : normalColor
         playerButton.tintColor = item == .player ? selectedColor : normalColor
-        profileButton.tintColor = item == .profile ? selectedColor : normalColor
+
         helpButton.tintColor = item == .help ? selectedColor : normalColor
         extrasButton.tintColor = item == .extras ? selectedColor : normalColor
         modesLabel.textColor = item == .modes ? selectedColor : normalColor
         playerLabel.textColor = item == .player ? selectedColor : normalColor
-        profileLabel.textColor = item == .profile ? selectedColor : normalColor
+
         helpLabel.textColor = item == .help ? selectedColor : normalColor
         extrasLabel.textColor = item == .extras ? selectedColor : normalColor
         UIView.animate(withDuration: AppTheme.durationPopover) {
             self.modesIndicator.alpha = item == .modes ? 1.0 : 0.0
             self.playerIndicator.alpha = item == .player ? 1.0 : 0.0
-            self.profileIndicator.alpha = item == .profile ? 1.0 : 0.0
+
             self.helpIndicator.alpha = item == .help ? 1.0 : 0.0
             self.extrasIndicator.alpha = item == .extras ? 1.0 : 0.0
         }
@@ -86,14 +82,13 @@ final class DavizinBottomNavView: UIView {
 
         configureButton(modesButton, image: "square.grid.2x2.fill", label: modesLabel, text: "MODOS", accessibility: "Modos", action: #selector(modesTapped))
         configureButton(playerButton, image: "person.crop.square.fill", label: playerLabel, text: "JUGADOR", accessibility: "Jugador", action: #selector(playerTapped))
-        configureButton(profileButton, image: "person.crop.circle.fill", label: profileLabel, text: "CUENTA", accessibility: "Cuenta", action: #selector(profileTapped))
+
         configureButton(helpButton, image: "questionmark.circle.fill", label: helpLabel, text: "AYUDA", accessibility: "Centro de ayuda", action: #selector(helpTapped))
         configureButton(extrasButton, image: "star.circle.fill", label: extrasLabel, text: "EXTRAS", accessibility: "Extras", action: #selector(extrasTapped))
 
         let stack = UIStackView(arrangedSubviews: [
             makeItem(button: modesButton, label: modesLabel, indicator: modesIndicator),
             makeItem(button: playerButton, label: playerLabel, indicator: playerIndicator),
-            makeItem(button: profileButton, label: profileLabel, indicator: profileIndicator),
             makeItem(button: helpButton, label: helpLabel, indicator: helpIndicator),
             makeItem(button: extrasButton, label: extrasLabel, indicator: extrasIndicator)
         ])
@@ -167,7 +162,6 @@ final class DavizinBottomNavView: UIView {
 
     @objc private func modesTapped() { onModes?() }
     @objc private func playerTapped() { onPlayer?() }
-    @objc private func profileTapped() { onProfile?() }
     @objc private func helpTapped() { onHelp?() }
     @objc private func extrasTapped() { onExtras?() }
 }
