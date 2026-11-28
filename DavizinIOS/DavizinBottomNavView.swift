@@ -2,20 +2,16 @@ import UIKit
 
 final class DavizinBottomNavView: UIView {
     var onModes: (() -> Void)?
-    var onPlayer: (() -> Void)?
     var onHelp: (() -> Void)?
     var onExtras: (() -> Void)?
 
     private let modesButton = UIButton(type: .system)
-    private let playerButton = UIButton(type: .system)
     private let helpButton = UIButton(type: .system)
     private let extrasButton = UIButton(type: .system)
     private let modesLabel = UILabel()
-    private let playerLabel = UILabel()
     private let helpLabel = UILabel()
     private let extrasLabel = UILabel()
     private let modesIndicator = UIView()
-    private let playerIndicator = UIView()
     private let helpIndicator = UIView()
     private let extrasIndicator = UIView()
 
@@ -33,19 +29,13 @@ final class DavizinBottomNavView: UIView {
         let selectedColor = AppTheme.readableAccent
         let normalColor = AppTheme.secondaryText
         modesButton.tintColor = item == .modes ? selectedColor : normalColor
-        playerButton.tintColor = item == .player ? selectedColor : normalColor
-
         helpButton.tintColor = item == .help ? selectedColor : normalColor
         extrasButton.tintColor = item == .extras ? selectedColor : normalColor
         modesLabel.textColor = item == .modes ? selectedColor : normalColor
-        playerLabel.textColor = item == .player ? selectedColor : normalColor
-
         helpLabel.textColor = item == .help ? selectedColor : normalColor
         extrasLabel.textColor = item == .extras ? selectedColor : normalColor
         UIView.animate(withDuration: AppTheme.durationPopover) {
             self.modesIndicator.alpha = item == .modes ? 1.0 : 0.0
-            self.playerIndicator.alpha = item == .player ? 1.0 : 0.0
-
             self.helpIndicator.alpha = item == .help ? 1.0 : 0.0
             self.extrasIndicator.alpha = item == .extras ? 1.0 : 0.0
         }
@@ -81,14 +71,11 @@ final class DavizinBottomNavView: UIView {
         layer.shadowOffset = CGSize(width: 0, height: 6)
 
         configureButton(modesButton, image: "square.grid.2x2.fill", label: modesLabel, text: "MODOS", accessibility: "Modos", action: #selector(modesTapped))
-        configureButton(playerButton, image: "person.crop.square.fill", label: playerLabel, text: "JUGADOR", accessibility: "Jugador", action: #selector(playerTapped))
-
         configureButton(helpButton, image: "questionmark.circle.fill", label: helpLabel, text: "AYUDA", accessibility: "Centro de ayuda", action: #selector(helpTapped))
         configureButton(extrasButton, image: "star.circle.fill", label: extrasLabel, text: "EXTRAS", accessibility: "Extras", action: #selector(extrasTapped))
 
         let stack = UIStackView(arrangedSubviews: [
             makeItem(button: modesButton, label: modesLabel, indicator: modesIndicator),
-            makeItem(button: playerButton, label: playerLabel, indicator: playerIndicator),
             makeItem(button: helpButton, label: helpLabel, indicator: helpIndicator),
             makeItem(button: extrasButton, label: extrasLabel, indicator: extrasIndicator)
         ])
@@ -161,7 +148,6 @@ final class DavizinBottomNavView: UIView {
     }
 
     @objc private func modesTapped() { onModes?() }
-    @objc private func playerTapped() { onPlayer?() }
     @objc private func helpTapped() { onHelp?() }
     @objc private func extrasTapped() { onExtras?() }
 }

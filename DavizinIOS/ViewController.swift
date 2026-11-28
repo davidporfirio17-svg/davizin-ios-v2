@@ -379,9 +379,6 @@ final class ViewController: UIViewController {
         bottomNavView.onModes = { [weak self] in
             self?.showModeSelection(animated: true)
         }
-        bottomNavView.onPlayer = { [weak self] in
-            self?.showPlayer(animated: true)
-        }
         bottomNavView.onHelp = { [weak self] in
             self?.showHelp(animated: true)
         }

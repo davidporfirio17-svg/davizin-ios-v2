@@ -313,10 +313,10 @@
   var curM=0;
 
   var ZSPEC={
-    cuello:{zf:0.62,rad:0.08},
-    pecho:{zf:0.42,rad:0.10},
-    head:{zf:0.82,rad:0.09},
-    drag:{zf:0.86,rad:0.12}
+    cuello:{zf:0.86,rad:0.08},
+    pecho:{zf:0.72,rad:0.10},
+    head:{zf:0.93,rad:0.09},
+    drag:{zf:0.97,rad:0.12}
   };
 
   var scene,camera,renderer,pivot,markers={},floorRing,floorDisc;
@@ -475,8 +475,8 @@
       floorDisc.position.y=0.005;
       scene.add(floorDisc);
 
-      camera.position.set(0,modelH*0.48,modelH*1.6);
-      camera.lookAt(0,modelH*0.44,0);
+      camera.position.set(0,modelH*0.46,modelH*1.7);
+      camera.lookAt(0,modelH*0.42,0);
 
       var moon=document.querySelector('.moon');
       var floor=document.querySelector('.floor');
