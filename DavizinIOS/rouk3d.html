@@ -110,6 +110,9 @@
     box-shadow:0 6px 16px -6px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.1);opacity:0;transform:scale(.7);transition:opacity .35s,transform .35s}
   .equip-icon.on{opacity:1;transform:scale(1)}
 
+  /* Canvas 3D (Three.js) */
+  #c3d{position:absolute;inset:0;z-index:2}
+
   /* Lista de modos (abajo) */
   .functions{margin-top:22px}
   .fh{display:flex;align-items:center;justify-content:space-between;margin:0 2px 12px}
@@ -207,6 +210,7 @@
     <div class="moon"></div>
     <div class="floor"></div>
     <div id="stage"></div>
+    <canvas id="c3d"></canvas>
     <div class="vignette"></div>
     <div id="vload" class="vload"><div><div class="spin"></div><div>Ingresa un UID y pulsa Buscar</div></div></div>
 
@@ -444,6 +448,95 @@
 
   // Preview de modos por default (lo reemplaza NYXEL_setModes cuando llega del Swift)
   renderOptions(OPTS.map(function(o){ return {id:o.n, name:o.n, sub:o.d, zone:o.zone}; }));
+})();
+</script>
+<script>
+(function(){
+  var LIBS=[
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js'
+  ];
+  var li=0;
+  function loadNext(){
+    if(li>=LIBS.length){boot();return;}
+    var s=document.createElement('script');s.src=LIBS[li];li++;
+    s.onload=loadNext;
+    s.onerror=function(){};
+    document.head.appendChild(s);
+  }
+  loadNext();
+
+  function boot(){
+    if(typeof THREE==='undefined')return;
+    var viewer=document.getElementById('viewer');
+    var canvas=document.getElementById('c3d');
+    if(!canvas||!viewer)return;
+
+    var w=viewer.clientWidth||390,h=viewer.clientHeight||510;
+
+    var scene=new THREE.Scene();
+    var camera=new THREE.PerspectiveCamera(38,w/h,0.1,100);
+    camera.position.set(0,1.0,3.4);
+
+    var renderer=new THREE.WebGLRenderer({canvas:canvas,alpha:true,antialias:true});
+    renderer.setSize(w,h);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    renderer.outputEncoding=THREE.sRGBEncoding;
+    renderer.toneMapping=THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure=1.0;
+
+    scene.add(new THREE.AmbientLight(0x8899bb,0.5));
+    var key=new THREE.DirectionalLight(0xeef4ff,1.0);
+    key.position.set(2,3,3);scene.add(key);
+    var fill=new THREE.DirectionalLight(0x4488ff,0.35);
+    fill.position.set(-2,1,-1);scene.add(fill);
+    var rim=new THREE.PointLight(0x2fb6ff,0.5,10);
+    rim.position.set(0,2.5,-2.5);scene.add(rim);
+
+    var ctrl=new THREE.OrbitControls(camera,renderer.domElement);
+    ctrl.enableDamping=true;
+    ctrl.dampingFactor=0.07;
+    ctrl.autoRotate=true;
+    ctrl.autoRotateSpeed=1.0;
+    ctrl.enablePan=false;
+    ctrl.minDistance=1.8;
+    ctrl.maxDistance=5;
+    ctrl.minPolarAngle=Math.PI*0.2;
+    ctrl.maxPolarAngle=Math.PI*0.75;
+    ctrl.target.set(0,0.9,0);
+    ctrl.update();
+
+    new THREE.GLTFLoader().load('rouk.glb',function(gltf){
+      var m=gltf.scene;
+      var box=new THREE.Box3().setFromObject(m);
+      var sz=box.getSize(new THREE.Vector3());
+      var ct=box.getCenter(new THREE.Vector3());
+      m.position.sub(ct);
+      var sc=2.2/Math.max(sz.x,sz.y,sz.z);
+      m.scale.setScalar(sc);
+      scene.add(m);
+      var moon=document.querySelector('.moon');
+      var floor=document.querySelector('.floor');
+      if(moon)moon.style.display='none';
+      if(floor)floor.style.display='none';
+    });
+
+    (function anim(){
+      requestAnimationFrame(anim);
+      ctrl.update();
+      renderer.render(scene,camera);
+    })();
+
+    new ResizeObserver(function(){
+      var w2=viewer.clientWidth,h2=viewer.clientHeight;
+      if(w2>0&&h2>0){
+        camera.aspect=w2/h2;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w2,h2);
+      }
+    }).observe(viewer);
+  }
 })();
 </script>
 </body></html>
