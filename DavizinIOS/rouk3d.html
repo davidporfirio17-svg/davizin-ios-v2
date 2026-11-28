@@ -507,20 +507,28 @@
     ctrl.target.set(0,0.9,0);
     ctrl.update();
 
-    new THREE.GLTFLoader().load('rouk.glb',function(gltf){
-      var m=gltf.scene;
-      var box=new THREE.Box3().setFromObject(m);
-      var sz=box.getSize(new THREE.Vector3());
-      var ct=box.getCenter(new THREE.Vector3());
-      m.position.sub(ct);
-      var sc=2.2/Math.max(sz.x,sz.y,sz.z);
-      m.scale.setScalar(sc);
-      scene.add(m);
-      var moon=document.querySelector('.moon');
-      var floor=document.querySelector('.floor');
-      if(moon)moon.style.display='none';
-      if(floor)floor.style.display='none';
-    });
+    var _bridge=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nyxel;
+    if(_bridge) _bridge.postMessage({t:'loadModel'});
+
+    window.NYXEL_onModelData=function(b64){
+      var bin=atob(b64);var len=bin.length;
+      var buf=new ArrayBuffer(len);var u8=new Uint8Array(buf);
+      for(var i=0;i<len;i++) u8[i]=bin.charCodeAt(i);
+      new THREE.GLTFLoader().parse(buf,'',function(gltf){
+        var m=gltf.scene;
+        var box=new THREE.Box3().setFromObject(m);
+        var sz=box.getSize(new THREE.Vector3());
+        var ct=box.getCenter(new THREE.Vector3());
+        m.position.sub(ct);
+        var sc=2.2/Math.max(sz.x,sz.y,sz.z);
+        m.scale.setScalar(sc);
+        scene.add(m);
+        var moon=document.querySelector('.moon');
+        var floor=document.querySelector('.floor');
+        if(moon)moon.style.display='none';
+        if(floor)floor.style.display='none';
+      });
+    };
 
     (function anim(){
       requestAnimationFrame(anim);

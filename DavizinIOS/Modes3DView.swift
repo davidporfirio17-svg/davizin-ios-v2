@@ -97,6 +97,21 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
             let itemId = body["itemId"] as? String ?? ""
             if !itemId.isEmpty { fetchItemImage(itemId: itemId) }
         }
+        if t == "loadModel" {
+            loadModel()
+        }
+    }
+
+    private func loadModel() {
+        guard let url = Bundle.main.url(forResource: "rouk", withExtension: "glb"),
+              let data = try? Data(contentsOf: url) else { return }
+        let b64 = data.base64EncodedString()
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(
+                "window.NYXEL_onModelData && window.NYXEL_onModelData('\(b64)');",
+                completionHandler: nil
+            )
+        }
     }
 
     private func fetchItemImage(itemId: String) {
