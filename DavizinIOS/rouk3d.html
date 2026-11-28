@@ -102,13 +102,7 @@
   @keyframes cardflash{0%{box-shadow:0 0 0 2px var(--mark),0 0 46px -4px var(--mark-glow),inset 0 1px 0 rgba(255,255,255,.22)}100%{}}
 
   /* Grid de items equipados (centro del visor) */
-  #equipGrid{position:absolute;inset:0;z-index:4;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-content:center;
-    padding:70px 50px 60px;opacity:0;transition:opacity .45s}
-  #equipGrid.on{opacity:1}
-  .equip-icon{width:56px;height:56px;border-radius:16px;background-color:rgba(10,14,22,.45);background-size:contain;background-position:center;background-repeat:no-repeat;
-    border:1px solid rgba(255,255,255,.14);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-    box-shadow:0 6px 16px -6px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.1);opacity:0;transform:scale(.7);transition:opacity .35s,transform .35s}
-  .equip-icon.on{opacity:1;transform:scale(1)}
+  #equipGrid{display:none}
 
   /* Canvas 3D (Three.js) */
   #c3d{position:absolute;inset:0;z-index:2}
@@ -347,7 +341,7 @@
     var btn = document.getElementById('goBtn'); btn.classList.remove('busy'); btn.textContent='Buscar';
     var pi = d.profileInfo || d.profile || {};
     var clothes = pi.clothes || d.clothes || d.clothesIDs || [];
-    if(clothes.length > 0) requestItemImages(clothes);
+    window._clothesIDs=clothes;
   };
 
   // ========== Items equipados ==========
@@ -518,15 +512,25 @@
         var m=gltf.scene;
         var box=new THREE.Box3().setFromObject(m);
         var sz=box.getSize(new THREE.Vector3());
-        var ct=box.getCenter(new THREE.Vector3());
-        m.position.sub(ct);
-        var sc=2.2/Math.max(sz.x,sz.y,sz.z);
+        var maxDim=Math.max(sz.x,sz.y,sz.z);
+        var sc=2.8/maxDim;
         m.scale.setScalar(sc);
+        box.setFromObject(m);
+        var ct=box.getCenter(new THREE.Vector3());
+        m.position.x-=ct.x;
+        m.position.y-=box.min.y;
+        m.position.z-=ct.z;
         scene.add(m);
+        var h=box.max.y-box.min.y;
+        ctrl.target.set(0,h*0.45,0);
+        camera.position.set(0,h*0.5,h*1.4);
+        ctrl.update();
         var moon=document.querySelector('.moon');
         var floor=document.querySelector('.floor');
         if(moon)moon.style.display='none';
         if(floor)floor.style.display='none';
+        window._3dModel=m;
+        window._3dScene=scene;
       });
     };
 
