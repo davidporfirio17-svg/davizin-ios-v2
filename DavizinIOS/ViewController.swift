@@ -34,6 +34,7 @@ final class ViewController: UIViewController {
     var onFreeFireLookup: ((String, String) -> Void)?
     var onFreeFireAsset: ((String, @escaping (UIImage?) -> Void) -> Void)?
     var onFreeFireBanCheck: ((String, @escaping (Result<FreeFireBanCheck, Error>) -> Void) -> Void)?
+    var onFreeFirePlayerInfo: ((String, String, @escaping ([String: Any]?) -> Void) -> Void)?
     var onLogout: (() -> Void)?
     var onClose: (() -> Void)?
 
@@ -557,7 +558,9 @@ final class ViewController: UIViewController {
 
         let screen = Modes3DView()
         screen.delegate = self
-        screen.onFetchItemImage = onFreeFireAsset
+        screen.onFetchPlayerInfo = { [weak self] uid, region, completion in
+            self?.onFreeFirePlayerInfo?(uid, region, completion)
+        }
         screen.setModes(modes)
         modes3DView = screen
         display(screen, animated: animated)
@@ -685,9 +688,6 @@ final class ViewController: UIViewController {
         screen.onOpenCatalogRequested = { [weak self, weak screen] in
             guard let summary = screen?.lastSummary else { return }
             self?.presentOutfitShowcase(for: summary)
-        }
-        screen.onOpenSiamTestRequested = { [weak self] in
-            self?.presentSiamBhauTest()
         }
         playerView = screen
         display(screen, animated: animated)
@@ -980,40 +980,6 @@ final class ViewController: UIViewController {
         present(vc, animated: true)
     }
 
-    /// Pantalla de DEBUG — carga `nyxel_siambhau.html` sin usar nada del flujo de Nyxel.
-    /// Permite probar los 3 endpoints de SiamBhau en aislamiento desde el iPhone.
-    fileprivate func presentSiamBhauTest() {
-        let vc = UIViewController()
-        vc.modalPresentationStyle = .fullScreen
-        vc.view.backgroundColor = UIColor(red: 0.043, green: 0.055, blue: 0.094, alpha: 1)
-        let wv = WKWebView()
-        wv.isOpaque = false
-        wv.backgroundColor = .clear
-        wv.scrollView.backgroundColor = .clear
-        wv.translatesAutoresizingMaskIntoConstraints = false
-        vc.view.addSubview(wv)
-        wv.davizinPinEdges(to: vc.view)
-        if let url = Bundle.main.url(forResource: "nyxel_siambhau", withExtension: "html") {
-            wv.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        }
-        // Botón cerrar flotante
-        let close = UIButton(type: .system)
-        close.setTitle("×", for: .normal)
-        close.titleLabel?.font = .systemFont(ofSize: 30, weight: .regular)
-        close.setTitleColor(.white, for: .normal)
-        close.backgroundColor = UIColor(white: 0, alpha: 0.55)
-        close.layer.cornerRadius = 20
-        close.translatesAutoresizingMaskIntoConstraints = false
-        vc.view.addSubview(close)
-        NSLayoutConstraint.activate([
-            close.widthAnchor.constraint(equalToConstant: 40),
-            close.heightAnchor.constraint(equalToConstant: 40),
-            close.trailingAnchor.constraint(equalTo: vc.view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
-            close.topAnchor.constraint(equalTo: vc.view.safeAreaLayoutGuide.topAnchor, constant: 12)
-        ])
-        close.addAction(UIAction { [weak vc] _ in vc?.dismiss(animated: true) }, for: .touchUpInside)
-        present(vc, animated: true)
-    }
 }
 
 extension ViewController: DavizinHeaderViewDelegate {

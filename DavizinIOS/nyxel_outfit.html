@@ -110,83 +110,7 @@
   .pcard .pill.id{font-family:'SF Mono',ui-monospace,monospace;letter-spacing:.06em;color:rgba(255,255,255,.6)}
   .pclose{position:absolute;top:10px;right:10px;width:36px;height:36px;border:0;border-radius:50%;background:rgba(10,14,22,.55);color:#fff;font-size:20px;cursor:pointer;display:grid;place-items:center;z-index:2;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 
-  @media (prefers-reduced-motion:reduce){.blob,.ava,.pcard,.slot,.moon{animation:none}}
-
-  /* ============ Visor del personaje · estilo Rouk 3D viewer ============ */
-  .charv{position:relative;width:100%;aspect-ratio:3/4;max-height:72vh;border-radius:28px;overflow:hidden;
-    background:
-      radial-gradient(60% 45% at 50% 50%, rgba(78,162,255,.10), transparent 62%),
-      radial-gradient(80% 50% at 50% 100%, rgba(122,92,255,.08), transparent 60%),
-      linear-gradient(170deg,#030611 0%,#07091a 55%,#020410);
-    border:0.5px solid rgba(255,255,255,.1);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 20px 50px -20px rgba(0,0,0,.65)}
-  /* Pills superiores tipo 3D LIVE · ROUK · CHARACTER */
-  .charv .topbar{position:absolute;top:14px;left:14px;right:14px;z-index:6;display:flex;gap:7px;justify-content:space-between}
-  .charv .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:.6rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.85);
-    background:rgba(10,14,22,.55);border:0.5px solid rgba(160,190,255,.22);
-    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-  .charv .pill b{color:#5ac8fa;font-weight:900}
-  .charv .pill .ld{width:7px;height:7px;border-radius:50%;background:#30d158;box-shadow:0 0 8px #30d158;animation:bl 1.4s ease-in-out infinite}
-  @keyframes bl{50%{opacity:.4}}
-  .charv .pill.mid{color:#fff;letter-spacing:.2em}
-
-  /* Luna + constelaciones */
-  .charv .moon{position:absolute;left:50%;top:18%;transform:translateX(-50%);width:68%;aspect-ratio:1;border-radius:50%;z-index:1;pointer-events:none;
-    background:radial-gradient(circle, rgba(170,200,255,.18),rgba(80,120,255,.05) 48%, transparent 68%);animation:mglow 7s ease-in-out infinite}
-  .charv .moon::after{content:"";position:absolute;inset:2%;border-radius:50%;border:1px solid rgba(150,190,255,.14)}
-  @keyframes mglow{0%,100%{opacity:1}50%{opacity:.78}}
-
-  /* Imagen con crop al centro */
-  .charv .charImg{position:absolute;inset:0;z-index:2;background-size:260% auto;background-position:50% 42%;background-repeat:no-repeat;transition:opacity .5s;opacity:0}
-  .charv .charImg.on{opacity:1;filter:drop-shadow(0 0 18px rgba(90,200,250,.18)) drop-shadow(0 0 36px rgba(90,200,250,.08))}
-  /* Tira de items equipados al pie del visor */
-  #equipStrip{position:absolute;bottom:28px;left:0;right:0;z-index:5;display:flex;gap:6px;justify-content:center;padding:0 16px;pointer-events:none}
-  .equip-icon{flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:#0a0e1e center/cover no-repeat;
-    border:1.5px solid rgba(255,255,255,.18);box-shadow:0 2px 8px rgba(0,0,0,.5);
-    opacity:0;transform:scale(.9);transition:opacity .4s ease,transform .4s cubic-bezier(.22,1,.3,1)}
-  .equip-icon.on{opacity:1;transform:scale(1)}
-  .charv .charVig{position:absolute;inset:0;z-index:3;pointer-events:none;
-    background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,6,17,.75) 72%, rgba(3,6,17,.98) 100%)}
-  .charv .charLoad{position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.55);font-size:.82rem;z-index:4;text-align:center;padding:40px 24px}
-  .charv .charLoad.hide{display:none}
-
-  /* Chips flotantes en 4 esquinas estilo Rouk */
-  .charv .zchip{position:absolute;z-index:5;display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;cursor:pointer;
-    font:inherit;font-weight:800;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:#eaf0ff;
-    background:rgba(10,14,22,.65);border:0.5px solid rgba(160,190,255,.28);
-    -webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);
-    box-shadow:0 10px 24px -14px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.14);transition:transform .14s, border-color .22s}
-  .charv .zchip:active{transform:scale(.94)}
-  .charv .zchip .dot{color:#5ac8fa;font-size:.6rem}
-  .charv .zchip .ar{color:rgba(255,255,255,.4);margin-left:2px;font-size:.9rem}
-  .charv .zchip.cTL{top:28%;left:3%}
-  .charv .zchip.cTR{top:18%;right:3%}
-  .charv .zchip.cMR{top:42%;right:3%}
-  .charv .zchip.cBL{top:58%;left:3%}
-  .charv .zchip.pulse{border-color:rgba(90,200,250,.7);box-shadow:0 0 0 1px rgba(90,200,250,.4),0 0 18px -6px rgba(90,200,250,.6);animation:zpulse .5s ease}
-  .charv .zchip::after{content:'';position:absolute;top:50%;height:1px;width:22px}
-  .charv .zchip.cTL::after,.charv .zchip.cBL::after{left:100%;margin-left:4px;background:linear-gradient(90deg,rgba(180,210,255,.35),transparent)}
-  .charv .zchip.cTR::after,.charv .zchip.cMR::after{right:100%;margin-right:4px;background:linear-gradient(270deg,rgba(180,210,255,.35),transparent)}
-  @keyframes zpulse{50%{transform:scale(1.06)}}
-
-  /* Flechas decorativas ‹ › (estilo Rouk) */
-  .charv .narr{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:#cfe3ff;font-size:22px;
-    background:rgba(10,14,22,.55);border:0.5px solid rgba(160,190,255,.22);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);cursor:pointer}
-  .charv .narr.lef{left:6px}
-  .charv .narr.rig{right:6px}
-  .charv .narr:active{transform:translateY(-50%) scale(.9)}
-
-  /* Barra inferior "VIEW CHARACTER OPTIONS · 3D" */
-  .charv .fbar{position:absolute;bottom:12px;left:0;right:0;z-index:5;text-align:center;font-size:.58rem;font-weight:800;letter-spacing:.3em;color:rgba(200,215,245,.5);text-transform:uppercase}
-  .charv .fbar b{color:#fff}
-
-  /* Piso brillante circular tipo Rouk */
-  .charv .floor{position:absolute;left:50%;bottom:11%;transform:translateX(-50%);width:50%;height:4%;border-radius:50%;z-index:2;pointer-events:none;
-    background:radial-gradient(circle, rgba(78,162,255,.35), transparent 70%);filter:blur(3px)}
-
-  /* Líneas sutiles de conexión */
-  .vlines{position:absolute;inset:0;z-index:4;width:100%;height:100%;pointer-events:none;overflow:visible}
-  .vlines line{stroke:rgba(140,180,240,.22);stroke-width:.3;stroke-dasharray:2 2}
+  @media (prefers-reduced-motion:reduce){.blob,.ava,.pcard,.slot{animation:none}}
 </style>
 </head>
 <body>
@@ -204,64 +128,6 @@
     <div class="name" id="name">—</div>
     <div class="uid" id="uid">UID —</div>
     <div class="ranks" id="ranks"></div>
-  </div>
-
-  <!-- Banner oficial del perfil (API SiamBhau /banner/profile) -->
-  <div class="sec" id="bannerWrap" style="display:none">
-    <div class="sh"><div class="l"><span class="lb">Banner oficial</span><h2>Perfil del jugador</h2></div></div>
-    <div style="border-radius:18px;overflow:hidden;background:rgba(0,0,0,.4);border:0.5px solid rgba(255,255,255,.1);box-shadow:0 14px 38px -18px rgba(0,0,0,.6)">
-      <img id="bannerImg" style="width:100%;height:auto;display:block;opacity:0;transition:opacity .4s" onload="this.style.opacity=1" onerror="document.getElementById('bannerWrap').style.display='none'">
-    </div>
-  </div>
-
-  <!-- Visor del personaje · estilo Rouk 3D viewer -->
-  <div class="sec" id="renderWrap" style="display:none">
-    <div class="sh">
-      <div class="l"><span class="lb">Visual Loadout</span><h2>View Character Options</h2></div>
-      <div class="count" id="charMeta">—</div>
-    </div>
-    <div class="charv" id="charv">
-      <!-- Pills superiores -->
-      <div class="topbar">
-        <span class="pill"><span class="ld"></span><b>LIVE</b></span>
-        <span class="pill mid" id="charName">—</span>
-        <span class="pill"><b>CHARACTER</b></span>
-      </div>
-      <!-- Luna + fondo -->
-      <div class="moon"></div>
-      <div class="floor"></div>
-      <!-- Imagen croppeada del personaje -->
-      <div class="charImg" id="charImgBox">
-        <div class="charLoad" id="charLoad"><div class="spin"></div><div style="margin-top:8px;font-size:.78rem">Renderizando…</div></div>
-      </div>
-      <div class="charVig"></div>
-      <div id="equipStrip"></div>
-      <!-- Chips flotantes de zona (4 posiciones estilo Rouk) -->
-      <button class="zchip cTL" onclick="pulseZone(this)"><span class="dot">⌖</span>Cabeza<span class="ar">›</span></button>
-      <button class="zchip cTR" onclick="pulseZone(this)"><span class="dot">⌖</span>Drag · Cabeza<span class="ar">›</span></button>
-      <button class="zchip cMR" onclick="pulseZone(this)"><span class="dot">⌖</span>Cuello<span class="ar">›</span></button>
-      <button class="zchip cBL" onclick="pulseZone(this)"><span class="dot">⌖</span>Pecho<span class="ar">›</span></button>
-      <!-- Flechas decorativas -->
-      <button class="narr lef" aria-label="Anterior">‹</button>
-      <button class="narr rig" aria-label="Siguiente">›</button>
-      <!-- Líneas sutiles de conexión -->
-      <svg class="vlines" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <line x1="22" y1="30" x2="48" y2="28" />
-        <line x1="78" y1="20" x2="54" y2="22" />
-        <line x1="78" y1="44" x2="56" y2="40" />
-        <line x1="22" y1="60" x2="48" y2="55" />
-      </svg>
-      <!-- Bar inferior -->
-      <div class="fbar"><b>View Character Options</b> · 3D</div>
-    </div>
-    <!-- Img oculta sirve para detectar carga/error -->
-    <img id="renderImg" style="display:none" onload="onRenderOk(this)" onerror="onRenderFail()">
-  </div>
-
-  <!-- Insights: ban check + login history + guild + friends + duo + wallet + wishlist + craftlands -->
-  <div class="sec" id="insightsWrap" style="display:none">
-    <div class="sh"><div class="l"><span class="lb">Intel</span><h2>Datos completos</h2></div></div>
-    <div id="insightsBody" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 
   <div class="sec">
@@ -286,44 +152,6 @@
   var PENDING_SUMMARY = null;
   var CATALOG_URL = 'https://raw.githubusercontent.com/davidporfirio17-svg/nyxel-ff-assets/main/items.json';
 
-  // ========== Outfit item overlay system ==========
-  var ICON_BASE = 'https://raw.githubusercontent.com/ashqking/FF-Items/main/ICONS/';
-  var ICON_FB   = 'https://raw.githubusercontent.com/I-SHOW-AKIRU200/AKIRU-ICONS/main/ICONS/';
-  function zoneFromId(id){
-    var p=String(id).substring(0,3);
-    switch(p){
-      case '201':case '214':case '912': return 'head';
-      case '202':case '904': return 'mask';
-      case '203':case '907': return 'top';
-      case '204':case '213': return 'bottom';
-      case '205': return 'shoes';
-      case '210':case '215':case '216': return 'back';
-      default: return null;
-    }
-  }
-  function showOutfitItems(ids){
-    var strip=document.getElementById('equipStrip');
-    if(!strip)return; strip.innerHTML='';
-    var seen={};
-    (ids||[]).forEach(function(id){
-      var zone=zoneFromId(id);
-      if(!zone||seen[zone])return;
-      seen[zone]=true;
-      var el=document.createElement('div'); el.className='equip-icon';
-      el.dataset.itemId=String(id);
-      var url=ICON_BASE+id+'.png';
-      var img=new Image();
-      img.onload=function(){ el.style.backgroundImage='url("'+url+'")'; setTimeout(function(){el.classList.add('on');},80); };
-      img.onerror=function(){
-        var url2=ICON_FB+id+'.png';
-        var img2=new Image(); img2.onload=function(){ el.style.backgroundImage='url("'+url2+'")'; el.classList.add('on'); }; img2.src=url2;
-      };
-      img.src=url;
-      strip.appendChild(el);
-    });
-  }
-
-  // Mapping de "tipo de slot" por heurística del nombre del icon
   function slotOf(icon){
     if(!icon) return null;
     var low = icon.toLowerCase();
@@ -343,259 +171,10 @@
     return icon.replace(/^(Icon_|cloth_|icon_|avatar_)/i,'').replace(/_/g,' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
   }
 
-  // Swift llama esto: NYXEL_setOutfitData({ nickname, uid, level, likes, region, br, cs, avatarURL, bannerURL, renderURL, clothesIDs: [...], weaponSkinIDs:[...], ... })
   window.NYXEL_setOutfitData = function(d){
     PENDING_SUMMARY = d;
-    // Banner de SiamBhau desactivado: /banner/profile devuelve datos de otro jugador
-    // Render oficial del personaje via API SiamBhau (se recorta al centro en CSS)
-    if(d.renderURL){
-      document.getElementById('renderWrap').style.display = 'block';
-      document.getElementById('renderImg').src = d.renderURL;
-    }
-    // Insights: ban + login + guild + friends + duo + wallet + wish + craftlands
-    if(d.banCheckURL || d.loginHistoryURL || d.guildURL || d.friendsURL){ loadInsights(d); }
     renderAll();
   };
-
-  // Callback cuando el PNG del personaje cargó OK → setea el background con crop
-  window.onRenderOk = function(img){
-    var box = document.getElementById('charImgBox');
-    var load = document.getElementById('charLoad');
-    if(box && img.src){
-      var cropped = false;
-      try {
-        var c = document.createElement('canvas'), ctx = c.getContext('2d');
-        var W = img.naturalWidth||1024, H = img.naturalHeight||1024;
-        var sx=Math.round(W*.28), sy=Math.round(H*.07), sw=Math.round(W*.44), sh=Math.round(H*.86);
-        c.width=sw; c.height=sh;
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-        ctx.getImageData(0,0,1,1);
-        box.style.backgroundImage='url("'+c.toDataURL()+'")';
-        box.style.backgroundSize='contain';
-        box.style.backgroundPosition='center bottom';
-        cropped=true;
-      } catch(e){}
-      if(!cropped) box.style.backgroundImage = 'url("'+img.src+'")';
-      box.classList.add('on');
-    }
-    if(load) load.classList.add('hide');
-    // Actualiza pill central con el nombre del jugador
-    var nameEl = document.getElementById('charName');
-    var d = PENDING_SUMMARY || {};
-    if(nameEl && d.nickname) nameEl.textContent = d.nickname;
-    var metaEl = document.getElementById('charMeta');
-    if(metaEl && d.uid) metaEl.innerHTML = 'UID <b style="color:#fff">'+d.uid+'</b>';
-    // Overlay items equipados sobre el personaje
-    var cids = d.clothesIDs || [];
-    if(cids.length) showOutfitItems(cids);
-  };
-  // Si el PNG falla: reintentar 2 veces con backoff antes de rendirse
-  var _renderRetries = 0;
-  window.onRenderFail = function(){
-    var load = document.getElementById('charLoad');
-    if(!load) return;
-    if(_renderRetries < 2 && PENDING_SUMMARY && PENDING_SUMMARY.renderURL){
-      _renderRetries++;
-      var delay = 2500 * _renderRetries; // 2.5s, 5s
-      load.innerHTML = '<div style="color:#ffd27a;line-height:1.4"><div class="spin"></div>⏱ Reintentando ('+_renderRetries+'/2)…<br><span style="opacity:.6;font-size:.72rem">API con rate-limit, reintentando en '+(delay/1000)+'s</span></div>';
-      setTimeout(function(){
-        var img = document.getElementById('renderImg');
-        img.src = PENDING_SUMMARY.renderURL + '&retry=' + _renderRetries;
-      }, delay);
-      return;
-    }
-    load.classList.remove('hide');
-    load.innerHTML = '<div style="color:#ffd27a;line-height:1.4">⏱ API con rate-limit prolongado.<br><span style="opacity:.6;font-size:.72rem">Espera 30s y vuelve a entrar a "Ver outfit".</span></div>';
-  };
-
-  // Pulse rojo tipo "zona de mira" al tap de un chip
-  window.pulseZone = function(el){
-    el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
-    try{if(navigator.vibrate)navigator.vibrate(12);}catch(e){}
-    setTimeout(function(){ el.classList.remove('pulse'); }, 600);
-  };
-
-  // ============ INSIGHTS (ban check + login history) ============
-  function pill(label, val, color){
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.06);border:0.5px solid '+color+';-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)">'+
-      '<div style="font-size:.66rem;font-weight:800;letter-spacing:.2em;color:rgba(255,255,255,.6);text-transform:uppercase">'+label+'</div>'+
-      '<div style="font-size:.9rem;font-weight:700;color:#fff;text-align:right">'+val+'</div>'+
-    '</div>';
-  }
-
-  // Extrae un campo de un objeto buscando varios alias posibles (soporta rutas .data.X)
-  function pick(obj, keys){
-    if(!obj) return null;
-    for(var i=0;i<keys.length;i++){
-      var parts = keys[i].split('.');
-      var v = obj;
-      for(var j=0;j<parts.length;j++){ if(v==null) break; v = v[parts[j]]; }
-      if(v!=null && v!=='' && v!=='NONE') return v;
-    }
-    return null;
-  }
-
-  function section(title){
-    return '<div style="font-size:.6rem;font-weight:800;letter-spacing:.3em;color:rgba(200,215,245,.55);text-transform:uppercase;margin:12px 2px 4px">'+title+'</div>';
-  }
-
-  function loadInsights(d){
-    var body = document.getElementById('insightsBody');
-    var wrap = document.getElementById('insightsWrap');
-    wrap.style.display = 'block';
-    body.innerHTML = '<div class="loading"><div class="spin"></div>Consultando datos completos…</div>';
-    var results = {};
-    var done = 0, total = 0, rateLimited = 0;
-
-    function render(){
-      var html = '';
-
-      // Ban Check
-      if(results.ban){
-        html += section('Estado de la cuenta');
-        var b = results.ban;
-        if(b.err){ html += pill('Ban Check', '<span style="color:#ff948b">'+b.err+'</span>', 'rgba(255,255,255,.1)'); }
-        else {
-          var banned = (b.is_banned===true || b.isBanned===true || b.banned===true || pick(b,['data.is_banned','data.isBanned'])===true || (typeof b.status==='string' && b.status.toLowerCase().indexOf('ban')>=0));
-          html += pill('Ban Check',
-            banned ? '<span style="color:#ff948b">⚠ BANEADO</span>' : '<span style="color:#86f5a3">✓ Cuenta limpia</span>',
-            banned ? 'rgba(255,69,58,.35)' : 'rgba(48,209,88,.3)');
-          var period = pick(b, ['period','ban_period','data.period']);
-          if(period) html += pill('Periodo del ban', period, 'rgba(255,69,58,.3)');
-        }
-      }
-
-      // Login history
-      if(results.login){
-        var l = results.login;
-        if(!l.err){
-          var last = pick(l, ['last_login','lastLogin','last_online','lastOnline','data.last_login']) ||
-                     (l.history && l.history[0] && (l.history[0].time||l.history[0].date||l.history[0].ts));
-          if(last) html += pill('Última conexión', '<span style="color:#86f5a3">'+last+'</span>', 'rgba(255,255,255,.1)');
-          var cnt = (l.history && l.history.length) || pick(l, ['data.history_count','count','total']);
-          if(cnt) html += pill('Logins registrados', cnt, 'rgba(255,255,255,.1)');
-        }
-      }
-
-      // Guild
-      if(results.guild){
-        var g = results.guild;
-        if(!g.err){
-          var gName = pick(g, ['name','clan_name','clanName','data.name','data.clan_name','guild_name']);
-          var gLv   = pick(g, ['level','clan_level','data.level']);
-          var gMem  = pick(g, ['members','members_count','membersCount','member_count','data.members']);
-          var gLead = pick(g, ['leader','leader_name','owner','data.leader']);
-          if(gName || gLv || gMem){
-            html += section('Clan');
-            if(gName) html += pill('Nombre', gName, 'rgba(90,200,250,.3)');
-            if(gLv)   html += pill('Nivel',  gLv,   'rgba(255,255,255,.1)');
-            if(gMem)  html += pill('Miembros', gMem, 'rgba(255,255,255,.1)');
-            if(gLead) html += pill('Líder',  gLead, 'rgba(255,255,255,.1)');
-          }
-        }
-      }
-
-      // Friends
-      if(results.friends){
-        var f = results.friends;
-        if(!f.err){
-          var fList = f.friends || f.list || (f.data && f.data.friends) || (f.data && f.data.list) || null;
-          var fCount = pick(f, ['count','total','friends_count','data.count']) || (fList && fList.length);
-          if(fCount){
-            html += section('Amigos');
-            html += pill('Total de amigos', fCount, 'rgba(255,255,255,.1)');
-          }
-        }
-      }
-
-      // Dynamic Duo
-      if(results.duo){
-        var du = results.duo;
-        if(!du.err){
-          var duoName = pick(du, ['duo_name','partner','name','data.partner']);
-          var duoMatches = pick(du, ['matches','games_played','data.matches']);
-          if(duoName || duoMatches){
-            html += section('Dynamic Duo');
-            if(duoName) html += pill('Compañero', duoName, 'rgba(255,255,255,.1)');
-            if(duoMatches) html += pill('Partidas juntos', duoMatches, 'rgba(255,255,255,.1)');
-          }
-        }
-      }
-
-      // Wallet
-      if(results.wallet){
-        var w = results.wallet;
-        if(!w.err){
-          var diamonds = pick(w, ['diamond','diamonds','data.diamond','data.diamonds']);
-          var gold = pick(w, ['gold','coins','data.gold']);
-          if(diamonds!=null || gold!=null){
-            html += section('Wallet');
-            if(diamonds!=null) html += pill('Diamantes', '💎 '+diamonds, 'rgba(255,255,255,.1)');
-            if(gold!=null) html += pill('Gold', '🪙 '+gold, 'rgba(255,255,255,.1)');
-          }
-        }
-      }
-
-      // Wish list
-      if(results.wish){
-        var wi = results.wish;
-        if(!wi.err){
-          var wishItems = wi.wishlist || wi.items || (wi.data && wi.data.wishlist) || null;
-          if(wishItems && wishItems.length){
-            html += section('Wish list');
-            html += pill('Items en lista', wishItems.length, 'rgba(255,255,255,.1)');
-          }
-        }
-      }
-
-      // Craftlands
-      if(results.craft){
-        var c = results.craft;
-        if(!c.err){
-          var maps = c.maps || c.craftlands || (c.data && c.data.maps) || null;
-          if(maps && maps.length){
-            html += section('Craftlands');
-            html += pill('Mapas creados', maps.length, 'rgba(255,255,255,.1)');
-          }
-        }
-      }
-
-      if(rateLimited > 0){
-        html += '<div style="padding:10px 14px;border-radius:12px;background:rgba(255,159,10,.14);color:#ffd27a;font-size:.75rem;text-align:center;border:0.5px solid rgba(255,159,10,.3);margin-top:8px">⏱ '+rateLimited+' endpoints tienen rate-limit activo. Espera unos segundos y reintenta.</div>';
-      }
-
-      body.innerHTML = html || '<div class="empty" style="padding:20px;color:rgba(255,255,255,.4);text-align:center">Sin datos adicionales del jugador</div>';
-    }
-
-    function fetchJson(url, slot){
-      total++;
-      fetch(url).then(function(r){ return r.text().then(function(t){
-        try{
-          var j = JSON.parse(t);
-          // Detectar rate limit
-          if(j && typeof j === 'object' && JSON.stringify(j).toLowerCase().indexOf('rate limit') >= 0){
-            results[slot] = {err:'Rate-limit'}; rateLimited++;
-          } else if(r.status >= 400){
-            results[slot] = {err:'HTTP '+r.status};
-          } else {
-            results[slot] = j;
-          }
-        }
-        catch(e){ results[slot] = {err:'Respuesta no-JSON'}; }
-      }); }).catch(function(e){
-        results[slot] = {err:'Sin conexión'};
-      }).finally(function(){ done++; if(done===total) render(); });
-    }
-
-    if(d.banCheckURL)     fetchJson(d.banCheckURL, 'ban');
-    if(d.loginHistoryURL) fetchJson(d.loginHistoryURL, 'login');
-    if(d.guildURL)        fetchJson(d.guildURL, 'guild');
-    if(d.friendsURL)      fetchJson(d.friendsURL, 'friends');
-    if(d.dynamicDuoURL)   fetchJson(d.dynamicDuoURL, 'duo');
-    if(d.walletURL)       fetchJson(d.walletURL, 'wallet');
-    if(d.wishURL)         fetchJson(d.wishURL, 'wish');
-    if(d.craftlandsURL)   fetchJson(d.craftlandsURL, 'craft');
-  }
 
   function renderAll(){
     if(!PENDING_SUMMARY) return;
@@ -614,7 +193,7 @@
     pill('LV', d.level||'');
     pill('♥', d.likes||'');
 
-    if(!CATALOG){ return; } // esperando catálogo
+    if(!CATALOG){ return; }
     renderGrid();
   }
 
@@ -626,7 +205,6 @@
     if(d.headPicID) ids.push(d.headPicID);
     if(d.petID) ids.push(d.petID);
 
-    // Deduplicar manteniendo orden
     var seen = {}; ids = ids.filter(function(x){ if(!x||x==='0'||seen[x])return false; seen[x]=1; return true; });
     document.getElementById('cnt').textContent = ids.length;
 
@@ -682,7 +260,6 @@
   window.closeP = closeP;
   window.openP = openP;
 
-  // Cargar catálogo
   fetch(CATALOG_URL).then(function(r){ return r.json(); }).then(function(d){
     CATALOG = d; renderAll();
   }).catch(function(){

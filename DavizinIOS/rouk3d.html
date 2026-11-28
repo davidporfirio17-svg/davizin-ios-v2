@@ -45,33 +45,9 @@
     box-shadow:0 0 0 1px rgba(60,130,255,.05),0 30px 72px -28px rgba(20,60,200,.5),inset 0 1px 0 rgba(255,255,255,.22)}
   #stage{position:absolute;inset:0;background-size:260% auto;background-position:50% 42%;background-repeat:no-repeat;transition:opacity .45s;opacity:0}
   #stage.on{opacity:1;filter:drop-shadow(0 0 18px rgba(90,200,250,.18)) drop-shadow(0 0 36px rgba(90,200,250,.08))}
-  #stage.on.dimmed{opacity:.15;filter:none}
   .vignette{position:absolute;inset:0;z-index:3;pointer-events:none;
     background:radial-gradient(ellipse 56% 68% at 50% 44%, transparent 44%, rgba(3,5,14,.75) 72%, rgba(3,5,14,.98) 100%)}
 
-  /* Tira de items equipados al pie del visor */
-  #equipStrip{position:absolute;bottom:28px;left:0;right:0;z-index:5;display:flex;gap:6px;justify-content:center;padding:0 16px;pointer-events:none}
-  .equip-icon{flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:#0a0e1e center/cover no-repeat;
-    border:1.5px solid rgba(255,255,255,.18);box-shadow:0 2px 8px rgba(0,0,0,.5);
-    opacity:0;transform:scale(.9);transition:opacity .4s ease,transform .4s cubic-bezier(.22,1,.3,1)}
-  .equip-icon.on{opacity:1;transform:scale(1)}
-
-  /* 2D Character compositing — items layered on body zones */
-  #charComposite{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none;
-    opacity:0;transition:opacity .6s ease}
-  #charComposite.on{opacity:1}
-  #charBody{position:relative;width:280px;height:400px}
-  #bodyCanvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1;pointer-events:none}
-  .char-item{position:absolute;left:50%;transform:translateX(-50%);object-fit:contain;pointer-events:none;
-    opacity:0;transition:opacity .5s ease;filter:drop-shadow(0 2px 8px rgba(0,0,0,.55))}
-  .char-item.loaded{opacity:1}
-  .char-item[data-zone="head"]{top:0;width:98px;height:98px;z-index:6}
-  .char-item[data-zone="mask"]{top:14px;width:78px;height:78px;z-index:7}
-  .char-item[data-zone="top"]{top:62px;width:196px;height:196px;z-index:4}
-  .char-item[data-zone="bottom"]{top:210px;width:152px;height:152px;z-index:3}
-  .char-item[data-zone="shoes"]{top:328px;width:134px;height:62px;z-index:2}
-  .char-item[data-zone="back"]{top:70px;width:134px;height:134px;z-index:1;opacity:0}
-  .char-item[data-zone="back"].loaded{opacity:.8}
 
   /* Pills superiores tipo 3D LIVE · NOMBRE · CHARACTER */
   .topbar{position:absolute;top:14px;left:14px;right:14px;z-index:6;display:flex;gap:7px;justify-content:space-between}
@@ -222,9 +198,7 @@
     <div class="moon"></div>
     <div class="floor"></div>
     <div id="stage"></div>
-    <div id="charComposite"><div id="charBody"><canvas id="bodyCanvas" width="148" height="380"></canvas></div></div>
     <div class="vignette"></div>
-    <div id="equipStrip"></div>
     <div id="vload" class="vload"><div><div class="spin"></div><div>Ingresa un UID y pulsa Buscar</div></div></div>
 
     <div class="topbar">
@@ -256,9 +230,6 @@
     </div>
   </div>
 
-  <!-- Img oculta para detectar load/error del PNG -->
-  <img id="renderImg" style="display:none" onload="onRenderOk()" onerror="onRenderFail()">
-
   <div class="functions">
     <div class="fh"><span class="lbl"><span class="bar"></span>Opciones</span><span class="count" id="count"></span></div>
     <div id="list"></div>
@@ -271,80 +242,11 @@
     <div class="actnote">Mantén presionado para preparar el entorno e inyectar</div>
   </div>
 
-  <p class="credits">Render del personaje · <b>SiamBhau API</b> · premium</p>
+  <p class="credits">Datos del jugador · <b>Free Fire API Hub</b></p>
 </div>
 
 <script>
 (function(){
-  // ========== Config SiamBhau ==========
-  var SIAM_KEY = (window.NYXEL_SIAM_KEY) || 'FFAPI-PREM-60-sjdonsl-X28';
-  var SIAM_BASE = 'https://siambhau69.eu.cc';
-
-  // ========== Outfit item overlay system ==========
-  // Maps Free Fire item ID prefixes to body zones
-  var ICON_BASE = 'https://raw.githubusercontent.com/ashqking/FF-Items/main/ICONS/';
-  var ICON_FB   = 'https://raw.githubusercontent.com/I-SHOW-AKIRU200/AKIRU-ICONS/main/ICONS/';
-  function zoneFromId(id){
-    var p=String(id).substring(0,3);
-    switch(p){
-      case '201':case '214': return 'head';
-      case '202': return 'mask';
-      case '203': return 'top';
-      case '204':case '213': return 'bottom';
-      case '205': return 'shoes';
-      case '210':case '215':case '216':case '904': return 'back';
-      default: return null;
-    }
-  }
-  function showOutfitItems(ids){
-    var strip=document.getElementById('equipStrip');
-    if(!strip)return; strip.innerHTML='';
-    var body=document.getElementById('charBody');
-    if(body) body.querySelectorAll('.char-item').forEach(function(e){e.remove();});
-    var seen={};
-    (ids||[]).forEach(function(id){
-      var zone=zoneFromId(id);
-      if(!zone||seen[zone])return;
-      seen[zone]=true;
-      var el=document.createElement('div'); el.className='equip-icon';
-      el.dataset.itemId=String(id);
-      var url=ICON_BASE+id+'.png';
-      var img=new Image();
-      img.onload=function(){ el.style.backgroundImage='url("'+url+'")'; setTimeout(function(){el.classList.add('on');},80); };
-      img.onerror=function(){
-        var url2=ICON_FB+id+'.png';
-        var img2=new Image(); img2.onload=function(){ el.style.backgroundImage='url("'+url2+'")'; el.classList.add('on'); }; img2.src=url2;
-      };
-      img.src=url;
-      strip.appendChild(el);
-      if(body){
-        var ci=document.createElement('img'); ci.className='char-item'; ci.dataset.zone=zone; ci.dataset.itemId=String(id);
-        ci.crossOrigin='anonymous';
-        ci.onload=function(){ ci.classList.add('loaded'); };
-        ci.onerror=function(){ var fb=ICON_FB+id+'.png'; ci.onerror=function(){ci.remove();}; ci.src=fb; };
-        ci.src=url;
-        body.appendChild(ci);
-      }
-    });
-    var cc=document.getElementById('charComposite'); if(cc) cc.classList.add('on');
-    document.getElementById('vload').classList.add('hide');
-    document.getElementById('hint').innerHTML = '✓ Prendas cargadas. Toca una zona para preparar.';
-    var btn = document.getElementById('goBtn'); btn.classList.remove('busy'); btn.textContent='Buscar';
-    _requestBetterImages(ids);
-  }
-  function _requestBetterImages(ids){
-    var br=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nyxel;
-    if(!br)return;
-    (ids||[]).forEach(function(id){ br.postMessage({t:'fetchItemImage',itemId:String(id)}); });
-  }
-  window.NYXEL_onItemImage=function(itemId,dataUrl){
-    if(!dataUrl)return;
-    var el=document.querySelector('.equip-icon[data-item-id="'+itemId+'"]');
-    if(el){ el.style.backgroundImage='url("'+dataUrl+'")'; if(!el.classList.contains('on'))el.classList.add('on'); }
-    var ci=document.querySelector('.char-item[data-item-id="'+itemId+'"]');
-    if(ci){ ci.src=dataUrl; if(!ci.classList.contains('loaded'))ci.classList.add('loaded'); }
-  };
-
   // Zonas / modos conocidos
   var ZLABEL = { cuello:'CUELLO', pecho:'PECHO', head:'CABEZA', drag:'DRAG · CABEZA' };
   function detectZone(name){ var s=(name||'').toLowerCase();
@@ -367,7 +269,7 @@
   function iconFor(z){return z==='cuello'?'◈':z==='pecho'?'✦':z==='head'?'⬡':z==='drag'?'◆':'❖';}
   function nhaptic(s){try{var h=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nyxel;if(h)h.postMessage({t:'haptic',s:s});}catch(e){}}
 
-  // ========== Buscar jugador y cargar PNG ==========
+  // ========== Buscar jugador ==========
   window.loadPlayer = function(){
     var uid = (document.getElementById('uid').value||'').trim();
     var reg = document.getElementById('reg').value || 'BR';
@@ -378,41 +280,26 @@
     nhaptic('light');
     var btn = document.getElementById('goBtn'); btn.classList.add('busy'); btn.textContent='Buscando…';
     document.getElementById('charName').textContent = 'UID ' + uid;
-    document.getElementById('hint').innerHTML = 'Pidiendo render del personaje con outfit real…';
-    var stage = document.getElementById('stage'); stage.classList.remove('on','dimmed'); stage.style.backgroundImage='';
+    document.getElementById('hint').innerHTML = 'Consultando perfil del jugador…';
     var vload = document.getElementById('vload'); vload.classList.remove('hide');
-    vload.innerHTML = '<div><div class="spin"></div>Pidiendo render a SiamBhau…</div>';
-    _retries = 0;
-    var url = SIAM_BASE+'/outfits/outfit?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(SIAM_KEY);
-    _lastUrl = url;
-    document.getElementById('renderImg').src = url;
+    vload.innerHTML = '<div><div class="spin"></div>Consultando Free Fire API Hub…</div>';
 
-    // Clear previous equip strip
-    var _es = document.getElementById('equipStrip'); if(_es) _es.innerHTML='';
-
-    // Show info panel immediately in loading state
     var ip = document.getElementById('infoPanel'); if(ip) ip.style.display='';
     document.getElementById('infoRegion').textContent = reg.toUpperCase();
     document.getElementById('statusBadge').className = 'offline-badge';
     document.getElementById('statusBadge').textContent = 'BUSCANDO…';
 
-    // Pedir info del jugador via Swift bridge (evita CORS) o fetch directo como fallback
     var _bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nyxel;
     if(_bridge){
       _bridge.postMessage({t:'fetchInfo', uid:uid, region:reg});
     } else {
-      // Fallback: fetch directo (funciona en navegador, falla en WKWebView por CORS)
-      fetch(SIAM_BASE+'/freefireinfo/bhau?uid='+encodeURIComponent(uid)+'&region='+encodeURIComponent(reg)+'&key='+encodeURIComponent(SIAM_KEY))
-        .then(function(r){ return r.json(); })
-        .then(function(j){ window.NYXEL_onInfoData(j); })
-        .catch(function(){
-          var sb = document.getElementById('statusBadge');
-          sb.className='offline-badge'; sb.textContent='SIN DATOS';
-        });
+      document.getElementById('vload').classList.add('hide');
+      var sb = document.getElementById('statusBadge');
+      sb.className='offline-badge'; sb.textContent='SIN BRIDGE';
     }
   };
 
-  // Callback: recibe JSON del jugador (vía Swift bridge o fetch directo)
+  // Callback: recibe JSON del jugador (vía Swift bridge → Worker → Free Fire API Hub)
   window.NYXEL_onInfoData = function(j){
     var d = (j && j.data) || j || {};
     var basic = d.basic || d.basicInfo || d || {};
@@ -424,61 +311,9 @@
     var lv = basic.level || basic.accountLevel || d.level || null;
     if(lv) document.getElementById('infoLevel').textContent = 'NV.' + lv;
     var sb = document.getElementById('statusBadge');
-    var isOnline = basic.isOnline || d.isOnline || false;
-    if(isOnline){ sb.className='online-badge'; sb.textContent='EN LÍNEA'; }
-    else if(nick){ sb.className='offline-badge'; sb.textContent='FUERA DE LÍNEA'; }
-    // Extract clothesIDs and overlay real items on character
-    var clothes = null;
-    try{
-      var pi = d.profileInfo || (j && j.profileInfo) || null;
-      clothes = (pi && pi.clothes) || d.clothes || null;
-    }catch(e){}
-    if(clothes && clothes.length) showOutfitItems(clothes);
-  };
-
-  var _retries = 0, _lastUrl = '';
-  window.onRenderOk = function(){
-    var img = document.getElementById('renderImg');
-    var stage = document.getElementById('stage');
-    var cropped = false;
-    // Canvas crop: extract JUST the center character (no hexagons/text)
-    try {
-      var c = document.createElement('canvas'), ctx = c.getContext('2d');
-      var W = img.naturalWidth||1024, H = img.naturalHeight||1024;
-      // Crop region: center character excluding hexagonal items and "YOUR OUTFITS" text
-      var sx=Math.round(W*.28), sy=Math.round(H*.07), sw=Math.round(W*.44), sh=Math.round(H*.86);
-      c.width=sw; c.height=sh;
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-      ctx.getImageData(0,0,1,1); // throws SecurityError if cross-origin tainted
-      stage.style.backgroundImage='url("'+c.toDataURL()+'")';
-      stage.style.backgroundSize='contain';
-      stage.style.backgroundPosition='center bottom';
-      cropped=true;
-    } catch(e){}
-    if(!cropped) stage.style.backgroundImage='url("'+img.src+'")';
-    stage.classList.add('on');
-    var cc=document.getElementById('charComposite');
-    if(cc && cc.classList.contains('on')) stage.classList.add('dimmed');
+    if(nick){ sb.className='offline-badge'; sb.textContent='CONSULTADO'; }
     document.getElementById('vload').classList.add('hide');
-    document.getElementById('hint').textContent = '✓ Personaje cargado. Toca una zona para preparar.';
-    var btn = document.getElementById('goBtn'); btn.classList.remove('busy'); btn.textContent='Buscar';
-  };
-  window.onRenderFail = function(){
-    var cc=document.getElementById('charComposite');
-    var compositeShowing = cc && cc.classList.contains('on');
-    if(_retries < 2 && _lastUrl && !compositeShowing){
-      _retries++;
-      var delay = 2500 * _retries;
-      document.getElementById('vload').innerHTML = '<div style="color:#ffd27a"><div class="spin"></div>⏱ Rate-limit · reintentando '+_retries+'/2 en '+(delay/1000)+'s…</div>';
-      setTimeout(function(){ document.getElementById('renderImg').src = _lastUrl+'&retry='+_retries; }, delay);
-      return;
-    }
-    if(compositeShowing){
-      document.getElementById('vload').classList.add('hide');
-      return;
-    }
-    document.getElementById('vload').innerHTML = '<div style="color:#ff948b"><div style="font-size:1.6rem;margin-bottom:6px">⚠</div>No se pudo cargar el personaje<br><span style="color:#ffd27a;font-size:.72rem">API con rate-limit prolongado o UID sin outfit</span></div>';
-    document.getElementById('hint').innerHTML = '<span style="color:#ff948b">Falló la carga. Espera 30s y reintenta.</span>';
+    document.getElementById('hint').textContent = nick ? '✓ Perfil cargado. Toca una zona para preparar.' : 'No se encontró el jugador.';
     var btn = document.getElementById('goBtn'); btn.classList.remove('busy'); btn.textContent='Buscar';
   };
 
@@ -552,32 +387,6 @@
   holdbtn.addEventListener('pointerup', endHold);
   holdbtn.addEventListener('pointerleave', endHold);
   holdbtn.addEventListener('pointercancel', endHold);
-
-  // Draw body silhouette on canvas
-  (function drawBody(){
-    var c=document.getElementById('bodyCanvas'); if(!c)return;
-    var ctx=c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height);
-    ctx.fillStyle='rgba(180,150,120,.18)';
-    ctx.beginPath();ctx.ellipse(74,34,24,30,0,0,Math.PI*2);ctx.fill();
-    ctx.fillRect(65,62,18,16);
-    ctx.beginPath();ctx.moveTo(34,78);ctx.quadraticCurveTo(26,78,24,86);ctx.lineTo(20,172);
-    ctx.quadraticCurveTo(20,182,32,184);ctx.lineTo(56,188);ctx.lineTo(92,188);ctx.lineTo(116,184);
-    ctx.quadraticCurveTo(128,182,128,172);ctx.lineTo(124,86);ctx.quadraticCurveTo(122,78,114,78);
-    ctx.closePath();ctx.fill();
-    ctx.globalAlpha=.7;
-    ctx.beginPath();ctx.moveTo(24,84);ctx.quadraticCurveTo(12,88,10,100);ctx.lineTo(4,154);
-    ctx.quadraticCurveTo(2,164,10,166);ctx.lineTo(18,166);ctx.quadraticCurveTo(24,164,24,156);ctx.lineTo(26,102);ctx.closePath();ctx.fill();
-    ctx.beginPath();ctx.moveTo(124,84);ctx.quadraticCurveTo(136,88,138,100);ctx.lineTo(144,154);
-    ctx.quadraticCurveTo(146,164,138,166);ctx.lineTo(130,166);ctx.quadraticCurveTo(124,164,124,156);ctx.lineTo(122,102);ctx.closePath();ctx.fill();
-    ctx.globalAlpha=1;
-    ctx.beginPath();ctx.moveTo(38,186);ctx.lineTo(32,200);ctx.lineTo(74,204);ctx.lineTo(116,200);ctx.lineTo(110,186);ctx.closePath();ctx.fill();
-    ctx.beginPath();ctx.moveTo(40,202);ctx.lineTo(36,302);ctx.quadraticCurveTo(36,310,44,312);ctx.lineTo(58,312);
-    ctx.quadraticCurveTo(64,310,64,302);ctx.lineTo(66,204);ctx.closePath();ctx.fill();
-    ctx.beginPath();ctx.moveTo(82,204);ctx.lineTo(84,302);ctx.quadraticCurveTo(84,310,92,312);ctx.lineTo(106,312);
-    ctx.quadraticCurveTo(112,310,112,302);ctx.lineTo(108,202);ctx.closePath();ctx.fill();
-    ctx.beginPath();ctx.ellipse(52,318,18,9,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.ellipse(98,318,18,9,0,0,Math.PI*2);ctx.fill();
-  })();
 
   // Preview de modos por default (lo reemplaza NYXEL_setModes cuando llega del Swift)
   renderOptions(OPTS.map(function(o){ return {id:o.n, name:o.n, sub:o.d, zone:o.zone}; }));

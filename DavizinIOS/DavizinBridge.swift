@@ -85,6 +85,30 @@ final class DavizinBridge {
             }
             self.loadFreeFireAsset(itemID: itemID, completion: completion)
         }
+        viewController.onFreeFirePlayerInfo = { [weak self] uid, region, completion in
+            guard let self, !self.sessionKey.isEmpty, !self.sessionHWID.isEmpty else {
+                completion(nil)
+                return
+            }
+            FreeFireStatsService.shared.lookup(uid: uid, region: region, key: self.sessionKey, hwid: self.sessionHWID) { result in
+                switch result {
+                case .success(let s):
+                    let info: [String: Any] = [
+                        "basicInfo": [
+                            "nickname": s.nickname ?? "",
+                            "level": s.level ?? "",
+                            "region": s.region ?? ""
+                        ],
+                        "profileInfo": [
+                            "clothes": s.clothesIDs
+                        ]
+                    ]
+                    completion(info)
+                case .failure:
+                    completion(nil)
+                }
+            }
+        }
         viewController.onFreeFireBanCheck = { [weak self] uid, completion in
             guard let self else {
                 completion(.failure(NSError(domain: "FreeFireBanCheck", code: 1, userInfo: [NSLocalizedDescriptionKey: "La sesión de Nyxel no está disponible."])))

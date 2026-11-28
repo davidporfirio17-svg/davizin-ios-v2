@@ -20,15 +20,10 @@ private final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
 final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
 
     weak var delegate: Modes3DViewDelegate?
-    var onFetchItemImage: ((String, @escaping (UIImage?) -> Void) -> Void)?
+    var onFetchPlayerInfo: ((String, String, @escaping ([String: Any]?) -> Void) -> Void)?
     private let webView: WKWebView
     private var pendingModes: [DavizinMode] = []
     private var loaded = false
-
-    private static var siamApiKey: String {
-        if let k = UserDefaults.standard.string(forKey: "nyxel.siambhau.apikey"), !k.isEmpty { return k }
-        return "FFAPI-PREM-60-sjdonsl-X28"
-    }
 
     override init(frame: CGRect) {
         let cfg = WKWebViewConfiguration()
@@ -97,34 +92,13 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
             let region = body["region"] as? String ?? "BR"
             fetchPlayerInfo(uid: uid, region: region)
         }
-        if t == "fetchItemImage" {
-            let itemId = body["itemId"] as? String ?? ""
-            if !itemId.isEmpty { fetchItemImage(itemId: itemId) }
-        }
-    }
-
-    private func fetchItemImage(itemId: String) {
-        guard itemId.allSatisfy({ $0.isNumber }), let fetcher = onFetchItemImage else { return }
-        fetcher(itemId) { [weak self] image in
-            guard let self, let image, let data = image.pngData() else { return }
-            let b64 = data.base64EncodedString()
-            let dataUrl = "data:image/png;base64,\(b64)"
-            DispatchQueue.main.async {
-                self.webView.evaluateJavaScript(
-                    "window.NYXEL_onItemImage && window.NYXEL_onItemImage('\(itemId)','\(dataUrl)');",
-                    completionHandler: nil
-                )
-            }
-        }
     }
 
     private func fetchPlayerInfo(uid: String, region: String) {
-        let base = "https://siambhau69.eu.cc"
-        let key = Self.siamApiKey
-        let urlStr = "\(base)/freefireinfo/bhau?uid=\(uid)&region=\(region)&key=\(key)"
-        guard let url = URL(string: urlStr) else { return }
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
-            guard let self = self, let data = data, error == nil,
+        guard let fetcher = onFetchPlayerInfo else { return }
+        fetcher(uid, region) { [weak self] info in
+            guard let self, let info,
+                  let data = try? JSONSerialization.data(withJSONObject: info),
                   let json = String(data: data, encoding: .utf8) else { return }
             DispatchQueue.main.async {
                 self.webView.evaluateJavaScript(
@@ -132,7 +106,7 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
                     completionHandler: nil
                 )
             }
-        }.resume()
+        }
     }
 
     deinit {
