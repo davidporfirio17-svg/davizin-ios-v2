@@ -187,7 +187,6 @@
 
     <div class="topbar">
       <span class="tpill"><span class="ld"></span><b>LIVE</b></span>
-      <span class="tpill" id="charName">Rubok</span>
       <span class="tpill"><b>CHARACTER</b></span>
     </div>
 
@@ -245,13 +244,8 @@
 
   var HOLOS=[
     {id:'',name:'SIN HOLO',none:true},
-    {id:'holo_ff',name:'HOLO FF'},
-    {id:'holo_davizin',name:'HOLO DAVIZIN'},
-    {id:'hi',name:'HI'},
-    {id:'gg',name:'GG'},
-    {id:'booyah',name:'BOOYAH'},
-    {id:'love',name:'LOVE'},
-    {id:'skull',name:'SKULL'}
+    {id:'holograma_mio',name:'HOLO DAVIZIN'},
+    {id:'holograma_revendedor',name:'HOLO BORDES'}
   ];
   var selectedHolo='';
 
@@ -501,7 +495,6 @@
   }
 
   function updateModelNav(){
-    document.getElementById('charName').textContent=MODELS[curM].name;
     var dots=document.getElementById('mdots').children;
     for(var i=0;i<dots.length;i++) dots[i].classList.toggle('on',i===curM);
   }
