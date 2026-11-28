@@ -20,8 +20,6 @@ private final class WeakScriptHandler: NSObject, WKScriptMessageHandler {
 final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
 
     weak var delegate: Modes3DViewDelegate?
-    var onFetchPlayerInfo: ((String, String, @escaping ([String: Any]?) -> Void) -> Void)?
-    var onFetchItemImage: ((String, @escaping (UIImage?) -> Void) -> Void)?
     private let webView: WKWebView
     private var pendingModes: [DavizinMode] = []
     private var loaded = false
@@ -88,15 +86,6 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
             let name = body["name"] as? String ?? ""
             delegate?.modes3DView(self, didRequestInjectModeId: id, name: name)
         }
-        if t == "fetchInfo" {
-            let uid = body["uid"] as? String ?? ""
-            let region = body["region"] as? String ?? "BR"
-            fetchPlayerInfo(uid: uid, region: region)
-        }
-        if t == "fetchItemImage" {
-            let itemId = body["itemId"] as? String ?? ""
-            if !itemId.isEmpty { fetchItemImage(itemId: itemId) }
-        }
         if t == "loadModel" {
             let name = body["name"] as? String ?? "rouk"
             loadModel(name: name)
@@ -112,51 +101,6 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
                 "window.NYXEL_onModelData && window.NYXEL_onModelData('\(b64)');",
                 completionHandler: nil
             )
-        }
-    }
-
-    private func fetchItemImage(itemId: String) {
-        guard let fetcher = onFetchItemImage else { return }
-        fetcher(itemId) { [weak self] image in
-            guard let self, let image, let data = image.pngData() else { return }
-            let b64 = data.base64EncodedString()
-            let safeId = itemId.filter { $0.isNumber || $0.isLetter }
-            DispatchQueue.main.async {
-                self.webView.evaluateJavaScript(
-                    "window.NYXEL_onItemImage && window.NYXEL_onItemImage('\(safeId)', 'data:image/png;base64,\(b64)');",
-                    completionHandler: nil
-                )
-            }
-        }
-    }
-
-    private func fetchPlayerInfo(uid: String, region: String) {
-        guard let fetcher = onFetchPlayerInfo else {
-            DispatchQueue.main.async { [weak self] in
-                self?.webView.evaluateJavaScript(
-                    "window.NYXEL_onInfoError && window.NYXEL_onInfoError('Bridge no conectado');",
-                    completionHandler: nil
-                )
-            }
-            return
-        }
-        fetcher(uid, region) { [weak self] info in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                if let info,
-                   let data = try? JSONSerialization.data(withJSONObject: info),
-                   let json = String(data: data, encoding: .utf8) {
-                    self.webView.evaluateJavaScript(
-                        "window.NYXEL_onInfoData && window.NYXEL_onInfoData(\(json));",
-                        completionHandler: nil
-                    )
-                } else {
-                    self.webView.evaluateJavaScript(
-                        "window.NYXEL_onInfoError && window.NYXEL_onInfoError('No se pudo consultar el perfil');",
-                        completionHandler: nil
-                    )
-                }
-            }
         }
     }
 

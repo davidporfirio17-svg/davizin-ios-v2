@@ -24,17 +24,6 @@
     background:linear-gradient(90deg,#fff,#bcd6ff);-webkit-background-clip:text;background-clip:text;color:transparent}
   .fmt{font-size:.66rem;font-weight:700;letter-spacing:.2em;color:var(--ink-3);white-space:nowrap;margin-top:6px}
 
-  .lookup{margin:4px 2px 14px;padding:14px;border-radius:18px;background:linear-gradient(170deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
-    border:0.5px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 10px 24px -14px rgba(0,0,0,.5)}
-  .lookup .row{display:flex;gap:8px}
-  .lookup input{flex:1;min-width:0;height:44px;border-radius:12px;border:0.5px solid rgba(255,255,255,.14);background:rgba(0,0,0,.35);color:#fff;font:inherit;font-size:.92rem;padding:0 12px;outline:none}
-  .lookup input:focus{border-color:var(--accent)}
-  .lookup .reg{width:84px;height:44px;border-radius:12px;border:0.5px solid rgba(255,255,255,.14);background:rgba(0,0,0,.35);color:#fff;font:inherit;font-size:.86rem;padding:0 8px;outline:none;-webkit-appearance:none;appearance:none;text-align:center;font-weight:700;letter-spacing:.1em}
-  .lookup .go{height:44px;padding:0 18px;border-radius:12px;border:0;background:linear-gradient(180deg,#0a84ff,#0a66cc);color:#fff;font:inherit;font-weight:800;font-size:.84rem;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 18px -8px rgba(10,132,255,.5)}
-  .lookup .go:active{transform:scale(.97)}
-  .lookup .go.busy{opacity:.55;pointer-events:none}
-  .lookup .hint{font-size:.64rem;color:var(--ink-3);margin-top:8px;letter-spacing:.06em}
 
   .viewer{position:relative;border-radius:30px;overflow:hidden;height:min(70vh,510px);
     background:linear-gradient(160deg, rgba(60,90,160,.16), rgba(12,20,40,.10));
@@ -148,21 +137,6 @@
   .hold.done{border-color:#2fe08a}
   .actnote{text-align:center;color:var(--ink-3);font-size:.66rem;margin-top:10px}
 
-  .infopanel{margin-top:14px;padding:14px 16px;border-radius:22px;
-    background:linear-gradient(170deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
-    border:0.5px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 10px 24px -14px rgba(0,0,0,.5)}
-  .info-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-  .info-head .tit{font-size:.64rem;font-weight:800;letter-spacing:.22em;color:rgba(200,215,245,.5);text-transform:uppercase}
-  .info-head .tit b{color:var(--accent)}
-  .online-badge{font-size:.56rem;font-weight:800;letter-spacing:.12em;padding:4px 10px;border-radius:999px;text-transform:uppercase;
-    color:#30d158;background:rgba(48,209,88,.1);border:0.5px solid rgba(48,209,88,.28)}
-  .offline-badge{font-size:.56rem;font-weight:800;letter-spacing:.12em;padding:4px 10px;border-radius:999px;text-transform:uppercase;
-    color:rgba(200,215,245,.4);background:rgba(200,215,245,.06);border:0.5px solid rgba(200,215,245,.12)}
-  .info-row{display:flex;gap:8px}
-  .info-cell{flex:1;padding:10px 8px;border-radius:14px;background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.08);text-align:center;overflow:hidden}
-  .info-cell small{display:block;font-size:.54rem;font-weight:800;letter-spacing:.18em;color:rgba(200,215,245,.45);text-transform:uppercase;margin-bottom:4px}
-  .info-cell b{display:block;font-size:.84rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   .credits{text-align:center;font-size:.62rem;letter-spacing:.06em;color:rgba(160,185,235,.30);margin:18px 2px 2px}
   .credits b{font-weight:700;color:rgba(170,195,240,.46)}
@@ -174,25 +148,6 @@
 <div class="screen">
   <div class="head">
     <div><div class="eyebrow">VISUAL · OUTFIT</div><h1>Elige tu zona</h1></div>
-    <div class="fmt">UID · LIVE</div>
-  </div>
-
-  <div class="lookup">
-    <div class="row">
-      <input id="uid" type="text" inputmode="numeric" placeholder="UID del jugador" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <select id="reg" class="reg">
-        <option value="BR" selected>BR</option>
-        <option value="SG">SG</option>
-        <option value="IND">IND</option>
-        <option value="SAC">SAC</option>
-        <option value="NA">NA</option>
-        <option value="EU">EU</option>
-        <option value="ME">ME</option>
-        <option value="BD">BD</option>
-      </select>
-      <button class="go" id="goBtn" onclick="loadPlayer()">Buscar</button>
-    </div>
-    <div class="hint" id="hint">Ingresa un UID y busca · la ropa real del jugador aparecerá abajo</div>
   </div>
 
   <div class="viewer" id="viewer">
@@ -222,20 +177,9 @@
     </div>
 
     <div class="zone" id="zone">ZONA DE MIRA · <b>—</b></div>
-    <div class="fbar"><b>View Character Options</b> · UID</div>
+    <div class="fbar"><b>View Character Options</b></div>
   </div>
 
-  <div id="infoPanel" class="infopanel" style="display:none">
-    <div class="info-head">
-      <span class="tit">◆ <b>FREE FIRE</b> · INFO DEL JUEGO</span>
-      <span class="offline-badge" id="statusBadge">BUSCANDO</span>
-    </div>
-    <div class="info-row">
-      <div class="info-cell"><small>Jugador</small><b id="infoNick">—</b></div>
-      <div class="info-cell"><small>Nivel</small><b id="infoLevel">—</b></div>
-      <div class="info-cell"><small>Región</small><b id="infoRegion">—</b></div>
-    </div>
-  </div>
 
   <div class="functions">
     <div class="fh"><span class="lbl"><span class="bar"></span>Opciones</span><span class="count" id="count"></span></div>
@@ -249,7 +193,6 @@
     <div class="actnote">Mantén presionado para preparar el entorno e inyectar</div>
   </div>
 
-  <p class="credits">Datos del jugador · <b>Free Fire API Hub</b></p>
 </div>
 
 <script>
@@ -274,80 +217,6 @@
   function esc(t){return String(t==null?'':t).replace(/[<>&]/g,function(c){return{'<':'&lt;','>':'&gt;','&':'&amp;'}[c];});}
   function iconFor(z){return z==='cuello'?'◈':z==='pecho'?'✦':z==='head'?'⬡':z==='drag'?'◆':'❖';}
   function nhaptic(s){try{var h=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nyxel;if(h)h.postMessage({t:'haptic',s:s});}catch(e){}}
-
-  window.loadPlayer=function(){
-    var uid=(document.getElementById('uid').value||'').trim();
-    var reg=document.getElementById('reg').value||'BR';
-    if(!uid||!/^\d{5,}$/.test(uid)){
-      document.getElementById('hint').innerHTML='<span style="color:#ff948b">UID inválido (debe ser solo dígitos, mín. 5)</span>';
-      return;
-    }
-    nhaptic('light');
-    var btn=document.getElementById('goBtn');btn.classList.add('busy');btn.textContent='Buscando…';
-    document.getElementById('hint').innerHTML='Consultando perfil del jugador…';
-    var ip=document.getElementById('infoPanel');if(ip)ip.style.display='';
-    document.getElementById('infoRegion').textContent=reg.toUpperCase();
-    document.getElementById('statusBadge').className='offline-badge';
-    document.getElementById('statusBadge').textContent='BUSCANDO…';
-    var _bridge=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nyxel;
-    if(_bridge){
-      _bridge.postMessage({t:'fetchInfo',uid:uid,region:reg});
-      window._fetchTimeout=setTimeout(function(){window.NYXEL_onInfoError('Tiempo de espera agotado');},15000);
-    } else {
-      var sb=document.getElementById('statusBadge');
-      sb.className='offline-badge';sb.textContent='SIN BRIDGE';
-      btn.classList.remove('busy');btn.textContent='Buscar';
-    }
-  };
-
-  window.NYXEL_onInfoError=function(msg){
-    if(window._fetchTimeout)clearTimeout(window._fetchTimeout);
-    document.getElementById('hint').innerHTML='<span style="color:#ff948b">✗ '+(msg||'Error al consultar')+'</span>';
-    var btn=document.getElementById('goBtn');btn.classList.remove('busy');btn.textContent='Reintentar';
-    var sb=document.getElementById('statusBadge');
-    sb.className='offline-badge';sb.textContent='ERROR';
-  };
-
-  window.NYXEL_onInfoData=function(j){
-    if(window._fetchTimeout)clearTimeout(window._fetchTimeout);
-    var d=(j&&j.data)||j||{};
-    var basic=d.basic||d.basicInfo||d||{};
-    var nick=basic.nickname||basic.name||d.nickname||null;
-    if(nick) document.getElementById('infoNick').textContent=nick;
-    var lv=basic.level||basic.accountLevel||d.level||null;
-    if(lv) document.getElementById('infoLevel').textContent='NV.'+lv;
-    var sb=document.getElementById('statusBadge');
-    if(nick){sb.className='offline-badge';sb.textContent='CONSULTADO';}
-    document.getElementById('hint').textContent=nick?'✓ Perfil cargado. Toca una zona para preparar.':'No se encontró el jugador.';
-    var btn=document.getElementById('goBtn');btn.classList.remove('busy');btn.textContent='Buscar';
-    var pi=d.profileInfo||d.profile||{};
-    var clothes=pi.clothes||d.clothes||d.clothesIDs||[];
-    window._clothesIDs=clothes;
-  };
-
-  function requestItemImages(ids){
-    var viewer=document.getElementById('viewer');
-    var grid=document.getElementById('equipGrid');
-    if(!grid){grid=document.createElement('div');grid.id='equipGrid';viewer.appendChild(grid);}
-    grid.innerHTML='';grid.classList.remove('on');
-    var bridge=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nyxel;
-    if(!bridge)return;
-    var ct=0,max=Math.min(ids.length,12);
-    for(var i=0;i<max;i++){
-      var id=String(ids[i]);if(!id||id==='0')continue;
-      var el=document.createElement('div');el.className='equip-icon';el.id='eq_'+id;
-      grid.appendChild(el);
-      bridge.postMessage({t:'fetchItemImage',itemId:id});
-      ct++;
-    }
-    if(ct>0)setTimeout(function(){grid.classList.add('on');},120);
-  }
-  window.NYXEL_onItemImage=function(itemId,dataUrl){
-    var el=document.getElementById('eq_'+itemId);
-    if(!el)return;
-    el.style.backgroundImage='url("'+dataUrl+'")';
-    el.classList.add('on');
-  };
 
   window.selectZoneByName=function(el,zone){
     var idx=-1;
@@ -606,7 +475,7 @@
       floorDisc.position.y=0.005;
       scene.add(floorDisc);
 
-      camera.position.set(0,modelH*0.44,modelH*1.25);
+      camera.position.set(0,modelH*0.48,modelH*1.6);
       camera.lookAt(0,modelH*0.44,0);
 
       var moon=document.querySelector('.moon');

@@ -555,12 +555,6 @@ final class ViewController: UIViewController {
 
         let screen = Modes3DView()
         screen.delegate = self
-        screen.onFetchPlayerInfo = { [weak self] uid, region, completion in
-            self?.onFreeFirePlayerInfo?(uid, region, completion)
-        }
-        screen.onFetchItemImage = { [weak self] itemID, completion in
-            self?.onFreeFireAsset?(itemID, completion)
-        }
         screen.setModes(modes)
         modes3DView = screen
         display(screen, animated: animated)
