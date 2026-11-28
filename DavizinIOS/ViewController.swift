@@ -553,6 +553,8 @@ final class ViewController: UIViewController {
         let screen = Modes3DView()
         screen.delegate = self
         screen.setModes(modes)
+        let holoModes = DavizinModeCatalog.holoEnabledModes(for: selectedGame)
+        screen.setHolos(holoModes)
         modes3DView = screen
         display(screen, animated: animated)
     }

@@ -242,15 +242,24 @@
     {n:'Chest Shot',d:'Mira al pecho',zone:'pecho'}
   ];
 
-  var HOLOS=[
-    {id:'',name:'SIN HOLO',none:true},
-    {id:'holograma_mio',name:'HOLO DAVIZIN'},
-    {id:'holograma_revendedor',name:'HOLO BORDES'}
-  ];
+  var HOLOS=[];
   var selectedHolo='';
 
-  (function buildHolos(){
+  function buildHolos(){
     var scroll=document.getElementById('holoScroll');
+    scroll.innerHTML='';
+    if(!HOLOS.length){
+      var card=document.createElement('div');
+      card.className='holo-card none sel';
+      var thumb=document.createElement('div');thumb.className='holo-thumb';
+      thumb.innerHTML='<span class="holo-x">✕</span>';
+      var lbl=document.createElement('span');lbl.className='holo-label';lbl.textContent='SIN ACCESO';
+      card.appendChild(thumb);card.appendChild(lbl);
+      scroll.appendChild(card);
+      document.getElementById('holoCount').textContent='Sin acceso';
+      selectedHolo='';
+      return;
+    }
     HOLOS.forEach(function(h,i){
       var card=document.createElement('div');
       card.className='holo-card'+(h.none?' none':'')+(i===0?' sel':'');
@@ -266,8 +275,19 @@
       card.addEventListener('click',function(){selectHolo(card,h.id);});
       scroll.appendChild(card);
     });
-    document.getElementById('holoCount').textContent=HOLOS.length+' disponibles';
-  })();
+    var avail=HOLOS.filter(function(h){return !h.none;}).length;
+    document.getElementById('holoCount').textContent=avail+' disponible'+(avail!==1?'s':'');
+    selectedHolo='';
+  }
+  buildHolos();
+
+  window.NYXEL_setHolos=function(arr){
+    if(!arr||!arr.length){HOLOS=[];selectedHolo='';buildHolos();return;}
+    HOLOS=[{id:'',name:'SIN HOLO',none:true}];
+    for(var i=0;i<arr.length;i++){HOLOS.push({id:arr[i].id,name:arr[i].name||arr[i].id});}
+    selectedHolo='';
+    buildHolos();
+  };
 
   function selectHolo(el,id){
     selectedHolo=id;

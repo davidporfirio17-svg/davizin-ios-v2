@@ -21,6 +21,7 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
     weak var delegate: Modes3DViewDelegate?
     private let webView: WKWebView
     private var pendingModes: [DavizinMode] = []
+    private var pendingHolos: [[String: Any]] = []
     private var loaded = false
 
     override init(frame: CGRect) {
@@ -59,6 +60,11 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
         if loaded { pushModes() }
     }
 
+    func setHolos(_ holos: [DavizinMode]) {
+        pendingHolos = holos.map { ["id": $0.id, "name": $0.displayName] }
+        if loaded { pushHolos() }
+    }
+
     private func pushModes() {
         let arr: [[String: Any]] = pendingModes.map { ["id": $0.id, "name": $0.displayName, "sub": ""] }
         guard let data = try? JSONSerialization.data(withJSONObject: arr),
@@ -66,9 +72,16 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
         webView.evaluateJavaScript("window.NYXEL_setModes && window.NYXEL_setModes(\(json));", completionHandler: nil)
     }
 
+    private func pushHolos() {
+        guard let data = try? JSONSerialization.data(withJSONObject: pendingHolos),
+              let json = String(data: data, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("window.NYXEL_setHolos && window.NYXEL_setHolos(\(json));", completionHandler: nil)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         loaded = true
         pushModes()
+        pushHolos()
     }
 
     func userContentController(_ u: WKUserContentController, didReceive message: WKScriptMessage) {
