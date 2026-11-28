@@ -101,6 +101,15 @@
   .viewer.flash{animation:cardflash .55s ease}
   @keyframes cardflash{0%{box-shadow:0 0 0 2px var(--mark),0 0 46px -4px var(--mark-glow),inset 0 1px 0 rgba(255,255,255,.22)}100%{}}
 
+  /* Grid de items equipados (centro del visor) */
+  #equipGrid{position:absolute;inset:0;z-index:4;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-content:center;
+    padding:70px 50px 60px;opacity:0;transition:opacity .45s}
+  #equipGrid.on{opacity:1}
+  .equip-icon{width:56px;height:56px;border-radius:16px;background-color:rgba(10,14,22,.45);background-size:contain;background-position:center;background-repeat:no-repeat;
+    border:1px solid rgba(255,255,255,.14);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    box-shadow:0 6px 16px -6px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.1);opacity:0;transform:scale(.7);transition:opacity .35s,transform .35s}
+  .equip-icon.on{opacity:1;transform:scale(1)}
+
   /* Lista de modos (abajo) */
   .functions{margin-top:22px}
   .fh{display:flex;align-items:center;justify-content:space-between;margin:0 2px 12px}
@@ -284,6 +293,7 @@
     var vload = document.getElementById('vload'); vload.classList.remove('hide');
     vload.innerHTML = '<div><div class="spin"></div>Consultando Free Fire API Hub…</div>';
 
+    var eg = document.getElementById('equipGrid'); if(eg){ eg.innerHTML=''; eg.classList.remove('on'); }
     var ip = document.getElementById('infoPanel'); if(ip) ip.style.display='';
     document.getElementById('infoRegion').textContent = reg.toUpperCase();
     document.getElementById('statusBadge').className = 'offline-badge';
@@ -331,6 +341,34 @@
     document.getElementById('vload').classList.add('hide');
     document.getElementById('hint').textContent = nick ? '✓ Perfil cargado. Toca una zona para preparar.' : 'No se encontró el jugador.';
     var btn = document.getElementById('goBtn'); btn.classList.remove('busy'); btn.textContent='Buscar';
+    var pi = d.profileInfo || d.profile || {};
+    var clothes = pi.clothes || d.clothes || d.clothesIDs || [];
+    if(clothes.length > 0) requestItemImages(clothes);
+  };
+
+  // ========== Items equipados ==========
+  function requestItemImages(ids){
+    var viewer = document.getElementById('viewer');
+    var grid = document.getElementById('equipGrid');
+    if(!grid){ grid=document.createElement('div'); grid.id='equipGrid'; viewer.appendChild(grid); }
+    grid.innerHTML=''; grid.classList.remove('on');
+    var bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nyxel;
+    if(!bridge) return;
+    var ct=0, max=Math.min(ids.length,12);
+    for(var i=0;i<max;i++){
+      var id=String(ids[i]); if(!id||id==='0') continue;
+      var el=document.createElement('div'); el.className='equip-icon'; el.id='eq_'+id;
+      grid.appendChild(el);
+      bridge.postMessage({t:'fetchItemImage', itemId:id});
+      ct++;
+    }
+    if(ct>0) setTimeout(function(){ grid.classList.add('on'); },120);
+  }
+  window.NYXEL_onItemImage = function(itemId, dataUrl){
+    var el = document.getElementById('eq_'+itemId);
+    if(!el) return;
+    el.style.backgroundImage = 'url("'+dataUrl+'")';
+    el.classList.add('on');
   };
 
   // ========== Selección de zona ==========

@@ -21,6 +21,7 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
 
     weak var delegate: Modes3DViewDelegate?
     var onFetchPlayerInfo: ((String, String, @escaping ([String: Any]?) -> Void) -> Void)?
+    var onFetchItemImage: ((String, @escaping (UIImage?) -> Void) -> Void)?
     private let webView: WKWebView
     private var pendingModes: [DavizinMode] = []
     private var loaded = false
@@ -91,6 +92,25 @@ final class Modes3DView: UIView, WKNavigationDelegate, WKScriptMessageHandler {
             let uid = body["uid"] as? String ?? ""
             let region = body["region"] as? String ?? "BR"
             fetchPlayerInfo(uid: uid, region: region)
+        }
+        if t == "fetchItemImage" {
+            let itemId = body["itemId"] as? String ?? ""
+            if !itemId.isEmpty { fetchItemImage(itemId: itemId) }
+        }
+    }
+
+    private func fetchItemImage(itemId: String) {
+        guard let fetcher = onFetchItemImage else { return }
+        fetcher(itemId) { [weak self] image in
+            guard let self, let image, let data = image.pngData() else { return }
+            let b64 = data.base64EncodedString()
+            let safeId = itemId.filter { $0.isNumber || $0.isLetter }
+            DispatchQueue.main.async {
+                self.webView.evaluateJavaScript(
+                    "window.NYXEL_onItemImage && window.NYXEL_onItemImage('\(safeId)', 'data:image/png;base64,\(b64)');",
+                    completionHandler: nil
+                )
+            }
         }
     }
 
